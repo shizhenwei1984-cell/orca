@@ -1,10 +1,12 @@
-const test = require('node:test')
-const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const os = require('node:os')
-const asar = require('@electron/asar')
-const { rebuildArchive } = require('./package.cjs')
+import { test } from 'vitest'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
+import asar from '@electron/asar'
+import packaging from './package.cjs'
+
+const { rebuildArchive } = packaging
 
 test('the installed archive and unpacked workers use the same personal build', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orca-package-'))

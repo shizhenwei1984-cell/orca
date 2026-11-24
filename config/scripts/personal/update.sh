@@ -51,8 +51,7 @@ if [[ ! -d $release || ! -f $package ]]; then
       pnpm -C mobile install --frozen-lockfile
       bash config/scripts/personal/sync-stable.test.sh
       bash config/scripts/personal/activate.test.sh
-      node --test config/scripts/personal/package.test.cjs
-      pnpm exec vitest run src/main/updater/lifecycle/personal-linux-update.test.ts src/main/telemetry/consent.test.ts --maxWorkers=2
+      pnpm exec vitest run --config config/vitest.config.ts config/scripts/personal/package.test.mjs src/main/updater/lifecycle/personal-linux-update.test.ts src/main/telemetry/consent.test.ts --maxWorkers=2
       pnpm run build:release:javascript
       node config/scripts/personal/package.cjs /src /stage/deb/opt/Orca/resources /stage/repack "$1" "$2"
     ' sh "$version" "$commit"
