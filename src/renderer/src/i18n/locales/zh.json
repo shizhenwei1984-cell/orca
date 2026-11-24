@@ -25274,6 +25274,10 @@
     }
   },
   "updates": {
+    "personal": {
+      "starting": "正在启动个人版更新程序…",
+      "started": "个人版已开始在后台构建。构建完成后，请重新打开 Orca。"
+    },
     "installBlock": {
       "instancesLabel": "正在使用 Orca 的实例",
       "browserLabel": "后台浏览器",

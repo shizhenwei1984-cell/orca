@@ -1,8 +1,9 @@
 import { X } from 'lucide-react'
-import type { ChangelogData } from '../../../../../shared/updater/update-status-types'
+import type { ChangelogData, UpdateStatus } from '../../../../../shared/updater/update-status-types'
 import { Button } from '../../ui/button'
 import { useTranslate } from '@/i18n/use-translate'
 import { openAppHttpLink } from '@/lib/browser/navigation/app-http-link-open'
+import { personalUpdateProgressText } from '@/app-shell/updates/updater-message-copy'
 
 function isAnimatedGif(url: string | undefined): boolean {
   return typeof url === 'string' && url.toLowerCase().endsWith('.gif')
@@ -123,15 +124,21 @@ export function UpdateAvailableSimpleContent({
   releaseUrl,
   onUpdate,
   onClose,
-  externallyManaged = false
+  externallyManaged = false,
+  personalUpdate
 }: {
   version: string
   releaseUrl?: string
   onUpdate: () => void
   onClose: () => void
   externallyManaged?: boolean
+  personalUpdate?: Extract<UpdateStatus, { state: 'available' }>['personalUpdate']
 }): React.JSX.Element {
   const t = useTranslate()
+  const personalUpdateProgress =
+    personalUpdate === 'starting' || personalUpdate === 'started'
+      ? personalUpdateProgressText(personalUpdate, t)
+      : null
   return (
     <div className="flex flex-col gap-2.5 p-3.5">
       <div className="flex items-start justify-between gap-2">
@@ -149,17 +156,18 @@ export function UpdateAvailableSimpleContent({
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        {t('auto.components.UpdateCard.05ad78a6d1', 'Orca v{{value0}} is ready.', {
-          value0: version
-        })}
+        {personalUpdateProgress ??
+          t('auto.components.UpdateCard.05ad78a6d1', 'Orca v{{value0}} is ready.', {
+            value0: version
+          })}
       </p>
       {externallyManaged ? (
         <ExternallyManagedNote />
-      ) : (
+      ) : !personalUpdate ? (
         <p className="text-xs leading-relaxed text-muted-foreground">
           {t('auto.components.UpdateCard.fdd4a364fa', "Sessions won't be interrupted.")}
         </p>
-      )}
+      ) : null}
       {releaseUrl && (
         <button
           type="button"
@@ -169,7 +177,7 @@ export function UpdateAvailableSimpleContent({
           {t('auto.components.UpdateCard.44324ef542', 'Release notes')}
         </button>
       )}
-      {!externallyManaged && (
+      {!externallyManaged && !personalUpdateProgress && (
         <Button
           variant="default"
           size="sm"

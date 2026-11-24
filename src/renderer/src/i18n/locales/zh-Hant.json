@@ -22357,6 +22357,10 @@
     }
   },
   "updates": {
+    "personal": {
+      "starting": "正在啟動個人版更新程式…",
+      "started": "個人版已開始在背景建置。建置完成後，請重新開啟 Orca。"
+    },
     "installBlock": {
       "instancesLabel": "正在使用 Orca 的執行個體",
       "browserLabel": "背景瀏覽器",

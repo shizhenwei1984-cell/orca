@@ -25861,7 +25861,11 @@
       "deadline": "Restart by {{deadline}}. Orca saves your sessions before restarting.",
       "download": "Open downloads"
     },
-    "remoteUpdateBusy": "This server is already updating. Check again once it finishes."
+    "remoteUpdateBusy": "This server is already updating. Check again once it finishes.",
+    "personal": {
+      "starting": "Starting the personal updater…",
+      "started": "The personal build started in the background. Reopen Orca after the build finishes."
+    }
   },
   "jira": {
     "connect": {

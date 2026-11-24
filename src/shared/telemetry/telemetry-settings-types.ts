@@ -16,7 +16,7 @@ export type ChatUiLaunchTipCohort =
   | 'treatment-center'
 
 export type TelemetrySettings = {
-  /** New users: true at install. Existing users: null until they resolve the first-launch banner. */
+  /** Sharing defaults off. Legacy profiles may have an unresolved null choice. */
   optedIn: boolean | null
   /** Local day sharing last turned on after being off; daily rows up to it are never sent. */
   sharingResumedDay?: string
@@ -24,7 +24,7 @@ export type TelemetrySettings = {
   sharingWasOff?: boolean
   /** Anonymous UUID v4. Generated on first run. Stable across launches; not surfaced in the UI. */
   installId: string
-  /** Cohort marker: true for pre-existing profiles (gates the opt-in banner), false for fresh installs. */
+  /** Cohort marker: true for profiles predating telemetry, false for fresh installs. */
   existedBeforeTelemetryRelease: boolean
   /** Frozen 50/50 assignment for fresh installs; absent for profiles predating the experiment. */
   onboardingLanguageCohort?: 'control' | 'treatment'

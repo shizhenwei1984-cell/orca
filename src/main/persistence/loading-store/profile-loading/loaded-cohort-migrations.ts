@@ -172,7 +172,7 @@ export class LoadedCohortMigrationOperations {
       typeof existing?.existedBeforeTelemetryRelease === 'boolean' &&
       typeof existing.installId === 'string' &&
       existing.installId.length > 0 &&
-      (existing.optedIn === true || existing.optedIn === false || existing.optedIn === null)
+      typeof existing.optedIn === 'boolean'
     ) {
       return state
     }
@@ -188,13 +188,7 @@ export class LoadedCohortMigrationOperations {
         telemetry: {
           ...existing,
           existedBeforeTelemetryRelease: resolvedExistedBefore,
-          // Preserve explicit true, false and null; only absence uses the cohort default.
-          optedIn:
-            existing?.optedIn === true || existing?.optedIn === false || existing?.optedIn === null
-              ? existing.optedIn
-              : resolvedExistedBefore
-                ? null
-                : true,
+          optedIn: existing?.optedIn === true,
           installId:
             typeof existing?.installId === 'string' && existing.installId.length > 0
               ? existing.installId

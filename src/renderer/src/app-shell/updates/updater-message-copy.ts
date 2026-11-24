@@ -1,6 +1,9 @@
 import { translate } from '@/i18n/i18n'
 import type { Translate } from '@/i18n/use-translate'
-import type { LinuxPackageCommandUnavailableReason } from '../../../../shared/updater/update-status-types'
+import type {
+  LinuxPackageCommandUnavailableReason,
+  UpdateStatus
+} from '../../../../shared/updater/update-status-types'
 import { isReleaseChannel, type ReleaseChannel } from '../../../../shared/updater/release-channel'
 import {
   UPDATER_FAILURE_COPY,
@@ -19,6 +22,21 @@ export function getReleaseChannelLabel(channel: string, t: Translate = translate
   // Updater errors can carry an ID or its legacy English label.
   const id = channel.toLowerCase()
   return isReleaseChannel(id) ? CHANNEL_LABELS[id](t) : channel
+}
+
+export function personalUpdateProgressText(
+  phase: Exclude<
+    Extract<UpdateStatus, { state: 'available' }>['personalUpdate'],
+    'ready' | undefined
+  >,
+  t: Translate
+): string {
+  return phase === 'starting'
+    ? t('updates.personal.starting', 'Starting the personal updater…')
+    : t(
+        'updates.personal.started',
+        'The personal build started in the background. Reopen Orca after the build finishes.'
+      )
 }
 
 type Param = (name: string) => string | null

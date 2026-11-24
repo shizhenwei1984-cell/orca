@@ -76,7 +76,9 @@ async function fetchReleaseFeedTags(): Promise<ReleaseFeedTag[] | null> {
   }
 }
 
-export async function fetchLatestStableReleaseTag(): Promise<string | null> {
+export async function fetchLatestStableReleaseTag({ requireManifest = true } = {}): Promise<
+  string | null
+> {
   try {
     // Resolve only the release-page redirect; installer redirects continue on to signed storage URLs.
     const latestUrl = 'https://github.com/stablyai/orca/releases/latest'
@@ -94,7 +96,7 @@ export async function fetchLatestStableReleaseTag(): Promise<string | null> {
     if (!isValidVersion(version) || isPrereleaseVersion(version)) {
       return null
     }
-    return (await getPlatformManifestReadiness(tag)) === 'ready' ? tag : null
+    return !requireManifest || (await getPlatformManifestReadiness(tag)) === 'ready' ? tag : null
   } catch {
     return null
   }

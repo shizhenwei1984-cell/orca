@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../shared/settings/global-settings-types'
-import { getDefaultSettings } from '../../shared/orca-profiles/constants'
-import { telemetryAtLaunch, telemetryWithOptIn } from './consent'
+import { getDefaultPersistedState, getDefaultSettings } from '../../shared/orca-profiles/constants'
+import { LoadedCohortMigrationOperations } from '../persistence/loading-store/profile-loading/loaded-cohort-migrations'
+import { resolveConsent, telemetryAtLaunch, telemetryWithOptIn } from './consent'
 
 const ENV = [
   'DO_NOT_TRACK',
@@ -23,6 +24,30 @@ const settings = (telemetry: GlobalSettings['telemetry']): GlobalSettings => ({
 const noon = (day: number) => new Date(2026, 10, day, 12)
 
 afterEach(() => vi.unstubAllEnvs())
+
+it('loads fresh and upgraded profiles with sharing off until the user opts in', () => {
+  for (const name of ENV) {
+    vi.stubEnv(name, '')
+  }
+  const cohorts = new LoadedCohortMigrationOperations({ loadNeedsSave: false })
+  const profile = getDefaultPersistedState('/home')
+  const fresh = cohorts.migrateTelemetry(profile, false)
+  const upgraded = cohorts.migrateTelemetry(profile, true)
+  const unresolved = {
+    ...upgraded,
+    settings: settings({ optedIn: null, installId: 'old', existedBeforeTelemetryRelease: true })
+  }
+
+  for (const loaded of [fresh, upgraded, cohorts.migrateTelemetry(unresolved, true)]) {
+    expect(loaded.settings.telemetry?.optedIn).toBe(false)
+    expect(resolveConsent(loaded.settings).effective).toBe('disabled')
+    const optedIn = telemetryWithOptIn(loaded.settings, true)
+    const optedInProfile = { ...loaded, settings: settings(optedIn) }
+    const reloaded = cohorts.migrateTelemetry(optedInProfile, true)
+    expect(reloaded.settings.telemetry?.optedIn).toBe(true)
+    expect(resolveConsent(reloaded.settings).effective).toBe('enabled')
+  }
+})
 
 describe('sharing resumed day', () => {
   it('stamps the day sharing is on again after any launch or toggle saw it off', () => {

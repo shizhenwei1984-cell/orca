@@ -18,6 +18,10 @@ function parseVersion(value: string): ParsedVersion | null {
   }
 }
 
+export function personalReleaseBase(version: string): string | undefined {
+  return /^(\d+\.\d+\.\d+)-personal\.g[a-f0-9]+$/i.exec(version)?.[1]
+}
+
 export function isValidAppVersion(value: string): boolean {
   return parseVersion(value) !== null
 }

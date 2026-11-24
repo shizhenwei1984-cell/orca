@@ -8,7 +8,10 @@ import { Button } from '../../ui/button'
 import { SearchableSetting } from '../section-layout/SearchableSetting'
 import { SettingsGroup } from '../section-layout/SettingsGroup'
 import { useIntlLocale, useTranslate } from '@/i18n/use-translate'
-import { updaterMessageText } from '@/app-shell/updates/updater-message-copy'
+import {
+  personalUpdateProgressText,
+  updaterMessageText
+} from '@/app-shell/updates/updater-message-copy'
 import {
   getUpdateCheckClickOptions,
   getUpdateCheckHint
@@ -23,6 +26,7 @@ import { useNow } from '@/lib/window-activity/use-now'
 import { isDelayedUpdatePending } from '../../../../../shared/updater/update-delay'
 import { getReleaseNotesUrlForVersion } from '../../../../../shared/updater/release-channel'
 import { openAppHttpLinkFromAnchor } from '@/lib/browser/navigation/app-http-link-open'
+import { personalReleaseBase } from '../../../../../shared/app-lifecycle/identity/app-version'
 
 export function GeneralUpdateSettingsSection({
   children
@@ -44,6 +48,10 @@ export function GeneralUpdateSettingsSection({
   }
 
   const [appVersion, setAppVersion] = useState<string | null>(null)
+  const personalBuild = appVersion !== null && personalReleaseBase(appVersion) !== undefined
+  const personalUpdate =
+    updateStatus.state === 'available' ? updateStatus.personalUpdate : undefined
+  const personalUpdateProgress = personalUpdate === 'starting' || personalUpdate === 'started'
   const installTarget = useAppStore((s) => s.retainedUpdateTarget)
   const [failedRestartTarget, setFailedRestartTarget] = useState<typeof installTarget>(null)
   const showManualRestart =
@@ -57,7 +65,7 @@ export function GeneralUpdateSettingsSection({
     60_000,
     updateStatus.state === 'not-available' && Boolean(updateStatus.delayedUpdate)
   )
-  const updateCheckHint = getUpdateCheckHint()
+  const updateCheckHint = personalBuild ? undefined : getUpdateCheckHint()
   // Hide channel switching behind Option/Alt-click because it can downgrade to unvetted builds.
   const [channelSwitcherRevealed, setChannelSwitcherRevealed] = useState(false)
 
@@ -93,7 +101,7 @@ export function GeneralUpdateSettingsSection({
       key="updates"
       title={t('settings.general.about.title', 'About')}
       onHeaderClick={(event) => {
-        if (event.altKey) {
+        if (event.altKey && !personalBuild) {
           setChannelSwitcherRevealed((revealed) => !revealed)
         }
       }}
@@ -125,6 +133,7 @@ export function GeneralUpdateSettingsSection({
             disabled={
               updateStatus.state === 'checking' ||
               updateStatus.state === 'downloading' ||
+              personalUpdate === 'starting' ||
               (updateStatus.state === 'error' &&
                 updateStatus.messageCode === 'macStagingTimeout') ||
               (updateStatus.state === 'downloaded' && updateStatus.installing)
@@ -142,7 +151,9 @@ export function GeneralUpdateSettingsSection({
             )}
           </Button>
 
-          {updateStatus.state === 'available' && !updateStatus.externallyManaged ? (
+          {updateStatus.state === 'available' &&
+          !updateStatus.externallyManaged &&
+          !personalUpdateProgress ? (
             <Button
               variant="default"
               size="sm"
@@ -227,17 +238,19 @@ export function GeneralUpdateSettingsSection({
             )}
           {updateStatus.state === 'available' && (
             <>
-              {updateStatus.externallyManaged
-                ? t(
-                    'auto.components.settings.GeneralUpdateSettingsSection.externallyManagedVersionAvailable',
-                    'Version {{version}} is available. Update Orca through your system package manager — Orca cannot install this release itself.',
-                    { version: updateStatus.version }
-                  )
-                : t(
-                    'auto.components.settings.GeneralUpdateSettingsSection.versionAvailable',
-                    'Version {{version}} is available.',
-                    { version: updateStatus.version }
-                  )}
+              {personalUpdateProgress
+                ? personalUpdateProgressText(personalUpdate, t)
+                : updateStatus.externallyManaged
+                  ? t(
+                      'auto.components.settings.GeneralUpdateSettingsSection.externallyManagedVersionAvailable',
+                      'Version {{version}} is available. Update Orca through your system package manager — Orca cannot install this release itself.',
+                      { version: updateStatus.version }
+                    )
+                  : t(
+                      'auto.components.settings.GeneralUpdateSettingsSection.versionAvailable',
+                      'Version {{version}} is available.',
+                      { version: updateStatus.version }
+                    )}
               {updateStatus.source !== 'local' && (
                 <a
                   href={
@@ -342,9 +355,9 @@ export function GeneralUpdateSettingsSection({
                     ))}
         </p>
       </SearchableSetting>
-      {isWebClientLocation() ? null : <AutomaticUpdatesSetting />}
-      <UpdateDelaySetting />
-      {channelSwitcherRevealed ? <ReleaseChannelSection /> : null}
+      {isWebClientLocation() || personalBuild ? null : <AutomaticUpdatesSetting />}
+      {personalBuild ? null : <UpdateDelaySetting />}
+      {channelSwitcherRevealed && !personalBuild ? <ReleaseChannelSection /> : null}
       <GeneralRemoteServerUpdates />
       {children}
     </SettingsGroup>

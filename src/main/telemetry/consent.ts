@@ -72,20 +72,9 @@ export function resolveConsent(settings: GlobalSettings): ConsentState {
     return envOverride
   }
 
-  const t = settings.telemetry
-  // Missing migrated settings fail closed to pending banner rather than silently enabling transmission.
-  if (!t) {
-    return { effective: 'pending_banner' }
-  }
-
-  if (t.optedIn === true) {
-    return { effective: 'enabled' }
-  }
-  if (t.optedIn === false) {
-    return { effective: 'disabled', reason: 'user_opt_out' }
-  }
-
-  return { effective: 'pending_banner' }
+  return settings.telemetry?.optedIn === true
+    ? { effective: 'enabled' }
+    : { effective: 'disabled', reason: 'user_opt_out' }
 }
 
 /** Opt-in update that keeps install identity and stamps the day sharing turns on from off or pending. */
