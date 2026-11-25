@@ -22,6 +22,7 @@ import { scrollStripSidewaysOnWheel } from '../tab-bar/strip/tab-strip-scroll-me
 import { StatusBarVisibilityMenu } from './composition/StatusBarVisibilityMenu'
 import { isPairedWebClientWindow } from '@/app-shell/chrome/desktop-window-chrome'
 import { GitBlameStatusSegment } from './GitBlameStatusSegment'
+import { SessionTokenStatusSegment } from './usage/SessionTokenStatusSegment'
 
 const PetStatusSegment = lazyWithRetry(() =>
   import('./PetStatusSegment').then((module) => ({ default: module.PetStatusSegment }))
@@ -99,6 +100,7 @@ export function StatusBarSurface({
       }}
     >
       <StatusBarUsageArea controller={controller} />
+      <SessionTokenStatusSegment />
 
       {/* Why: attention segments shrink only after usage reaches its minimum, then scroll instead of
           compressing; the row's padding keeps edge badges and focus rings inside the scroll box. */}

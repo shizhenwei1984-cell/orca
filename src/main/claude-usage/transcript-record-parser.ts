@@ -28,6 +28,7 @@ type ClaudeUsageSourceRecord = {
   uuid?: string
   isSidechain?: boolean
   agentId?: string
+  parent_tool_use_id?: string | null
   message?: {
     id?: string
     model?: string
@@ -101,9 +102,10 @@ function mayEncodeAssistantType(line: string): boolean {
   return line.includes('assistant')
 }
 
-function parseClaudeUsageSourceRecord(
+export function parseClaudeUsageSourceRecord(
   line: string,
-  fallbackSessionId: string | null = null
+  fallbackSessionId: string | null = null,
+  scope?: { rootSessionId: string; excludedEntries?: ReadonlySet<string> }
 ): ClaudeUsageParsedSourceTurn | null {
   // Skip large user/tool-result payloads before parsing; only assistant records carry usage.
   if (!mayEncodeAssistantType(line)) {
@@ -125,6 +127,22 @@ function parseClaudeUsageSourceRecord(
   }
 
   const usage = parsed.message?.usage
+  if (
+    scope &&
+    (sessionId !== scope.rootSessionId ||
+      parsed.isSidechain === true ||
+      parsed.agentId != null ||
+      parsed.parent_tool_use_id != null ||
+      (parsed.uuid !== undefined && scope.excludedEntries?.has(parsed.uuid)) ||
+      [
+        usage?.input_tokens,
+        usage?.output_tokens,
+        usage?.cache_read_input_tokens,
+        usage?.cache_creation_input_tokens
+      ].some((count) => typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0))
+  ) {
+    return null
+  }
   const inputTokens = usage?.input_tokens ?? 0
   const outputTokens = usage?.output_tokens ?? 0
   const cacheReadTokens = usage?.cache_read_input_tokens ?? 0
@@ -135,7 +153,7 @@ function parseClaudeUsageSourceRecord(
     cacheWriteTokens
   )
 
-  if (inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0) {
+  if (!scope && inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0) {
     return null
   }
 

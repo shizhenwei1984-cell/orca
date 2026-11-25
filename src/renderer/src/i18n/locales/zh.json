@@ -5431,6 +5431,17 @@
             "server_replaced_summary": "此主机现在运行的 Orca 服务器与此计算机配对的服务器不同",
             "server_replaced_explanation": "Orca 正以其他 SSH 用户连接主机，或者其服务器已重新安装。请在“设置”›“远程 Orca 服务器”中打开此服务器的 ⋯ 菜单并选择“遗忘…”，然后连接 SSH 主机以配对当前服务器。"
           },
+          "SessionTokenStatusSegment": {
+            "title": "会话令牌用量",
+            "rate": "{{speed}} 令牌/秒",
+            "tokens": "{{tokens}} 令牌",
+            "cache": "缓存命中率 {{hit}}",
+            "apiRateDetail": "最近一轮中每秒 API 用时对应的输出令牌数。",
+            "turnRateDetail": "按最近一轮总用时计算的平均每秒输出令牌数。",
+            "countDetail": "此会话的输入和输出令牌总数。缓存读取的令牌只计一次。",
+            "cacheDetail": "缓存命中率是从缓存读取的令牌占会话全部输入令牌的比例。",
+            "unavailable": "短横线表示用量或耗时不可用。"
+          },
           "NativeChatResumeStatusSegment": {
             "tooltip": "打开可恢复的中断智能体",
             "failedTooltip": "重启后 Orca 未能恢复的智能体，点击查看详情",

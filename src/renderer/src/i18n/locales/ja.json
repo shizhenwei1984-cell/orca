@@ -5007,6 +5007,17 @@
             "server_replaced_summary": "このホストでは、このコンピューターとペアリングしたものとは別の Orca サーバーが実行されています",
             "server_replaced_explanation": "Orca が別の SSH ユーザーとしてホストに接続しているか、サーバーが再インストールされました。「設定」›「リモート Orca サーバー」でこのサーバーの ⋯ メニューから「登録を解除…」を選び、SSH ホストに接続して現在のサーバーとペアリングしてください。"
           },
+          "SessionTokenStatusSegment": {
+            "title": "セッションのトークン使用量",
+            "rate": "{{speed}} トークン/秒",
+            "tokens": "{{tokens}} トークン",
+            "cache": "キャッシュヒット {{hit}}",
+            "apiRateDetail": "直近のターンにおける API 処理時間 1 秒あたりの出力トークン数です。",
+            "turnRateDetail": "直近のターン全体で平均した 1 秒あたりの出力トークン数です。",
+            "countDetail": "このセッションの入力と出力の合計です。キャッシュ読み取りは一度だけ数えます。",
+            "cacheDetail": "キャッシュヒット率は、全入力トークンのうちキャッシュから読み取った割合です。",
+            "unavailable": "ダッシュは使用量や処理時間を取得できないことを示します。"
+          },
           "NativeChatResumeStatusSegment": {
             "tooltip": "中断された Agent を開いて再開可能",
             "failedTooltip": "再起動後に Orca が再開できなかった Agent。詳細はクリックしてください。",

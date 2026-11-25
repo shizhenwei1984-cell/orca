@@ -4,18 +4,23 @@ import type {
 } from '../claude-structured-session-state'
 import { settleClaudeTurnEndWaiters } from './claude-request-end-wait'
 import { isRootClaudeFrame } from './claude-turn-opening'
+import { createClaudeSessionOutputObserver } from './claude-session-output-rate'
 
 export function claudeTurnResumePointWriter(
   sessionId: string,
   sessions: ReadonlyMap<string, ClaudeSession>,
   deps: Pick<ClaudeStructuredSessionAdapterDeps, 'persistResumePoint'>
 ) {
+  const observeOutput = createClaudeSessionOutputObserver()
   return (
     session: ClaudeSession | null,
     message: Record<string, unknown>,
     leafUuid: string | null
   ): void => {
     if (session && message.type === 'result' && isRootClaudeFrame(message)) {
+      if (sessions.get(sessionId) === session) {
+        observeOutput(session.providerSessionId, message)
+      }
       persistClaudeTurnResumePoint(
         sessionId,
         session,

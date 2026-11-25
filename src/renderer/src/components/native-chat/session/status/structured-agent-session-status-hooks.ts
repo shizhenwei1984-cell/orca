@@ -25,6 +25,27 @@ function useSessionFeed(
   return { feed, subscribe }
 }
 
+export function useStructuredAgentSessionTokenActivity(
+  sessionId: string,
+  target: RuntimeClientTarget
+) {
+  const { feed, subscribe } = useSessionFeed(sessionId, target)
+  const providerSessionId = useSyncExternalStore(
+    subscribe,
+    () => feed.getSnapshot().get(sessionId)?.providerSession?.id,
+    () => undefined
+  )
+  const working = useSyncExternalStore(
+    subscribe,
+    () => {
+      const entry = feed.getSnapshot().get(sessionId)
+      return entry?.status === 'working' || entry?.hostExecutionPhase === 'starting'
+    },
+    () => false
+  )
+  return { providerSessionId, working }
+}
+
 /** Option state reads only the permission answer and observation, so other summary fields never re-render the chat. */
 export function useStructuredAgentSessionPermissionStatus(
   sessionId: string,

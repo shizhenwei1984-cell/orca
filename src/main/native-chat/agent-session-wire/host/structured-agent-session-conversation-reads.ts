@@ -71,6 +71,7 @@ export function createStructuredAgentSessionConversationReads(context: () => Rea
   }))
   const journalOf = async (id: string) => (await context().conversation(id)).journal
   return {
+    sessionHistoryOrigin: async (id: string) => (await journalOf(id)).reads.historyOrigin(),
     currentWorkAtRest: async (sessionId: string) => {
       await context().conversation(sessionId)
       const { deps, sessions } = context()
