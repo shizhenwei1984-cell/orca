@@ -5081,6 +5081,9 @@
               }
             },
             "cursor": {
+              "personalSpend": "Talep üzerine kişisel harcama",
+              "teamSpend": "Talep üzerine ekip harcaması",
+              "teamLimit": "Ekip harcama sınırı",
               "expired": {
                 "label": "Oturum açma süresi doldu",
                 "message": "Orca'nın çalıştığı bilgisayarda bir terminalde cursor-agent login komutunu çalıştırın, ardından kullanım bilgilerini yeniden yüklemeyi deneyin."

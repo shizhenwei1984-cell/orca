@@ -5285,6 +5285,9 @@
               }
             },
             "cursor": {
+              "personalSpend": "个人按需支出",
+              "teamSpend": "团队按需支出",
+              "teamLimit": "团队支出上限",
               "expired": {
                 "label": "登录已过期",
                 "message": "请在运行 Orca 的电脑上的终端中运行 cursor-agent login，然后重新刷新用量"

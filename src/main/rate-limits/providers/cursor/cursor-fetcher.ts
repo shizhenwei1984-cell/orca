@@ -235,6 +235,11 @@ export async function fetchCursorRateLimits(
     }
     const mapped = mapCursorUsageSummary(parseCursorUsageSummary(outcome.data))
 
+    const reading = {
+      planType: mapped.planType,
+      usageMetadata: metadata,
+      ...(mapped.cursorOnDemandSpend ? { cursorOnDemandSpend: mapped.cursorOnDemandSpend } : {})
+    }
     const unified = mapped.planType?.startsWith('unified_') === true
     const planPools = mapped.buckets.filter(
       (bucket) => bucket.name !== CURSOR_ON_DEMAND_BUCKET_NAME
@@ -257,22 +262,20 @@ export async function fetchCursorRateLimits(
             ...period.buckets,
             ...mapped.buckets.filter((bucket) => bucket.name === CURSOR_ON_DEMAND_BUCKET_NAME)
           ],
-          planType: mapped.planType,
-          usageMetadata: metadata
+          ...reading
         })
       }
     }
 
     // Unlimited plans retain account/plan identity without a misleading quota bar.
     if (mapped.isUnlimited) {
-      return result('ok', null, { planType: mapped.planType, usageMetadata: metadata })
+      return result('ok', null, reading)
     }
     if (mapped.monthly || mapped.buckets.length > 0) {
       return result('ok', null, {
         ...(mapped.monthly ? { monthly: mapped.monthly } : {}),
         ...(mapped.buckets.length > 0 ? { buckets: mapped.buckets } : {}),
-        planType: mapped.planType,
-        usageMetadata: metadata
+        ...reading
       })
     }
 
@@ -286,11 +289,10 @@ export async function fetchCursorRateLimits(
       return legacy.result
     }
     const legacyWindow = mapCursorLegacyRequestQuota(legacy.data)
-    if (legacyWindow) {
+    if (legacyWindow || mapped.cursorOnDemandSpend) {
       return result('ok', null, {
-        monthly: legacyWindow,
-        planType: mapped.planType,
-        usageMetadata: metadata
+        ...(legacyWindow ? { monthly: legacyWindow } : {}),
+        ...reading
       })
     }
 

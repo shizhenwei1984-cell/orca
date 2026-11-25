@@ -3865,6 +3865,9 @@
               }
             },
             "cursor": {
+              "personalSpend": "Gasto pessoal sob demanda",
+              "teamSpend": "Gasto da equipe sob demanda",
+              "teamLimit": "Limite de gastos da equipe",
               "expired": {
                 "label": "Login expirado",
                 "message": "Execute cursor-agent login em um terminal no computador que executa o Orca e tente consultar o uso novamente."

@@ -4737,6 +4737,9 @@
               }
             },
             "cursor": {
+              "personalSpend": "Dépenses personnelles à la demande",
+              "teamSpend": "Dépenses d’équipe à la demande",
+              "teamLimit": "Plafond de dépenses de l’équipe",
               "expired": {
                 "label": "Connexion expirée",
                 "message": "Exécutez cursor-agent login dans un terminal sur l'ordinateur qui exécute Orca, puis réessayez."

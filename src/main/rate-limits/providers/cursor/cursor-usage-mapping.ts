@@ -5,6 +5,7 @@ import {
   CURSOR_OTHER_MODELS_BUCKET_NAME
 } from '../../../../shared/agent-usage/rate-limits/cursor-usage-buckets'
 import type {
+  CursorOnDemandSpend,
   RateLimitBucket,
   RateLimitWindow
 } from '../../../../shared/agent-usage/rate-limits/rate-limit-types'
@@ -29,6 +30,7 @@ const cursorUsageSummarySchema = z
     membershipType: z.unknown(),
     isUnlimited: z.unknown(),
     // The dashboard sends null for absent pools; optional-only schemas would reject the entire valid response.
+    teamUsage: z.object({ onDemand: cursorPoolSchema.nullish() }).nullish().catch(undefined),
     individualUsage: z
       .object({
         plan: cursorPoolSchema.nullish(),
@@ -57,6 +59,7 @@ export function parseCursorUsageSummary(data: unknown): CursorUsageSummary {
 }
 
 export type CursorUsageMapping = {
+  cursorOnDemandSpend?: CursorOnDemandSpend
   monthly: RateLimitWindow | null
   buckets: RateLimitBucket[]
   planType: string | null
@@ -72,6 +75,33 @@ function finiteNumber(value: unknown): number | null {
   }
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function spendCents(value: unknown): number | undefined {
+  const amount = finiteNumber(value)
+  return amount !== null && amount >= 0 ? amount : undefined
+}
+
+function mapOnDemandSpend(
+  personal: CursorPool | null | undefined,
+  team: CursorPool | null | undefined
+): CursorOnDemandSpend | undefined {
+  const personalUsedCents = personal?.enabled === true ? spendCents(personal.used) : undefined
+  const teamUsedCents = team?.enabled === true ? spendCents(team.used) : undefined
+  const teamLimitCents =
+    team?.enabled === true
+      ? team.limit === null
+        ? 'unlimited'
+        : spendCents(team.limit)
+      : undefined
+  if (
+    personalUsedCents === undefined &&
+    teamUsedCents === undefined &&
+    teamLimitCents === undefined
+  ) {
+    return undefined
+  }
+  return { personalUsedCents, teamUsedCents, teamLimitCents }
 }
 
 export function parseCursorTimestampMs(value: unknown): number | null {
@@ -161,7 +191,6 @@ export function mapCursorUsageSummary(summary: CursorUsageSummary): CursorUsageM
     buckets.push({ name: CURSOR_OTHER_MODELS_BUCKET_NAME, ...toWindow(otherModels) })
   }
 
-  // teamUsage.onDemand is team-wide spend, not this member's allowance, so it stays unmapped.
   const onDemand = summary.individualUsage?.onDemand
   const onDemandPercent =
     onDemand?.enabled === true ? poolPercent(onDemand, 'totalPercentUsed') : null
@@ -175,6 +204,7 @@ export function mapCursorUsageSummary(summary: CursorUsageSummary): CursorUsageM
     : null
   const membership = summary.membershipType
   return {
+    cursorOnDemandSpend: mapOnDemandSpend(onDemand, summary.teamUsage?.onDemand),
     monthly: planPercent === null ? null : toWindow(planPercent),
     buckets,
     planType: typeof membership === 'string' && membership.trim() ? membership.trim() : null,

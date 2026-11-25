@@ -98,7 +98,14 @@ export type UsageRateLimitMetadata = {
   authFailureAccount?: UsageReadingAccount
 }
 
+export type CursorOnDemandSpend = {
+  personalUsedCents?: number
+  teamUsedCents?: number
+  teamLimitCents?: number | 'unlimited'
+}
+
 export type ProviderRateLimits = {
+  cursorOnDemandSpend?: CursorOnDemandSpend
   provider:
     | 'claude'
     | 'codex'

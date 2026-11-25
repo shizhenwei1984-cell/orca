@@ -3,6 +3,7 @@ import type {
   RateLimitBucket,
   RateLimitWindow
 } from '../../../../../shared/agent-usage/rate-limits/rate-limit-types'
+import { CursorSpendRows } from './CursorSpendRows'
 import { formatResetDuration } from '../../../../../shared/agent-usage/rate-limits/rate-limit-reset-format'
 import { AgentIcon } from '@/components/agent/icons/AgentIcon'
 import {
@@ -374,6 +375,10 @@ export function ProviderPanel({
           now={now}
         />
       ))}
+
+      {p.provider === 'cursor' && p.cursorOnDemandSpend ? (
+        <CursorSpendRows spend={p.cursorOnDemandSpend} mutedClass={mutedClass} />
+      ) : null}
 
       {p.extraUsage ? (
         <ProviderExtraUsageSection

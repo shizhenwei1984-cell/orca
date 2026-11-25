@@ -4869,6 +4869,9 @@
               }
             },
             "cursor": {
+              "personalSpend": "個人のオンデマンド利用額",
+              "teamSpend": "チームのオンデマンド利用額",
+              "teamLimit": "チームの利用上限額",
               "expired": {
                 "label": "サインインの有効期限切れ",
                 "message": "Orca を実行しているコンピュータのターミナルで cursor-agent login を実行し、使用状況の取得を再試行してください。"
