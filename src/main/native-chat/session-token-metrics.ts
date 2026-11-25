@@ -1,4 +1,5 @@
 import type {
+  SessionOutputRate,
   SessionTokenCounts,
   SessionTokenMetrics
 } from '../../shared/agent-usage/session-token-metrics'
@@ -19,12 +20,18 @@ import {
   sameJsonlFileSnapshot,
   type JsonlFileSnapshot
 } from '../usage/source-input/jsonl/jsonl-file-snapshot'
-import { readClaudeSessionOutputRate } from '../claude/structured/turns/claude-session-output-rate'
+import { parseClaudeUsageSourceRecord } from '../claude-usage/transcript-record-parser'
+import { readRecord } from '../codex/app-server/codex-item-field-readers'
+import {
+  measuredClaudeTurns,
+  readClaudeTranscriptOutput,
+  type ClaudeTranscriptOutput
+} from './claude-transcript-output-rate'
+import type { OutputMeasurement } from './session-output-measurement'
 import { resolveSessionFilePath, type ResolveSessionFileOptions } from './session-file-resolver'
 import { parseSshTranscriptPath } from './transcript-filesystem/ssh-transcript-path'
 import {
   addSessionTokenCounts,
-  readClaudeSessionTokenRecord,
   readCodexSessionTokenRecord,
   type CodexSessionTokenState
 } from './session-token-records'
@@ -33,11 +40,15 @@ type Source = Pick<SessionTokenMetrics, 'agent' | 'providerSessionId'> & {
   location: ResolveSessionFileOptions
   copiedEntries?: ReadonlySet<string>
 }
-type ClaudeRecord = NonNullable<ReturnType<typeof readClaudeSessionTokenRecord>>
-type ClaudeCounts = ClaudeRecord['counts']
+type ClaudeRecord = NonNullable<ReturnType<typeof parseClaudeUsageSourceRecord>>
+type ClaudeCounts = { input: number; output: number; cacheRead: number; cacheWrite: number }
 type TokenState = {
   codex: CodexSessionTokenState
-  claude: { counts: SessionTokenCounts | null; requests: Map<string, ClaudeCounts> }
+  claude: {
+    counts: SessionTokenCounts | null
+    requests: Map<string, ClaudeCounts>
+    output: ClaudeTranscriptOutput
+  }
 }
 type CachedSource = {
   path: string
@@ -48,19 +59,38 @@ type CachedSource = {
 
 const cache = new Map<string, CachedSource>()
 const pending = new InFlightPromiseDedupe<CachedSource | null>()
+const lastRates = new Map<string, { rate: SessionOutputRate; hadTranscript: boolean }>()
 
 function freshState(): TokenState {
   return {
-    codex: { matches: false, previous: null, counts: null, turn: null, outputRate: null },
-    claude: { counts: null, requests: new Map() }
+    codex: {
+      matches: false,
+      previous: null,
+      counts: null,
+      lastUsage: null,
+      turnId: null,
+      turns: new Map()
+    },
+    claude: {
+      counts: null,
+      requests: new Map(),
+      output: { active: null, turns: new Map(), owners: new Map(), requests: new Map() }
+    }
   }
 }
 
 function addClaudeRecord(
   state: TokenState['claude'],
   seen: Map<string, ClaudeCounts>,
-  { key, counts }: ClaudeRecord
+  row: ClaudeRecord
 ): void {
+  const key = row.dedupeKey
+  const counts = {
+    input: row.inputTokens,
+    output: row.outputTokens,
+    cacheRead: row.cacheReadTokens,
+    cacheWrite: row.cacheWriteTokens
+  }
   const old = key ? (seen.get(key) ?? state.requests.get(key)) : undefined
   const maxima = old
     ? {
@@ -93,43 +123,86 @@ async function readSource(
   if (!path || isWslUncPath(path) || parseSshTranscriptPath(path)) {
     return null
   }
-  const reader = await openJsonlFileReader(path)
+  const reader = await openJsonlFileReader(path).catch(async (error: unknown) => {
+    if (!retained) {
+      throw error
+    }
+    const nextPath = await resolveSessionFilePath(agent, providerSessionId, location)
+    if (
+      !nextPath ||
+      nextPath === path ||
+      isWslUncPath(nextPath) ||
+      parseSshTranscriptPath(nextPath)
+    ) {
+      throw error
+    }
+    return openJsonlFileReader(nextPath)
+  })
   try {
-    if (retained && sameJsonlFileSnapshot(retained.stats, reader.stats)) {
+    if (retained?.path === reader.path && sameJsonlFileSnapshot(retained.stats, reader.stats)) {
       return retained
     }
-    const checkpoint = await resolveJsonlFileCheckpoint(path, retained?.checkpoint, reader)
+    const checkpoint =
+      retained?.path === reader.path && reader.stats.size > retained.stats.size
+        ? await resolveJsonlFileCheckpoint(reader.path, retained.checkpoint, reader)
+        : null
     const original = checkpoint && retained ? retained.state : freshState()
-    const state = { codex: { ...original.codex }, claude: { ...original.claude } }
+    const output = original.claude.output
+    const state: TokenState = {
+      codex: { ...original.codex, turns: new Map(original.codex.turns) },
+      claude: {
+        ...original.claude,
+        output: {
+          ...output,
+          turns: new Map(output.turns),
+          owners: new Map(output.owners),
+          requests: new Map(output.requests)
+        }
+      }
+    }
     const claudeSeen = new Map<string, ClaudeCounts>()
     let endOffset = checkpoint?.parsedBytes ?? 0
-    for await (const row of readJsonlLinesFromOffset(path, endOffset, reader)) {
+    for await (const row of readJsonlLinesFromOffset(reader.path, endOffset, reader)) {
       if (!row.terminated) {
         break
       }
       endOffset = row.endOffset
-      if (agent === 'codex') {
-        try {
+      try {
+        if (agent === 'codex') {
           readCodexSessionTokenRecord(
             state.codex,
             row.line,
             providerSessionId,
             source.copiedEntries
           )
-        } catch (error) {
-          if (!(error instanceof SyntaxError)) {
-            throw error
+        } else {
+          const usage = parseClaudeUsageSourceRecord(row.line, null, {
+            rootSessionId: providerSessionId,
+            excludedEntries: source.copiedEntries
+          })
+          if (usage) {
+            addClaudeRecord(state.claude, claudeSeen, usage)
+          }
+          if (/"(?:assistant|user|system|attachment)"/.test(row.line)) {
+            const entry = readRecord(JSON.parse(row.line))
+            if (
+              entry.sessionId === providerSessionId &&
+              entry.isSidechain !== true &&
+              entry.agentId == null &&
+              entry.parent_tool_use_id == null
+            ) {
+              readClaudeTranscriptOutput(state.claude.output, entry, source.copiedEntries)
+            }
           }
         }
-      } else {
-        const turn = readClaudeSessionTokenRecord(row.line, providerSessionId, source.copiedEntries)
-        if (turn) {
-          addClaudeRecord(state.claude, claudeSeen, turn)
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) {
+          throw error
         }
       }
     }
     const nextCheckpoint = await buildJsonlFileCheckpoint(
-      path,
+      reader.path,
       endOffset,
       checkpoint?.headDigest,
       reader
@@ -140,10 +213,60 @@ async function readSource(
     for (const [id, usage] of claudeSeen) {
       state.claude.requests.set(id, usage)
     }
-    return { path, stats: reader.stats, checkpoint: nextCheckpoint, state }
+    return { path: reader.path, stats: reader.stats, checkpoint: nextCheckpoint, state }
   } finally {
     await reader.handle.close()
   }
+}
+
+function* measuredTurns(
+  source: Source,
+  state: TokenState | undefined
+): Iterable<OutputMeasurement> {
+  const { agent, providerSessionId, copiedEntries } = source
+  if (agent === 'codex') {
+    for (const [id, turn] of state?.codex.turns ?? []) {
+      if (turn.measurement && !copiedEntries?.has(id)) {
+        yield turn.measurement
+      }
+    }
+    return
+  }
+
+  yield* measuredClaudeTurns(providerSessionId, state?.claude.output, copiedEntries)
+}
+
+function latestRate(
+  key: string,
+  source: Source,
+  state: TokenState | undefined
+): SessionOutputRate | null {
+  const previous = lastRates.get(key)
+  if (!state && previous?.hadTranscript) {
+    return previous.rate
+  }
+  let output = 0
+  let durationMs = 0
+  for (const turn of measuredTurns(source, state)) {
+    output += turn.output
+    durationMs += turn.durationMs
+  }
+  if (!durationMs) {
+    return previous?.rate ?? null
+  }
+  const rate: SessionOutputRate = {
+    tokensPerSecond: (output * 1000) / durationMs,
+    interval: 'session'
+  }
+  lastRates.delete(key)
+  lastRates.set(key, { rate, hadTranscript: state !== undefined })
+  if (lastRates.size > 128) {
+    const oldest = lastRates.keys().next().value
+    if (oldest !== undefined) {
+      lastRates.delete(oldest)
+    }
+  }
+  return rate
 }
 
 export async function readSessionTokenMetrics(source: Source): Promise<SessionTokenMetrics> {
@@ -152,12 +275,13 @@ export async function readSessionTokenMetrics(source: Source): Promise<SessionTo
     agent,
     providerSessionId,
     source.location,
-    source.copiedEntries?.size
+    source.copiedEntries && Array.from(source.copiedEntries).sort()
   ])
   const result = await pending.run(key, async () => {
-    const value = await readSource(source, cache.get(key)).catch(() => null)
-    cache.delete(key)
+    const retained = cache.get(key)
+    const value = await readSource(source, retained).catch(() => null)
     if (value) {
+      cache.delete(key)
       cache.set(key, value)
     }
     if (cache.size > 4) {
@@ -172,9 +296,6 @@ export async function readSessionTokenMetrics(source: Source): Promise<SessionTo
     agent,
     providerSessionId,
     counts: result?.state[agent].counts ?? null,
-    outputRate:
-      agent === 'claude'
-        ? readClaudeSessionOutputRate(providerSessionId)
-        : (result?.state.codex.outputRate ?? null)
+    outputRate: latestRate(key, source, (result ?? cache.get(key))?.state)
   }
 }

@@ -7,7 +7,7 @@ export type SessionTokenCounts = {
 
 export type SessionOutputRate = {
   tokensPerSecond: number
-  interval: 'api' | 'turn'
+  interval: 'session'
 }
 
 /** Returned by the runtime that owns this provider conversation. */

@@ -165,7 +165,7 @@ export async function acquireClaudeSession({
             ...observedAt
           })
           // Final snapshots and the turn settlement must reach the journal before its leaf can move.
-          recordTurnEnd(liveSession, message, leafAtFrame)
+          recordTurnEnd(liveSession, message, leafAtFrame, startsTurn, observedAt.observedAt)
         }),
       (settlement) => deps.onDispatchSettledLate?.({ sessionId, ...settlement })
     )

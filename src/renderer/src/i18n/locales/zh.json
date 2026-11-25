@@ -5436,8 +5436,7 @@
             "rate": "{{speed}} 令牌/秒",
             "tokens": "{{tokens}} 令牌",
             "cache": "缓存命中率 {{hit}}",
-            "apiRateDetail": "最近一轮中每秒 API 用时对应的输出令牌数。",
-            "turnRateDetail": "按最近一轮总用时计算的平均每秒输出令牌数。",
+            "sessionRateDetail": "此会话中已测量轮次的平均每秒输出令牌数，包含进行中轮次的可用用量。",
             "countDetail": "此会话的输入和输出令牌总数。缓存读取的令牌只计一次。",
             "cacheDetail": "缓存命中率是从缓存读取的令牌占会话全部输入令牌的比例。",
             "unavailable": "短横线表示用量或耗时不可用。"

@@ -6182,8 +6182,7 @@
             "rate": "{{speed}} tok/s",
             "tokens": "{{tokens}} tokens",
             "cache": "{{hit}} cache hit",
-            "apiRateDetail": "Output tokens per second of API time in the most recent turn.",
-            "turnRateDetail": "Output tokens per second averaged over the most recent turn.",
+            "sessionRateDetail": "Average output tokens per second across measured turns in this session, including available in-progress usage.",
             "countDetail": "Total input and output tokens for this session. Cached reads are counted once.",
             "cacheDetail": "Cache hit is the share of all session input tokens read from cache.",
             "unavailable": "A dash means usage or timing is unavailable."

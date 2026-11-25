@@ -15,12 +15,26 @@ export function claudeTurnResumePointWriter(
   return (
     session: ClaudeSession | null,
     message: Record<string, unknown>,
-    leafUuid: string | null
+    leafUuid: string | null,
+    startsTurn: boolean,
+    observedAt: number | undefined
   ): void => {
-    if (session && message.type === 'result' && isRootClaudeFrame(message)) {
-      if (sessions.get(sessionId) === session) {
-        observeOutput(session.providerSessionId, message)
-      }
+    if (!session || !isRootClaudeFrame(message)) {
+      return
+    }
+    if (
+      sessions.get(sessionId) === session &&
+      (startsTurn || message.type === 'stream_event' || message.type === 'result')
+    ) {
+      observeOutput({
+        sessionId: session.providerSessionId,
+        message,
+        leafUuid,
+        startsTurn,
+        observedAt: observedAt ?? Date.now()
+      })
+    }
+    if (message.type === 'result') {
       persistClaudeTurnResumePoint(
         sessionId,
         session,

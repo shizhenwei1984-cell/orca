@@ -70,7 +70,6 @@ function ChatTokens({ target, sessionId }: { target: RuntimeClientTarget; sessio
   const { providerSessionId, working } = useStructuredAgentSessionTokenActivity(sessionId, target)
   return (
     <FocusedTokens
-      key={providerSessionId}
       target={target}
       request={{ kind: 'chat', sessionId }}
       providerSessionId={providerSessionId}
@@ -96,67 +95,112 @@ function FocusedTokens({
   const paneKey = request.kind === 'terminal' ? request.paneKey : null
 
   useEffect(() => {
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    let reads = 0
-    let reading = false
-    async function read(): Promise<void> {
-      if (reading || document.hidden || controller.signal.aborted) {
-        return
-      }
-      reading = true
-      reads++
-      try {
-        const params = chatId
-          ? { kind: 'chat', sessionId: chatId }
-          : { kind: 'terminal', paneKey, providerSessionId }
-        const result = await callRuntimeRpc<SessionTokenMetrics | null>(
-          target,
-          'agentSession.tokenMetrics',
-          params,
-          { signal: controller.signal, background: true }
-        )
-        if (!controller.signal.aborted) {
-          setMetrics(
-            result && (!providerSessionId || result.providerSessionId === providerSessionId)
-              ? result
+    const params: Request | null = chatId
+      ? { kind: 'chat', sessionId: chatId }
+      : paneKey && providerSessionId
+        ? { kind: 'terminal', paneKey, providerSessionId }
+        : null
+    if (!params) {
+      return
+    }
+    return pollSessionTokenMetrics({
+      target,
+      params,
+      working,
+      onSnapshot: (result) => {
+        setMetrics((previous) => {
+          if (result && providerSessionId && result.providerSessionId !== providerSessionId) {
+            return null
+          }
+          if (!result) {
+            return previous &&
+              (!providerSessionId || previous.providerSessionId === providerSessionId)
+              ? { ...previous, counts: null }
               : null
-          )
-        }
-      } catch (error) {
-        if (
-          !controller.signal.aborted &&
-          error instanceof RuntimeRpcCallError &&
-          error.code === 'method_not_found'
-        ) {
-          setSupported(false)
-          return
-        }
-      } finally {
-        reading = false
-      }
-      // Give the final transcript flush time to land, then stop reading an idle session.
-      if (!controller.signal.aborted && !document.hidden && (working || reads < 3)) {
-        timer = setTimeout(() => void read(), 2_000)
-      }
-    }
-    const visibilityChanged = (): void => {
-      clearTimeout(timer)
-      if (!document.hidden) {
-        reads = 0
-        void read()
-      }
-    }
-    document.addEventListener('visibilitychange', visibilityChanged)
-    void read()
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-      document.removeEventListener('visibilitychange', visibilityChanged)
-    }
+          }
+          if (
+            result.outputRate?.interval !== 'session' &&
+            previous?.providerSessionId === result.providerSessionId &&
+            previous.agent === result.agent
+          ) {
+            return { ...result, outputRate: previous.outputRate }
+          }
+          return result
+        })
+      },
+      onUnsupported: () => setSupported(false)
+    })
   }, [target, chatId, paneKey, providerSessionId, working])
 
-  return supported ? <SessionTokenReadout metrics={metrics} /> : null
+  const matchingMetrics =
+    !providerSessionId || metrics?.providerSessionId === providerSessionId ? metrics : null
+  return supported ? <SessionTokenReadout metrics={matchingMetrics} /> : null
+}
+
+function pollSessionTokenMetrics({
+  target,
+  params,
+  working,
+  onSnapshot,
+  onUnsupported
+}: {
+  target: RuntimeClientTarget
+  params: Request
+  working: boolean
+  onSnapshot: (result: SessionTokenMetrics | null) => void
+  onUnsupported: () => void
+}): () => void {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let reads = 0
+  let reading = false
+  async function read(): Promise<void> {
+    if (reading || document.hidden || controller.signal.aborted) {
+      return
+    }
+    reading = true
+    reads++
+    try {
+      const result = await callRuntimeRpc<SessionTokenMetrics | null>(
+        target,
+        'agentSession.tokenMetrics',
+        params,
+        { signal: controller.signal, background: true }
+      )
+      if (!controller.signal.aborted) {
+        onSnapshot(result)
+      }
+    } catch (error) {
+      if (
+        !controller.signal.aborted &&
+        error instanceof RuntimeRpcCallError &&
+        error.code === 'method_not_found'
+      ) {
+        onUnsupported()
+        return
+      }
+    } finally {
+      reading = false
+    }
+    // Give the final transcript flush time to land, then stop reading an idle session.
+    if (!controller.signal.aborted && !document.hidden && (working || reads < 3)) {
+      timer = setTimeout(() => void read(), 2_000)
+    }
+  }
+  const visibilityChanged = (): void => {
+    clearTimeout(timer)
+    if (!document.hidden) {
+      reads = 0
+      void read()
+    }
+  }
+  document.addEventListener('visibilitychange', visibilityChanged)
+  void read()
+  return () => {
+    controller.abort()
+    clearTimeout(timer)
+    document.removeEventListener('visibilitychange', visibilityChanged)
+  }
 }
 
 function SessionTokenReadout({ metrics }: { metrics: SessionTokenMetrics | null }) {
@@ -171,7 +215,7 @@ function SessionTokenReadout({ metrics }: { metrics: SessionTokenMetrics | null 
     [locale]
   )
   const counts = metrics?.counts
-  const rate = metrics?.outputRate
+  const rate = metrics?.outputRate?.interval === 'session' ? metrics.outputRate : null
   const tokens = counts ? compact.format(counts.input + counts.output) : '—'
   const hit =
     counts && counts.input > 0 && counts.cacheRead !== null
@@ -221,15 +265,10 @@ function SessionTokenReadout({ metrics }: { metrics: SessionTokenMetrics | null 
         <div className="space-y-1.5 p-3 text-xs">
           <p className="font-medium">{title}</p>
           <p>
-            {rate?.interval === 'api'
-              ? t(
-                  'auto.components.status.bar.SessionTokenStatusSegment.apiRateDetail',
-                  'Output tokens per second of API time in the most recent turn.'
-                )
-              : t(
-                  'auto.components.status.bar.SessionTokenStatusSegment.turnRateDetail',
-                  'Output tokens per second averaged over the most recent turn.'
-                )}
+            {t(
+              'auto.components.status.bar.SessionTokenStatusSegment.sessionRateDetail',
+              'Average output tokens per second across measured turns in this session, including available in-progress usage.'
+            )}
           </p>
           <p>
             {t(
