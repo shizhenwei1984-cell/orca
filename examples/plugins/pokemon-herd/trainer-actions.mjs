@@ -106,6 +106,9 @@ function applyToPokemon(save, { slot, pokemon }, item, { at, slots, battles }) {
     next = registerEvolution(next, updated)
   }
   if (item === 'berry' || item === 'sitrus-berry') {
+    if (slots.includes(slot)) {
+      next.party[slot] = { ...next.party[slot], careNote: { kind: 'feed', at, item } }
+    }
     next = creditResearch(next, at, slots, 'berry', 1)
   }
   return settleBadges(next, slots, updated)
@@ -123,7 +126,9 @@ function replaceParty(save, slot, pokemon, incoming, at, key, { same, all } = {}
         }
       }
     : save.box
-  return { ...putPokemon(save, slot, incoming), box }
+  const next = putPokemon(save, slot, incoming)
+  delete next.party[slot].careNote
+  return { ...next, box }
 }
 
 function bringOut(save, { slot, pokemon }, target, { at, key, battles }) {
@@ -241,7 +246,10 @@ function pet(save, { slot, pokemon }, { at, slots }) {
   const updated = savedPokemon(withFriend(trainerPick(pokemon), FRIEND.pat), pokemon)
   let next = {
     ...save,
-    party: { ...save.party, [slot]: { ...member, pokemon: updated, petAt: at } }
+    party: {
+      ...save.party,
+      [slot]: { ...member, pokemon: updated, petAt: at, careNote: { kind: 'pet', at } }
+    }
   }
   next = creditResearch(next, at, slots, 'pet', 1)
   const tip = allowance(next.daily, 'tip', TIP.pat)

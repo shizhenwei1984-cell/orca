@@ -172,7 +172,7 @@ function battleLog(result) {
 }
 
 // The host owns refreshes and persists actions through onAction. render accepts a structured snapshot.
-export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
+export function mountEncounterPanel(root, { onAction, sprite, onSound, onCapture }) {
   const sheet = text('link')
   sheet.rel = 'stylesheet'
   sheet.href = new URL('./encounters.css', import.meta.url).href
@@ -286,10 +286,12 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
     ball.addEventListener('change', () => {
       ballChoice = ball.value
       draw()
+      onCapture?.({ ball: ball.value || null })
     })
     berry.addEventListener('change', () => {
       berryChoice = berry.value
       draw()
+      onCapture?.({ bait: berry.value || null })
     })
     const choice = text('div', null, 'encounter-actions')
     choice.append(
@@ -315,6 +317,27 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
     if (offer.remaining != null) {
       node.append(text('p', `${offer.remaining} throws left`, 'encounter-muted'))
     }
+  }
+
+  function menuActions() {
+    if (!model) {
+      return []
+    }
+    const { busy, canStartTower, calls, tower } = model
+    const choices = []
+    if (!busy && !pending) {
+      if (tower.run || canStartTower) {
+        choices.push(
+          tower.run
+            ? ['End Tower climb', () => submit({ type: 'tower-quit' })]
+            : ['Enter Battle Tower', () => submit({ type: 'tower-start' })]
+        )
+      }
+      for (const { id, name, count } of calls) {
+        choices.push([`Use ${name} · ${count}`, () => submit({ type: 'call', item: id })])
+      }
+    }
+    return choices
   }
 
   function draw() {
@@ -523,6 +546,33 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
   return {
     stage,
     submit,
+    menuActions,
+    captureControls(settings, change) {
+      const bag = model?.capture
+      if (!bag?.balls.length) {
+        return []
+      }
+      const ball = options(
+        [['', 'Auto'], ...bag.balls.map(({ id, name, count }) => [id, `${name} · ${count}`])],
+        settings.ball ?? ''
+      )
+      const berry = options(
+        [
+          ['auto', 'Auto'],
+          ['', 'None'],
+          ...bag.berries.map(({ id, name, count }) => [id, `${name} · ${count}`])
+        ],
+        settings.bait ?? ''
+      )
+      ball.onchange = () => change({ ball: ball.value || null })
+      berry.onchange = () => change({ bait: berry.value || null })
+      return [label('Ball to throw', ball), label('Berry before each throw', berry)]
+    },
+    setCapture({ ball, bait }) {
+      ballChoice = ball ?? ''
+      berryChoice = bait ?? ''
+      draw()
+    },
     sound(value) {
       if (sound === value) {
         return
@@ -550,7 +600,8 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
     focus() {
       const control =
         content.querySelector('[data-encounter-control="ball"]') ??
-        content.querySelector('.encounter-primary:enabled, [data-encounter-control="fighter"]')
+        content.querySelector('.encounter-primary:enabled, [data-encounter-control="fighter"]') ??
+        content.querySelector('button:enabled')
       control?.focus({ preventScroll: true })
       content.scrollIntoView({ block: 'nearest', inline: 'nearest' })
     },

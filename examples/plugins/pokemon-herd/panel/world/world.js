@@ -37,6 +37,7 @@ export function mountWorld(container, callbacks = {}) {
   root.className = 'pokemon-world'
   root.setAttribute('role', 'group')
   root.setAttribute('aria-label', 'Pokémon Herd')
+  root.setAttribute('aria-keyshortcuts', 'B Alt+Shift+B S Shift+F10')
   root.tabIndex = 0
   const style = document.createElement('link')
   style.rel = 'stylesheet'
@@ -290,7 +291,6 @@ export function mountWorld(container, callbacks = {}) {
 
   function pet(actor, event) {
     focusActor(actor, now())
-    actor.petUntil = now() + 2800
     options.onPet?.(actor.entity, event)
     paint(view.performance.now(), true)
   }

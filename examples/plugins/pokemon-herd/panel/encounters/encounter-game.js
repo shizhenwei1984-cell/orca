@@ -10,7 +10,7 @@ const center = (rect) => rect.left + rect.width / 2
 
 export function mountEncounterGame(
   root,
-  { request, sprite, cry, onVisitor, onSettings, interactions, world, signal }
+  { request, sprite, cry, onVisitor, onSettings, onRare, interactions, world, signal }
 ) {
   const document = root.ownerDocument
   const view = document.defaultView
@@ -34,12 +34,26 @@ export function mountEncounterGame(
   const panel = mountEncounterPanel(root, {
     onAction: command,
     sprite,
+    onCapture:
+      onSettings &&
+      ((patch) => {
+        Promise.resolve()
+          .then(() => onSettings(patch))
+          .catch(() => panel.setCapture(settings))
+      }),
     onSound(value) {
-      sound = value
       stage.sound(value, true)
       Promise.resolve()
         .then(() => onSettings?.({ battleSounds: value }))
-        .catch(() => {})
+        .then(
+          () => {
+            sound = value
+          },
+          () => {
+            panel.sound(sound)
+            stage.sound(sound)
+          }
+        )
     }
   })
   const stage = mountBattleStage(panel.stage, {
@@ -58,11 +72,11 @@ export function mountEncounterGame(
   }
 
   function input() {
+    const rain = worldNode()?.dataset.weather
     return {
-      workspaceId: scope.workspaceId,
-      terminalIds: scope.terminalIds,
-      settings,
-      rain: worldNode()?.dataset.weather
+      ...(scope.workspaceId && { workspaceId: scope.workspaceId }),
+      terminalIds: scope.terminalIds.slice(0, 50),
+      ...(rain && { rain })
     }
   }
 
@@ -90,6 +104,13 @@ export function mountEncounterGame(
     const parked = busy || (act && motionKinds.has(act.kind) && now >= act.from && now < act.until)
     if (visitorMotion?.id !== visitorId) {
       visitorMotion = { id: visitorId, from: -0.08, startedAt: visitor?.appearedAt ?? now }
+      if (
+        visitor &&
+        !visitor.trainer &&
+        pick.tags?.some((tag) => ['Shiny', 'Alpha', 'Legendary'].includes(tag))
+      ) {
+        onRare?.(pick, scope.signal)
+      }
     }
     const motion = visitorMotion
     const from = motion.from
@@ -142,7 +163,11 @@ export function mountEncounterGame(
   }
 
   function partyMember(actor) {
-    return snapshot?.party.find(({ terminalId }) => terminalId === (actor?.terminalId ?? actor?.id))
+    return snapshot?.party.find(
+      ({ terminalId, slot, pokemonId }) =>
+        terminalId === (actor?.terminalId ?? actor?.id) &&
+        (!actor?.ref || (actor.ref.slot === slot && actor.ref.id === pokemonId))
+    )
   }
 
   function actorNearVisitor(visitor) {
@@ -217,7 +242,7 @@ export function mountEncounterGame(
     reading = active
     view.clearTimeout(refreshTimer)
     try {
-      const model = await request('encounter.read', input())
+      const model = await request('encounter.read', input(), active.signal)
       if (scope !== active || lifetime.signal.aborted) {
         return
       }
@@ -234,7 +259,9 @@ export function mountEncounterGame(
       stage.render(model, model.now)
       checkProximity()
     } catch {
-      readFailure = true
+      if (scope === active) {
+        readFailure = true
+      }
     } finally {
       if (reading === active) {
         reading = null
@@ -257,15 +284,22 @@ export function mountEncounterGame(
       client,
       sequence: ++sequence,
       revision: snapshot.revision,
-      action: { ...action, pokemonId, opponentId }
+      action: {
+        ...action,
+        ...(pokemonId && { pokemonId }),
+        ...(opponentId && { opponentId })
+      }
     }
     sending = active
     view.clearTimeout(refreshTimer)
     try {
       try {
-        return await request('encounter.command', payload)
-      } catch {
-        return await request('encounter.command', payload)
+        return await request('encounter.command', payload, active.signal)
+      } catch (error) {
+        if (scope !== active) {
+          throw error
+        }
+        return await request('encounter.command', payload, active.signal)
       }
     } finally {
       if (sending === active) {
@@ -314,7 +348,7 @@ export function mountEncounterGame(
     onDrop: drop,
     onSpar: spar,
     onMenu({ visitor }) {
-      if (visitor?.id === snapshot?.visitor?.id && visitor) {
+      if (visitor && (visitor.id === snapshot?.visitor?.id || visitor.id === snapshot?.raid?.id)) {
         panel.focus()
         return true
       }
@@ -340,7 +374,11 @@ export function mountEncounterGame(
       return
     }
     if (patch.settings) {
+      const before = settings
       settings = { ...settings, ...patch.settings }
+      if (settings.ball !== before.ball || settings.bait !== before.bait) {
+        panel.setCapture(settings)
+      }
       if (
         typeof patch.settings.battleSounds === 'boolean' &&
         patch.settings.battleSounds !== sound
@@ -432,5 +470,12 @@ export function mountEncounterGame(
   }
 
   signal?.addEventListener('abort', destroy, { once: true })
-  return { update, refresh, worldCallbacks, destroy }
+  return {
+    update,
+    refresh,
+    menuActions: panel.menuActions,
+    captureControls: panel.captureControls,
+    worldCallbacks,
+    destroy
+  }
 }
