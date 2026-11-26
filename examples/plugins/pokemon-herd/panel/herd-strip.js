@@ -4,31 +4,28 @@ export function mountHerdStrip(orca, world, signal) {
   }
   document.body.classList.add('herd-strip')
   const toolbar = document.querySelector('.toolbar')
-  const scene = world.firstElementChild
-  const padding = Number.parseFloat(getComputedStyle(document.body).paddingBottom)
   let preferredHeight = 0
-  let stripHeight = 0
   const settings = document.querySelector('#herd-settings')
-  const expanded = '.trainer-dialog[open], .catalog-picker[open], #herd-settings:not([hidden])'
+  const expanded =
+    '.trainer-dialog[open], .catalog-picker[open], #herd-settings:not([hidden]), #encounters:not([hidden]), #herd:not([hidden])'
   const updateHeight = () => {
+    const padding = Number.parseFloat(getComputedStyle(document.body).paddingBottom)
     document.body.style.setProperty(
       '--herd-settings-top',
       `${toolbar.offsetHeight + padding + 4}px`
     )
-    if (!world.hidden) {
-      stripHeight = Math.ceil(scene.getBoundingClientRect().bottom + scrollY + padding)
-    }
-    const height = document.querySelector(expanded) ? 480 : stripHeight
+    const height = document.querySelector(expanded) ? 480 : document.body.offsetHeight
     if (height > 0 && height !== preferredHeight) {
       preferredHeight = height
       orca.panel.setPreferredHeight(height)
     }
   }
   const observer = new ResizeObserver(updateHeight)
-  observer.observe(toolbar)
-  observer.observe(scene)
+  observer.observe(document.body)
   const settingsObserver = new MutationObserver(updateHeight)
-  settingsObserver.observe(settings, { attributeFilter: ['hidden'] })
+  for (const element of [settings, world, document.querySelector('#encounters')]) {
+    settingsObserver.observe(element, { attributeFilter: ['hidden'] })
+  }
   document.addEventListener(
     'toggle',
     (event) => {
@@ -46,4 +43,5 @@ export function mountHerdStrip(orca, world, signal) {
     },
     { once: true }
   )
+  return true
 }

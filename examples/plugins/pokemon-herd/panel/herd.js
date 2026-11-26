@@ -55,6 +55,7 @@ let progressDirty = false
 let focusRequest
 let menuRequest
 let showFamily = true
+let showEncounters = false
 const care = mountWorldCare(orca, careStatus, (action) => {
   if (action.type === 'pet') {
     preferences.play('pet')
@@ -154,8 +155,9 @@ function runCommand(command, agent) {
 
 function selectView(party) {
   actions.hidePopover()
+  document.body.dataset.view = party ? 'party' : 'world'
   worldContainer.hidden = party
-  encounterContainer.hidden = party
+  encounterContainer.hidden = party || (strip && !showEncounters)
   showActions.hidden = party
   herd.hidden = !party
   showWorld.setAttribute('aria-pressed', String(!party))
@@ -194,7 +196,21 @@ function openActions({ agent, x, y, anchor }) {
       ['Change Pokémon', () => runCommand('open-picker', agent)]
     )
   } else if (!agent) {
-    items.push(...encounters.menuActions())
+    if (strip) {
+      items.push([
+        showEncounters ? 'Hide encounters' : 'Show encounters',
+        () => setEncounters(!showEncounters)
+      ])
+    }
+    items.push(
+      ...encounters.menuActions().map(([label, run]) => [
+        label,
+        () => {
+          setEncounters(true)
+          run()
+        }
+      ])
+    )
     if (workspace) {
       const choose = preferences.get().chooseMoves
       items.push([
@@ -209,21 +225,64 @@ function openActions({ agent, x, y, anchor }) {
     items.push(['Settings', () => toggleSettings(true)])
   }
   actions.setAttribute('aria-label', agent ? `${agent.species} actions` : 'World actions')
-  actions.replaceChildren(
-    ...items.map(([label, run]) => {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.textContent = label
-      button.onclick = (event) => {
-        actions.hidePopover()
-        if (event.isTrusted && !scope?.aborted) {
-          run(event)
-        }
+  const actionButton = (label, run) => {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.textContent = label
+    button.onclick = (event) => {
+      actions.hidePopover()
+      if (event.isTrusted && !scope?.aborted) {
+        run(event)
       }
-      return button
-    })
-  )
+    }
+    return button
+  }
+  const reportActionError = (error) => {
+    careStatus.textContent = error.message
+  }
+  const actionGroup = (label, buttons) => {
+    const group = document.createElement('div')
+    group.className = 'world-action-group'
+    group.setAttribute('role', 'group')
+    group.setAttribute('aria-label', label)
+    const title = document.createElement('span')
+    title.textContent = label
+    title.setAttribute('aria-hidden', 'true')
+    group.append(title, ...buttons)
+    return group
+  }
+  actions.replaceChildren(...items.map(([label, run]) => actionButton(label, run)))
   if (!agent) {
+    const rows = actionGroup(
+      'Rows',
+      [1, 2, 3].map((rows) => {
+        const button = actionButton(`${rows}`, () => {
+          void preferences.patch({ rows }).catch(reportActionError)
+        })
+        button.setAttribute('aria-label', `${rows} ${rows === 1 ? 'row' : 'rows'}`)
+        button.setAttribute('aria-pressed', String(preferences.get().rows === rows))
+        return button
+      })
+    )
+    actions.prepend(rows)
+    const workspaceId = workspace?.context.workspaceId
+    if (workspace && orca.panel?.moveTo) {
+      const placements = [
+        ['Bottom', 'bottom'],
+        ['Left sidebar', 'left'],
+        ['Right sidebar', 'right']
+      ]
+      rows.after(
+        actionGroup(
+          'Move panel',
+          placements.map(([label, placement]) =>
+            actionButton(label, () => {
+              void orca.panel.moveTo(placement, workspaceId).catch(reportActionError)
+            })
+          )
+        )
+      )
+    }
     actions.append(
       ...encounters.captureControls(preferences.get(), (patch) => {
         if (scope?.aborted) {
@@ -300,7 +359,12 @@ function openActions({ agent, x, y, anchor }) {
   }
   actions.showPopover({ source: anchor.closest('button') ?? anchor })
   position()
-  actions.firstElementChild.focus()
+  actions.querySelector('button')?.focus({ preventScroll: true })
+}
+
+function setEncounters(open) {
+  showEncounters = open
+  encounterContainer.hidden = worldContainer.hidden || !open
 }
 
 actions.addEventListener('beforetoggle', (event) => {
@@ -666,7 +730,10 @@ retry.onclick = () => {
   void readProgress()
 }
 
-mountHerdStrip(orca, worldContainer, signal)
+const strip = mountHerdStrip(orca, worldContainer, signal)
+if (strip) {
+  setEncounters(false)
+}
 
 let activationSubscription
 

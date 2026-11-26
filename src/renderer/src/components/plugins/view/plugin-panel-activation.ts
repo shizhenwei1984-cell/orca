@@ -4,27 +4,19 @@ import {
   isLivePlugin,
   usePluginPanelsStore
 } from '@/store/plugins/catalog/plugin-contribution-catalog'
-import { resolveQualifiedWorktreeExecutionOwner } from '@/lib/workspace/ownership/qualified-worktree-execution-owner'
-import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 import { selectActiveTabForWorktree } from '@/store/slices/tabs/active-tab-selection'
 import { resolveTerminalHandleForPane } from '../../terminal-pane/clipboard/terminal-handle-copy'
 import { openPluginPanel } from './plugin-panel-placement'
 import { pluginPanelNotShownReason } from './plugin-view-shown'
 import { openPluginPanelParamsSchema } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import type { PluginHostCallOutcome } from '../../../../../shared/plugins/frames/plugin-protocol'
-import {
-  pluginWorkspaceId,
-  PLUGIN_HOST_ID_MAX_LENGTH
-} from '../../../../../shared/plugins/workers/plugin-host-api-workspace-methods'
-import {
-  getActiveSidebarWorkspaceId,
-  parseWorkspaceKey
-} from '../../../../../shared/workspace/identity/workspace-scope'
+import { getActiveSidebarWorkspaceId } from '../../../../../shared/workspace/identity/workspace-scope'
 import type { PluginHostPanel } from '../../../../../shared/plugins/plugin-list-entry'
 import { pluginPanelTabKey } from '../../../../../shared/plugins/frames/plugin-tab-key'
 import { PLUGIN_TERMINAL_ID_MAX_LENGTH } from '../../../../../shared/plugins/workers/plugin-host-api-workspace-context'
 import { canShowRightSidebarForView } from '../../right-sidebar/visibility/right-sidebar-visibility'
 import type { AppState } from '@/store/types'
+import { frameWorkspaceId } from './plugin-panel-workspace'
 
 type PanelActivation = {
   action: string
@@ -48,25 +40,18 @@ type ScopedReceiver = {
 const receivers = new Map<string, ScopedReceiver>()
 let pending: PendingActivation | undefined
 
-export function frameWorkspaceId(state: AppState): string | undefined {
-  const id = state.activeWorktreeId
-  if (!id) {
-    return undefined
-  }
-  const owner =
-    parseWorkspaceKey(id)?.type === 'folder'
-      ? null
-      : resolveQualifiedWorktreeExecutionOwner(
-          selectWorktreesByRepo(state),
-          state.repos,
-          id,
-          state.activeWorkspaceExecutionHostId
-        )
-  const projected = pluginWorkspaceId({ id, identityKey: owner?.worktree.identity?.key })
-  return projected.length <= PLUGIN_HOST_ID_MAX_LENGTH &&
-    (projected.startsWith('identity:') || parseWorkspaceKey(projected)?.type === 'folder')
-    ? projected
-    : undefined
+function isScopedReceiverCurrent(
+  receiver: ScopedReceiver | undefined,
+  state: AppState
+): receiver is ScopedReceiver {
+  return (
+    receiver?.worktreeId === state.activeWorktreeId &&
+    receiver.hostId === state.activeWorkspaceExecutionHostId
+  )
+}
+
+export function hasCurrentPluginPanelReceiver(tabKey: string, state: AppState): boolean {
+  return isScopedReceiverCurrent(receivers.get(tabKey), state)
 }
 
 function deliver(): void {
@@ -75,9 +60,7 @@ function deliver(): void {
   const state = useAppStore.getState()
   if (
     current?.activation &&
-    receiver &&
-    receiver.worktreeId === state.activeWorktreeId &&
-    receiver.hostId === state.activeWorkspaceExecutionHostId &&
+    isScopedReceiverCurrent(receiver, state) &&
     !pluginPanelNotShownReason(state, current.panel)
   ) {
     current.dispose()

@@ -5,11 +5,8 @@ import {
   type PluginEventPayload
 } from '../../../../../shared/plugins/events/plugin-events'
 import type { PluginPanelPush } from '../../../../../shared/plugins/workers/plugin-panel-bridge-protocol'
-import {
-  activePluginTerminalPane,
-  frameWorkspaceId,
-  readActiveTerminalId
-} from '../view/plugin-panel-activation'
+import { activePluginTerminalPane, readActiveTerminalId } from '../view/plugin-panel-activation'
+import { frameWorkspaceId } from '../view/plugin-panel-workspace'
 
 function sameWorkspace(a: AppState, b: AppState): boolean {
   return (

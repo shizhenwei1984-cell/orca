@@ -117,8 +117,12 @@ export function bindWorldPreferences(orca, signal, apply) {
       await orca.storage.set(WORLD_SETTINGS_KEY, next)
       if (!signal.aborted) {
         for (const control of controls) {
-          if (control.type === 'checkbox' && Object.hasOwn(patch, control.name)) {
-            control.checked = next[control.name]
+          if (Object.hasOwn(patch, control.name)) {
+            if (control.type === 'checkbox') {
+              control.checked = next[control.name]
+            } else {
+              control.value = String(next[control.name])
+            }
           }
         }
         update(next)

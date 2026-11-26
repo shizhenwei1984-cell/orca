@@ -209,35 +209,7 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
     }),
     on: on
   }
-${PLUGIN_FRAME_FACADES_SCRIPT}  if (C.user) {
-    orca.shell = Object.freeze({
-      openExternal: function (url) { return userCall(C.user.openExternal, { url: String(url) }) }
-    })
-    orca.files = Object.freeze({
-      saveAs: function (options) {
-        var o = options || {}
-        var data = ArrayBuffer.isView(o.data)
-          ? o.data.buffer.slice(o.data.byteOffset, o.data.byteOffset + o.data.byteLength)
-          : o.data
-        var params = { data: data }
-        if (o.suggestedName !== undefined) params.suggestedName = o.suggestedName
-        if (o.mimeType !== undefined) params.mimeType = o.mimeType
-        return userCall(C.user.saveAs, params).then(function (result) {
-          return { status: result && result.status === 'saved' ? 'saved' : 'cancelled' }
-        })
-      }
-    })
-  }
-  if (C.surface === 'panel' && C.user) {
-    orca.panel = Object.freeze({
-      setPreferredHeight: function (height) {
-        if (Number.isSafeInteger(height) && height > 0) {
-          post({ kind: 'evt', event: E.panelPreferredHeight, payload: height })
-        }
-      }
-    })
-  }
-  Object.defineProperty(orca, 'api', { get: function () { return api }, enumerable: true })
+${PLUGIN_FRAME_FACADES_SCRIPT}  Object.defineProperty(orca, 'api', { get: function () { return api }, enumerable: true })
   Object.defineProperty(orca, 'locale', {
     get: function () { return locale || navigator.language }, enumerable: true
   })

@@ -1,6 +1,7 @@
 import {
   FRAME_EVENTS,
   PANEL_CONTROL_MESSAGE_MAX_BYTES,
+  MOVE_PLUGIN_PANEL_METHOD,
   OPEN_PLUGIN_PANEL_METHOD,
   readPanelPongId
 } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
@@ -75,6 +76,7 @@ export type PluginFrameHostOptions = {
   onPong?: (pingId: number) => void
   onPanelActivationReady?: (workspaceId: unknown) => void
   onOpenPanel?: (params: unknown) => PluginHostCallOutcome
+  onMovePanel?: (params: unknown) => PluginHostCallOutcome
   editor?: PluginFrameEditorChannel
   /** Injectable for tests; defaults to the shared per-plugin budget. */
   budget?: PanelMessageBudget
@@ -305,6 +307,21 @@ export function createPluginFrameEnvelopeHandler(
         )
       }
       respond(pluginOutcomeResponse(request.id, result))
+      return
+    }
+    if (request.method === MOVE_PLUGIN_PANEL_METHOD) {
+      const result =
+        context.transport === 'guest' && !options.declarative && options.isActive?.() !== false
+          ? options.onMovePanel?.(request.params)
+          : undefined
+      respond(
+        result
+          ? pluginOutcomeResponse(request.id, result)
+          : pluginFailure(
+              request.id,
+              pluginError('not_permitted', 'This frame cannot move panels.')
+            )
+      )
       return
     }
     const settled = options.trackHostCall?.()
