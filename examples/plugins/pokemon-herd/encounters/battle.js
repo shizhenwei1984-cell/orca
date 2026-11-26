@@ -187,7 +187,7 @@ function strike(a, b, move, answer, first, flinched, takeHit, weather, random) {
   const att = a.side
   const def = b.side
   const by = a.by
-  const event = { side: by, move: move.name, type: move.type, notes: [] }
+  const event = { side: by, move: move.name, type: move.type, physical: move.physical, notes: [] }
   if (att.recharge) {
     att.recharge = false
     return { ...event, move: null, notes: ['It must recharge!'] }

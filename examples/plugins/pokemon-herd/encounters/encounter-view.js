@@ -1,5 +1,5 @@
 import { battleKey } from './battle.js'
-import { canFight, dueOutbreak, hpOf, visitorPickAt } from './encounter-state.js'
+import { canFight, CROSS_MS, dueOutbreak, hpOf, visitorPickAt } from './encounter-state.js'
 import { encounterContext, movesFor } from './encounters.js'
 import { fullName } from './rules/dex.js'
 import { cooldownLeft, raidPhase } from './rules/events.js'
@@ -15,6 +15,7 @@ import {
 } from './rules/trainer.js'
 import { TOWER_HEAL_IDS, TOWER_BENCH_HEALS } from './rules/trainers.js'
 import { sizeClass } from './rules/weather.js'
+import { HALT, ICON } from './rules/wildacts.js'
 
 const inBag = (ids, items) =>
   ids.filter((id) => items[id] > 0).map((id) => ({ id, name: ITEMS[id].name, count: items[id] }))
@@ -59,6 +60,9 @@ export function describePick(pick, hp = null) {
     dex: pick.dex,
     form: pick.form,
     shiny: !!pick.shiny,
+    gender: pick.gender,
+    mega: pick.mega,
+    megaKind: pick.megaKind,
     name: pick.nick || fullName(pick.dex, pick.form),
     hp,
     tags: [
@@ -103,9 +107,19 @@ export function renderEncounterSnapshot(state, options) {
     visitor: v && {
       id: v.id,
       pick: describePick(pick, pick.hp ?? 1),
+      appearedAt: v.appearedAt,
       expiresAt: v.expiresAt,
+      crossing: v.crossing ?? CROSS_MS,
+      act: v.act && {
+        ...v.act,
+        icon: v.act.icon ?? ICON[v.act.kind],
+        proximity: Object.hasOwn(HALT, v.act.kind) && v.act.from == null
+      },
+      throws: v.throws ?? 0,
+      teleportAt: v.teleportAt,
       raid: !!v.raid,
       trainer: tr && {
+        cls: tr.cls,
         name: tr.name,
         title: tr.title,
         floor: tr.tower,
@@ -127,7 +141,7 @@ export function renderEncounterSnapshot(state, options) {
       moves:
         v && !state.clash ? movesFor(v, party, slot).map(({ name, type }) => ({ name, type })) : [],
       fighter: tr?.fighter === slot,
-      mega: /m[XY]?$/.test(String(battleKey(mon)))
+      megaActive: /m[XY]?$/.test(String(battleKey(mon)))
     })),
     healing: inBag(TOWER_HEAL_IDS, items),
     calls: settings.visitors === 'off' || state.call ? [] : inBag(['honey', 'azure-flute'], items),
@@ -159,6 +173,7 @@ export function renderEncounterSnapshot(state, options) {
     callPending: !!state.call,
     result: result && {
       ...result,
+      outcome: revealed ? result.kind : undefined,
       kind: revealed ? result.kind : 'throwing',
       reward: revealed ? describeReward(result.reward) : null,
       ball: ITEMS[result.ball]?.name,

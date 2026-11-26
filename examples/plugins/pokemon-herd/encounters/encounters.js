@@ -54,6 +54,7 @@ import {
   TOWER_SWITCH
 } from './rules/trainers.js'
 import { weatherNow } from './rules/weather.js'
+import { FLEE_SPEED, HALT, TEASE_PURSE } from './rules/wildacts.js'
 
 export { createEncounterState } from './encounter-state.js'
 
@@ -251,7 +252,7 @@ function settleExchange(state, context) {
   state.clash = null
   if (!tr) {
     if (opponentFainted) {
-      state.result = { ...state.result, kind: 'wild-fainted', at: now }
+      state.result = { ...state.result, kind: 'wild-fainted' }
       clearVisitor(state, context)
     }
     return
@@ -463,6 +464,9 @@ function capture(state, context, deltas, action) {
     v.expiresAt += until - now
   }
   if (!result.caught) {
+    if (!terminal && v.act?.kind === 'teleport') {
+      v.teleportAt = until
+    }
     return
   }
   const found = caughtPick(pick, now, random, ball)
@@ -516,7 +520,15 @@ function strikeRaid(state, context, deltas, slot) {
   if (hit.back) {
     state.counters = { ...state.counters, [slot]: { at: now + COUNTER_LAND_MS, dmg: hit.back.dmg } }
   }
-  state.result = { kind: 'raid-hit', own: pick, pick: raid.boss, hit, hp: updated.hp, at: now }
+  state.result = {
+    kind: 'raid-hit',
+    own: pick,
+    ownBefore: hpOf(state, slot, now),
+    pick: raid.boss,
+    hit,
+    hp: updated.hp,
+    at: now
+  }
   if (updated.beaten && !updated.paid) {
     const reward = raidReward(updated.boss)
     updated.paid = true
@@ -615,8 +627,10 @@ function spar(state, context, deltas, action) {
       side: turn.by === 'a' ? 'own' : 'opponent',
       move: turn.move?.name,
       type: turn.move?.type,
+      physical: turn.move?.physical,
       damage: turn.dmg,
       targetHp: turn.hp,
+      ownHp: turn.tick?.hp ?? turn.recoil?.hp ?? turn.drain?.hp,
       miss: turn.move?.miss,
       crit: turn.move?.crit,
       effectiveness: turn.move?.eff,
@@ -763,6 +777,18 @@ function applyAction(state, context, deltas, action) {
     if (state.tower.run && hp != null) {
       saveHp(state, slot, Math.max(0.01, hp - TOWER_SWITCH), now)
     }
+    const visitor = state.visitor
+    if (visitor?.battle?.slot === slot) {
+      visitor.battle.slot = null
+    }
+    if (visitor?.statuses) {
+      delete visitor.statuses[slot]
+    }
+    if (visitor?.trainer?.fighter === slot) {
+      visitor.trainer.choice = null
+      visitor.trainer.itemTurn = true
+      visitor.trainer.nextAt = now + 700
+    }
     return
   }
   if (action.type === 'heal') {
@@ -792,6 +818,32 @@ function applyAction(state, context, deltas, action) {
   }
   if (state.clash) {
     return 'Wait for the current action to finish.'
+  }
+  if (action.type === 'nearby') {
+    const act = v.act
+    const slot = action.slot
+    if (!act || act.from != null || !Object.hasOwn(HALT, act.kind) || !Object.hasOwn(party, slot)) {
+      return 'That visitor has already moved on.'
+    }
+    const working = context.workingSlots.includes(slot)
+    if ((act.kind === 'curious') !== working && act.kind !== 'friendly') {
+      return 'The visitor is looking for another Pokémon.'
+    }
+    if (act.kind === 'challenge' && !canFight(state, party, slot, now)) {
+      return 'That Pokémon is unavailable.'
+    }
+    const ms = HALT[act.kind]
+    Object.assign(act, { slot, from: now, until: now + ms })
+    v.expiresAt += ms
+    if (act.kind === 'tease') {
+      v.purse = Math.round(v.purse * TEASE_PURSE)
+      v.expiresAt = act.until + (v.expiresAt - act.until) / FLEE_SPEED
+    }
+    if (act.kind === 'challenge') {
+      act.until = now
+      runExchange(state, context, slot)
+    }
+    return
   }
   if (action.type === 'gift') {
     return takeGift(state, context, deltas)
@@ -842,7 +894,9 @@ export function transitionEncounter(previous, action, options) {
     seen: [],
     research: []
   }
-  settleTimed(state, context, deltas, action.type === 'tick')
+  if (action.type !== 'work') {
+    settleTimed(state, context, deltas, action.type === 'tick')
+  }
   const error = applyAction(state, context, deltas, action)
   if (error) {
     return { state: before, deltas: null, error }
