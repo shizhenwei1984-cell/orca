@@ -54,7 +54,7 @@ export type PluginAgentStatusRow = Pick<
   | 'restoredUnconfirmed'
   | 'subagents'
   | 'mainAgent'
-> & { connectionId?: string | null }
+> & { connectionId?: string | null; receivedAt?: number }
 
 export type PluginWorkspaceContext = z.output<typeof pluginWorkspaceContextSchema>
 
@@ -148,16 +148,20 @@ export function projectPluginWorkspaceAgents(
   worktreeId: string,
   terminals: readonly PluginWorkspaceTerminal[],
   rows: readonly PluginAgentStatusRow[],
-  readTaskTitles: () => ReadonlyMap<string, string> = () => new Map()
+  readTaskTitles: () => ReadonlyMap<string, string> = () => new Map(),
+  includeLiveIdentity = false
 ) {
-  const listed = rows
-    .filter((row) => row.worktreeId === worktreeId && row.providerSessionOnly !== true)
+  const workspaceRows = rows.filter(
+    (row) => row.worktreeId === worktreeId && row.providerSessionOnly !== true
+  )
+  const listed = workspaceRows
     .toSorted((a, b) => b.stateStartedAt - a.stateStartedAt)
     .slice(0, PLUGIN_AGENT_LIST_LIMIT)
   const taskTitles = listed.length > 0 ? readTaskTitles() : new Map<string, string>()
   const folderAgents = new Map<string, Set<string>>()
   const matched = listed.map((row) => {
     const host = getConnectionExecutionHostId(row.connectionId)
+    const sessionId = pluginAgentSessionId(row.providerSession) ?? null
     const terminal = terminalForPane(
       terminals.filter(
         ({ executionHostId }) => executionHostId === undefined || executionHostId === host
@@ -177,9 +181,30 @@ export function projectPluginWorkspaceAgents(
       peers.add(terminal.id)
       folderAgents.set(folder, peers)
     }
-    return { row, terminal, folder, liveTerminalId: liveTerminal?.id }
+    const liveIdentity =
+      includeLiveIdentity &&
+      liveTerminal &&
+      sessionId &&
+      (!row.terminalHandle || row.terminalHandle === liveTerminal.id) &&
+      typeof row.receivedAt === 'number' &&
+      row.receivedAt > 0 &&
+      Number.isFinite(row.receivedAt) &&
+      row.paneKey.length > 0 &&
+      row.paneKey.length <= 2048 &&
+      terminals.filter((item) => item.paneKey === row.paneKey && item.executionHostId === host)
+        .length === 1 &&
+      !workspaceRows.some(
+        (item) =>
+          item !== row &&
+          (item.providerSession?.id === sessionId ||
+            (item.paneKey === row.paneKey &&
+              getConnectionExecutionHostId(item.connectionId) === host))
+      )
+        ? { paneKey: row.paneKey, hostId: host, receivedAt: row.receivedAt }
+        : undefined
+    return { row, terminal, folder, liveTerminalId: liveTerminal?.id, liveIdentity, sessionId }
   })
-  return matched.map(({ row, terminal, folder, liveTerminalId }) => {
+  return matched.map(({ row, terminal, folder, liveTerminalId, liveIdentity, sessionId }) => {
     const taskTitle = taskTitles.get(row.paneKey)
     const children = liveTerminalId
       ? row.subagents?.slice(0, 16).flatMap(({ id, state, startedAt }) =>
@@ -208,7 +233,8 @@ export function projectPluginWorkspaceAgents(
         ? { sameFolderRival: true as const }
         : {}),
       ...(children?.length ? { children, leadWorking: row.mainAgent?.state === 'working' } : {}),
-      sessionId: pluginAgentSessionId(row.providerSession) ?? null,
+      sessionId,
+      ...(liveIdentity ? { liveIdentity } : {}),
       // Only that it is a dispatched task, and its title: never the dispatch's own records.
       task:
         taskTitle === undefined ? null : { title: taskTitle.slice(0, PLUGIN_AGENT_TASK_TITLE_MAX) }

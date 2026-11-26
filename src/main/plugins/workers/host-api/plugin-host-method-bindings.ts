@@ -175,7 +175,7 @@ const HANDLERS: Record<PluginHostMethodName, BoundPluginHostMethod> = {
       return surface === 'worker' ? projected : pluginFrameWorkspaceContext(projected)
     }
   ),
-  'agents.list': bind(api['agents.list'], async (params, { services, scope }) => {
+  'agents.list': bind(api['agents.list'], async (params, { services, scope, surface }) => {
     const worktreeId = params?.workspaceId
       ? worktreeShowAnswer.parse(
           await rpc(services)(
@@ -195,7 +195,8 @@ const HANDLERS: Record<PluginHostMethodName, BoundPluginHostMethod> = {
         terminals,
         services.listAgentStatuses(),
         // Only read when the workspace has agents: it reads the orchestration database.
-        () => services.listAgentTaskTitles?.() ?? new Map()
+        () => services.listAgentTaskTitles?.() ?? new Map(),
+        surface === 'worker'
       )
     }
   }),
