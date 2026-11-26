@@ -12,10 +12,18 @@ export function createTerminalTabAppearanceActions(
 ): Pick<TerminalSlice, 'setTabCustomTitle' | 'setTabColor'> {
   return {
     setTabCustomTitle: (tabId, title, opts) => {
+      if (opts?.isCurrent?.() === false) {
+        return
+      }
       // Why: a remote server's tab is named on that server, which republishes the name back here.
       const state = get()
       void import('@/runtime/hosted-terminals/actions/web-runtime-terminal-rename').then(
-        ({ renameHostTerminalTab }) => renameHostTerminalTab(state, tabId, title)
+        ({ renameHostTerminalTab }) => {
+          if (opts?.isCurrent?.() !== false) {
+            return renameHostTerminalTab(state, tabId, title)
+          }
+          return undefined
+        }
       )
       set((s) => {
         const owners = [...getTerminalTabOwnerWorktreeIds(s.tabsByWorktree, tabId)]
@@ -34,7 +42,7 @@ export function createTerminalTabAppearanceActions(
       })
       const item = findRenamableUnifiedTab(get().unifiedTabsByWorktree, tabId)
       if (item?.contentType === 'agent-session') {
-        const action = captureStructuredChatRename(get, item)
+        const action = captureStructuredChatRename(get, item, opts?.isCurrent)
         void import('@/runtime/native-chat/naming/structured-chat-rename')
           .then(({ renameStructuredChatTab }) =>
             renameStructuredChatTab(

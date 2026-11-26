@@ -1,3 +1,4 @@
+import { workspaceViewFrameMethods } from './plugin-workspace-view'
 import {
   EDITOR_METHODS,
   FRAME_EVENTS,
@@ -53,7 +54,7 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
     protocol: PLUGIN_PROTOCOL_VERSION,
     surface,
     api: { major: PLUGIN_HOST_API_MAJOR, minor: pluginHostApiMinorFor(methods) },
-    methods,
+    methods: [...methods, ...workspaceViewFrameMethods(surface, transport !== 'parent')],
     codes: PLUGIN_ERROR_CODES,
     events: FRAME_EVENTS,
     editor: EDITOR_METHODS,

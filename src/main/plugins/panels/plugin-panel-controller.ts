@@ -1,3 +1,4 @@
+import { WORKSPACE_VIEW_AUTHORIZATION } from '../../../shared/plugins/frames/plugin-workspace-view'
 import {
   panelActionCallSchema,
   type PluginFrameEntry
@@ -137,10 +138,7 @@ export class PluginPanelController {
     origin: { desktop?: boolean; callerWebContentsId?: number } = {}
   ): Promise<PluginHostCallOutcome> {
     const sessionToken = this.extractSessionToken(call)
-    if (!sessionToken) {
-      return { ok: false, code: 'invalid_request', error: 'invalid panel session' }
-    }
-    const binding = this.sessions.resolve(ownerKey, sessionToken)
+    const binding = sessionToken && this.sessions.resolve(ownerKey, sessionToken)
     if (!binding) {
       return { ok: false, code: 'invalid_request', error: 'invalid panel session' }
     }
@@ -166,6 +164,11 @@ export class PluginPanelController {
     }
     if (!this.isCurrent(binding)) {
       return { ok: false, code: 'unavailable', error: 'panel session is no longer available' }
+    }
+    if (parsed.data.action === WORKSPACE_VIEW_AUTHORIZATION) {
+      return origin.desktop && binding.surface === 'panel'
+        ? { ok: true, value: { pluginKey: binding.pluginKey } }
+        : { ok: false, code: 'not_permitted', error: 'Desktop panel session required.' }
     }
     return this.options.executeHostCall(
       binding.pluginKey,

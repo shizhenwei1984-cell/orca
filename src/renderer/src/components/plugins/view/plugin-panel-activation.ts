@@ -179,7 +179,11 @@ export function activatePluginCommandPanel(pluginKey: string, commandId: string)
   }
 }
 
-export function openSiblingPluginPanel(from: string, params: unknown): PluginHostCallOutcome {
+export function openSiblingPluginPanel(
+  from: string,
+  params: unknown,
+  permitsWorkspaceHandle?: (value: string) => boolean
+): PluginHostCallOutcome {
   const parsed = openPluginPanelParamsSchema.safeParse(params)
   if (!parsed.success) {
     return {
@@ -206,11 +210,12 @@ export function openSiblingPluginPanel(from: string, params: unknown): PluginHos
   const tabKey = plugin && pluginPanelTabKey(plugin.pluginKey, panel)
   const target = plugin?.panels.find((entry) => entry.tabKey === tabKey)
   const state = useAppStore.getState()
+  const publicId = frameWorkspaceId(state)
   if (
     !target?.actions?.includes(action) ||
-    workspaceId !== frameWorkspaceId(state) ||
+    (workspaceId !== publicId && !permitsWorkspaceHandle?.(workspaceId)) ||
     !canShowRightSidebarForView(state.activeView) ||
-    !openPanelActivation(target, { action, input, workspaceId })
+    !openPanelActivation(target, { action, input, workspaceId: publicId })
   ) {
     return {
       ok: false,

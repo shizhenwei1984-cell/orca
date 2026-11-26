@@ -395,3 +395,50 @@ body[data-rail='true'] {
     padding-inline: 2px;
   }
 }
+
+.workspace-view {
+  display: grid;
+  gap: 2px;
+  margin-inline-start: 12px;
+}
+
+.workspace-view.compact {
+  justify-items: center;
+  margin-inline-start: 0;
+}
+
+.workspace-tab,
+.workspace-review {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workspace-tab > button:first-child {
+  min-width: 0;
+  flex: 1;
+  text-align: start;
+}
+
+.workspace-tab[data-current='true'] {
+  background: var(--orca-accent);
+  border-radius: var(--orca-radius);
+}
+
+.workspace-view > button,
+.workspace-review > button {
+  justify-self: start;
+  color: var(--orca-muted-foreground);
+}
+
+.workspace-review > button:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-view.compact .workspace-review {
+  flex-wrap: wrap;
+  justify-content: center;
+}
