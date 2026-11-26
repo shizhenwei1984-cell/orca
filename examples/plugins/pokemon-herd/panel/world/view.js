@@ -1,3 +1,4 @@
+import { ITEMS } from '../../encounters/rules/items.js'
 import { attention } from './motion.js'
 import { reactIcon } from './reactions.js'
 import { paintSprite, spriteSet } from './sprites.js'
@@ -19,7 +20,7 @@ export function createActor(document, entity, now, x, row, visitor = false) {
   button.dataset.actor = entity.id
   button.dataset.kind = visitor ? 'visitor' : 'agent'
   if (!visitor) {
-    button.setAttribute('aria-keyshortcuts', 'P S')
+    button.setAttribute('aria-keyshortcuts', 'P B S Alt+Shift+P Alt+Shift+B Shift+F10')
   }
   const [tag, body, sprite, badge] = ['tag', 'body', 'sprite', 'badge'].map((name) => {
     const span = document.createElement('span')
@@ -107,16 +108,20 @@ export function paintActors(
           : STATES[actor.mood]
       const shots = actor.react?.shot
       const activeShot = shots && now >= shots.at && now < shots.until && !reduced
-      const icon = attention(actor.mood)
-        ? actor.mood === 'blocked'
-          ? '!'
-          : '…'
-        : actor.petUntil > now
-          ? '♥'
-          : actor.flashUntil > now
-            ? '✦'
-            : reactIcon(actor, now) ||
-              (entity.state === 'done' ? '✓' : actor.mood === 'sleep' ? 'zZ' : '')
+      const { careNote, hungry } = entity
+      const care = careNote && now >= careNote.at && now - careNote.at < 3200 ? careNote.kind : ''
+      const careIcon = care === 'pet' ? '♥' : care ? (ITEMS[careNote.item]?.icon ?? '🍓') : ''
+      const attentionIcon = attention(actor.mood)
+        ? hungry
+          ? '🥺'
+          : actor.mood === 'blocked'
+            ? '!'
+            : '…'
+        : ''
+      const evolved = entity.evolvedAt && now >= entity.evolvedAt && now - entity.evolvedAt < 3000
+      const flash = actor.flashUntil > now || evolved ? '✦' : ''
+      const resting = entity.state === 'done' ? '✓' : actor.mood === 'sleep' ? 'zZ' : ''
+      const icon = careIcon || attentionIcon || flash || reactIcon(actor, now) || resting
       const rival =
         entity.rivalGroup &&
         actor.mood === 'working' &&
@@ -130,10 +135,11 @@ export function paintActors(
       actor.lastPaint = now
       button.dataset.mood = visitor ? 'wild' : actor.mood
       button.dataset.focused = entity.focused ? 'true' : 'false'
-      button.dataset.petted = actor.petUntil > now ? 'true' : 'false'
+      button.dataset.petted = String(care === 'pet')
+      button.dataset.care = care
       button.dataset.row = row
       button.classList.toggle('pokemon-world__actor--dragging', !!actor.dragging)
-      setLabel(actor, status, settings.tags || visitor)
+      setLabel(actor, hungry ? `${status} · Hungry` : status, settings.tags || visitor)
       const scale = settings.scale * (entity.parentId ? 1.5 : 2)
       const { w, h } = paintSprite(sprite, actor, {
         now,

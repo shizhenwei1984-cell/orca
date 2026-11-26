@@ -285,7 +285,7 @@ export function evolveInto(pick, dex, at) {
 // Its agent finished a job: one more on its count, and it evolves if it can. Returns { pick, evolved }.
 export function gainJob(pick, slot, how = {}, at = 0) {
   const counted = { ...pick, jobs: (pick.jobs ?? 0) + (pick.held === 'lucky-egg' ? 2 : 1) }
-  const dex = evolveTarget(counted, slot, { night: how.night })
+  const dex = how.evolve === false ? null : evolveTarget(counted, slot, { night: how.night })
   return dex
     ? { pick: evolveInto(counted, dex, at), evolved: true }
     : { pick: counted, evolved: false }

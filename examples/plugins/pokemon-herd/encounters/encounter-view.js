@@ -95,7 +95,7 @@ export function renderEncounterSnapshot(state, options) {
   const pick = v && visitorPickAt(v, now)
   const canThrow = pick && !tr && v.giftAt != null && now >= v.giftAt + 800 && !state.clash
   const raid = state.raid
-  const phase = settings.raids ? raidPhase(raid, now) : null
+  const phase = raidPhase(raid, now)
   const run = state.tower.run
   const outbreak = dueOutbreak(state, context)
   const result = state.result
@@ -143,6 +143,7 @@ export function renderEncounterSnapshot(state, options) {
       fighter: tr?.fighter === slot,
       megaActive: /m[XY]?$/.test(String(battleKey(mon)))
     })),
+    capture: { balls: inBag(BALLS, items), berries: inBag(Object.keys(BAIT), items) },
     healing: inBag(TOWER_HEAL_IDS, items),
     calls: settings.visitors === 'off' || state.call ? [] : inBag(['honey', 'azure-flute'], items),
     raid: phase && {

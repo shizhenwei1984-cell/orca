@@ -3,8 +3,19 @@ import { appearanceOf } from './catalog/trainer-catalog.mjs'
 import { species, starterDex } from './panel/pokemon.mjs'
 import { loadCare } from './trainer-rules/breed.mjs'
 import { genderFrom } from './encounters/rules/gender.js'
-import { addItem, addMoney, CANDY_JOB_MS, jobPay, loadBag } from './encounters/rules/items.js'
+import {
+  addItem,
+  addMoney,
+  CANDY_JOB_MS,
+  jobPay,
+  loadBag,
+  MAX_ITEM,
+  pickup,
+  pickupDelay
+} from './encounters/rules/items.js'
 import { FRIEND, expShareTarget, gainJob, hash, withFriend } from './encounters/rules/picks.js'
+import { pokemonId } from './trainer-actions.mjs'
+import { abilityOf } from './encounters/rules/abilities.js'
 import { loadDex } from './encounters/rules/trainer.js'
 import {
   MINUTE,
@@ -15,7 +26,8 @@ import {
   registerSeen,
   savedPokemon,
   settleBadges,
-  trainerPick
+  trainerPick,
+  trainerPerks
 } from './trainer-game.mjs'
 
 const QUICK_COOLDOWN = 10 * MINUTE
@@ -135,6 +147,7 @@ export function recordStatus(
     slots = [event.paneKey],
     rnd = Math.random,
     initialPick,
+    evolve = true,
     workspaceId = event.workspaceListId ?? event.workspaceId
   } = {}
 ) {
@@ -182,9 +195,11 @@ export function recordStatus(
   if (pokemon && berry && next.bag.items.berry > 0) {
     next = { ...next, bag: addItem(next.bag, 'berry', -1) }
     pokemon = gainFriendship(pokemon, FRIEND.meal)
+    companion.careNote = { kind: 'feed', at }
     next = creditResearch(next, at, slots, 'berry', 1)
   }
   if (quick) {
+    companion.careNote = { kind: 'pet', at }
     next = creditResearch(next, at, slots, 'quick', 1)
   }
   if (uncredited) {
@@ -204,13 +219,13 @@ export function recordStatus(
     }
     next = { ...next, bag: paid }
     const pick = trainerPick(pokemon)
-    const how = { night: isNight(at) }
+    const how = { night: isNight(at), evolve }
     const result = gainJob(pick, paneKey, how, at)
     pokemon = savedPokemon(result.pick, pokemon, undefined, pokemon.jobs + 1)
     if (result.evolved) {
       next = registerEvolution(next, pokemon)
     }
-    if (pick.held === 'exp-share') {
+    if (evolve && pick.held === 'exp-share') {
       const picks = Object.fromEntries(
         slots.flatMap((slot) => {
           const active = next.party[slot]?.pokemon
@@ -233,19 +248,82 @@ export function recordStatus(
   return settleBadges(next, slots, pokemon)
 }
 
+export function dueCare({ pokemon, run, pickupAt }, at, settings) {
+  if (!pokemon || !run) {
+    return null
+  }
+  if (
+    run.input &&
+    !run.input.hungry &&
+    at - run.input.since >= HUNGRY_AFTER &&
+    pokemon.held !== 'leftovers'
+  ) {
+    return 'hunger'
+  }
+  return settings.pickup &&
+    run.state !== 'working' &&
+    !needsInput(run.state) &&
+    (pickupAt == null || pickupAt <= at)
+    ? 'pickup'
+    : null
+}
+
+export function sampleCare(save, at, slots, settings, rnd = Math.random) {
+  let bag = save.bag
+  let party = save.party
+  for (const slot of slots) {
+    const member = party[slot]
+    const { pokemon, run } = member
+    const due = dueCare(member, at, settings)
+    let next = member
+    if (due === 'hunger') {
+      next = {
+        ...next,
+        pokemon: gainFriendship(pokemon, FRIEND.hungry),
+        run: { ...run, input: { ...run.input, hungry: true } }
+      }
+    } else if (due === 'pickup') {
+      const ability = abilityOf(trainerPick(pokemon), slot)
+      const gatherer = ability === 'pickup' || ability === 'honey-gather'
+      const delay =
+        (pickupDelay(rnd) * trainerPerks(save, slots).pickup * (gatherer ? 2 / 3 : 1)) /
+        (pokemon.held === 'amulet-coin' ? 2 : 1)
+      next = { ...next, pickupAt: at + delay }
+      if (member.pickupAt != null) {
+        const item = ability === 'honey-gather' && rnd() < 0.5 ? 'honey' : pickup(rnd)
+        if ((bag.items[item] ?? 0) < MAX_ITEM) {
+          bag = addItem(bag, item)
+          next.careNote = { kind: 'pickup', at, item }
+        }
+      }
+    }
+    if (next !== member) {
+      if (party === save.party) {
+        party = { ...party }
+      }
+      party[slot] = next
+    }
+  }
+  return party === save.party ? save : { ...save, party, bag }
+}
+
 export function trainerView(save, terminalIds) {
   const terminals = new Set(terminalIds)
   const matches = new Map()
-  for (const member of Object.values(save.party)) {
+  for (const [slot, member] of Object.entries(save.party)) {
     const id = member.terminalId
-    if (member.pokemon && terminals.has(id) && !(matches.get(id)?.lastAt >= member.lastAt)) {
-      matches.set(id, member)
+    if (member.pokemon && terminals.has(id) && !(matches.get(id)?.member.lastAt >= member.lastAt)) {
+      matches.set(id, { slot, member })
     }
   }
-  const companions = Array.from(matches, ([terminalId, member]) => {
+  const companions = Array.from(matches, ([terminalId, { slot, member }]) => {
     const { starter, dex, form, jobs, stageJobs, friendship } = member.pokemon
     return {
       terminalId,
+      ref: { slot, id: pokemonId(member.pokemon, slot) },
+      hungry: !!member.run?.input?.hungry,
+      careNote: member.careNote ?? null,
+      evolvedAt: member.pokemon.evolvedAt ?? null,
       starter,
       dex,
       appearance: appearanceOf(member.pokemon),
@@ -261,6 +339,7 @@ export function trainerView(save, terminalIds) {
     ...save.work,
     money: save.bag.money,
     candy: save.bag.items['rare-candy'] ?? 0,
+    berries: ['berry', 'sitrus-berry'].filter((item) => save.bag.items[item] > 0),
     companions
   }
 }

@@ -78,7 +78,17 @@ function moveRoomKeys(rooms, resolve, merge) {
 }
 
 export function reconcileTrainerWorkspaces(save, catalog, legacy, workspaceId) {
-  const resolve = (id) => (workspaceId && id && id === legacy ? workspaceId : catalog.resolve(id))
+  const aliases = new Map()
+  for (const { workspaceId: oldId, hostWorkspaceId: raw } of Object.values(save.party)) {
+    const id = raw && oldId && catalog.resolve(raw, oldId)
+    if (id && id !== oldId) {
+      aliases.set(oldId, !aliases.has(oldId) || aliases.get(oldId) === id ? id : null)
+    }
+  }
+  if (legacy && workspaceId) {
+    aliases.set(legacy, workspaceId)
+  }
+  const resolve = (id) => aliases.get(id) ?? catalog.resolve(id)
   let party = save.party
   for (const [slot, member] of Object.entries(save.party)) {
     const oldId = member.workspaceId ?? member.workspaceListId

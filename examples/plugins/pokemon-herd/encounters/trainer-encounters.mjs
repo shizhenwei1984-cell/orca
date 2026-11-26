@@ -20,7 +20,7 @@ import { addMoney } from './rules/items.js'
 import { BAIT, AUTO_BAIT, dayOf } from './rules/trainer.js'
 import { TOWER_HEAL_IDS } from './rules/trainers.js'
 import { weatherNow } from './rules/weather.js'
-import { VISIT_EVERY } from './rules/settings.js'
+import { readHerdSettings } from '../world-settings.mjs'
 
 const playerActions = new Set([
   'attack',
@@ -73,7 +73,12 @@ function rulesFor(save, { slots, at, rnd, settings, rain }) {
     topDex,
     perks: trainerPerks(save, slots),
     workingSlots: slots.filter((slot) => save.party[slot].run?.state === 'working'),
-    weather: rain === 'rain' || rain === 'storm' ? weatherNow(rain) : undefined,
+    weather:
+      settings?.weather !== false && (rain === 'rain' || rain === 'storm')
+        ? weatherNow(rain)
+        : undefined,
+    ball: settings?.ball,
+    bait: settings?.bait,
     settings,
     xAttack: save.boosts?.['x-attack'] > at
   }
@@ -135,6 +140,14 @@ function applyEncounter(save, action, context) {
       party[slot] = { ...party[slot], pokemon: savedPokemon(pick, party[slot].pokemon) }
     }
     next = { ...next, party }
+  }
+  if (action.type === 'heal') {
+    const { slot, item } = action
+    const kind = ['berry', 'sitrus-berry'].includes(item) ? 'feed' : 'heal'
+    next = {
+      ...next,
+      party: { ...next.party, [slot]: { ...next.party[slot], careNote: { kind, at, item } } }
+    }
   }
   if (deltas.seen.length) {
     next = registerSeen(next, deltas.seen)
@@ -210,7 +223,7 @@ export function encounterTrainerAction(save, action, context) {
 }
 
 function requestScope(input) {
-  const { workspaceId, terminalIds, settings, rain } = input ?? {}
+  const { workspaceId, terminalIds, rain } = input ?? {}
   if (
     (workspaceId != null && (typeof workspaceId !== 'string' || workspaceId.length > 1024)) ||
     !Array.isArray(terminalIds) ||
@@ -219,19 +232,7 @@ function requestScope(input) {
   ) {
     throw new Error('Invalid encounter workspace.')
   }
-  return {
-    workspaceId,
-    terminalIds,
-    rain,
-    settings: {
-      ...(Object.hasOwn(VISIT_EVERY, settings?.visitors) && { visitors: settings.visitors }),
-      ...Object.fromEntries(
-        ['spar', 'chooseMoves', 'raids', 'outbreaks']
-          .filter((key) => typeof settings?.[key] === 'boolean')
-          .map((key) => [key, settings[key]])
-      )
-    }
-  }
+  return { workspaceId, terminalIds, rain }
 }
 
 function snapshotFor(save, context) {
@@ -284,7 +285,13 @@ function verifyAction(save, state, context, action) {
 
 export function registerEncounterHandlers(
   orca,
-  { store, getScope, clock = Date.now, rnd = Math.random }
+  {
+    store,
+    getScope,
+    preferences = () => readHerdSettings(orca.storage),
+    clock = Date.now,
+    rnd = Math.random
+  }
 ) {
   const cries = new Map()
   orca.panels.handle('encounter.cry', async ({ dex } = {}) => {
@@ -334,6 +341,7 @@ export function registerEncounterHandlers(
   async function contextFor(save, input, catalog, at, fresh) {
     return {
       ...input,
+      settings: await preferences(),
       ...roomScope(
         save,
         await getScope(save, input.terminalIds, catalog, {

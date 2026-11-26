@@ -1,4 +1,4 @@
-const KEY = 'world.settings'
+import { captureSettings, WORLD_SETTINGS_KEY } from '../world-settings.mjs'
 
 export function bindWorldPreferences(orca, signal, apply) {
   const form = document.querySelector('#world-settings')
@@ -7,7 +7,7 @@ export function bindWorldPreferences(orca, signal, apply) {
   const save = form.querySelector('[type="submit"]')
   const controls = [...form.querySelectorAll('select, input')]
   let audio
-  let enabled = false
+  let current = { ...values(), ...captureSettings() }
 
   function values() {
     return Object.fromEntries(
@@ -22,18 +22,23 @@ export function bindWorldPreferences(orca, signal, apply) {
     )
   }
 
-  function update({ sound, ...settings }) {
-    enabled = sound
+  function update(settings) {
+    current = settings
     apply(settings)
   }
 
-  function play(kind, gesture = false) {
-    if (signal.aborted || !window.AudioContext || (!gesture && audio?.state !== 'running')) {
-      return
+  function arm(event) {
+    if (!signal.aborted && window.AudioContext && event.isTrusted) {
+      audio ??= new AudioContext()
+      if (audio.state === 'suspended') {
+        void audio.resume().catch(() => {})
+      }
     }
-    audio ??= new AudioContext()
-    if (audio.state === 'suspended' && gesture) {
-      void audio.resume().catch(() => {})
+  }
+
+  function play(kind) {
+    if (signal.aborted || audio?.state !== 'running') {
+      return
     }
     const frequencies = kind === 'spar' ? [392, 330] : [523, 659]
     for (const [index, frequency] of frequencies.entries()) {
@@ -54,7 +59,11 @@ export function bindWorldPreferences(orca, signal, apply) {
     'click',
     (event) => {
       if (event.isTrusted) {
-        play('pet', true)
+        arm(event)
+        void audio
+          ?.resume()
+          .then(() => play('pet'))
+          .catch(() => {})
       }
     },
     { signal }
@@ -70,12 +79,20 @@ export function bindWorldPreferences(orca, signal, apply) {
   async function load() {
     busy(true)
     try {
-      const stored = await orca.storage.get(KEY)
+      const [stored, battleSounds] = await Promise.all([
+        orca.storage.get(WORLD_SETTINGS_KEY),
+        orca.storage.get('battle.sounds')
+      ])
       if (signal.aborted) {
         return
       }
       for (const control of controls) {
-        const value = stored?.[control.name]
+        const value =
+          control.name === 'battleSounds'
+            ? (stored?.battleSounds ?? battleSounds)
+            : control.name === 'visitors' && stored?.visitors === false
+              ? 'off'
+              : stored?.[control.name]
         if (control.type === 'checkbox') {
           if (typeof value === 'boolean') {
             control.checked = value
@@ -84,7 +101,7 @@ export function bindWorldPreferences(orca, signal, apply) {
           control.value = String(value)
         }
       }
-      update(values())
+      update({ ...values(), ...captureSettings(stored) })
     } catch {
       status.textContent = 'Could not load saved settings.'
     } finally {
@@ -92,24 +109,33 @@ export function bindWorldPreferences(orca, signal, apply) {
     }
   }
 
+  async function persist(next, patch) {
+    busy(true)
+    status.textContent = ''
+    try {
+      await orca.storage.set(WORLD_SETTINGS_KEY, next)
+      if (!signal.aborted) {
+        for (const control of controls) {
+          if (control.type === 'checkbox' && Object.hasOwn(patch, control.name)) {
+            control.checked = next[control.name]
+          }
+        }
+        update(next)
+        status.textContent = 'Settings saved.'
+      }
+    } catch (error) {
+      status.textContent = 'Could not save settings. Try again.'
+      throw error
+    } finally {
+      busy(false)
+    }
+  }
+
   form.addEventListener(
     'submit',
-    async (event) => {
+    (event) => {
       event.preventDefault()
-      const next = values()
-      busy(true)
-      status.textContent = ''
-      try {
-        await orca.storage.set(KEY, next)
-        if (!signal.aborted) {
-          update(next)
-          status.textContent = 'Settings saved.'
-        }
-      } catch {
-        status.textContent = 'Could not save settings. Try again.'
-      } finally {
-        busy(false)
-      }
+      void persist({ ...current, ...values() }, {}).catch(() => {})
     },
     { signal }
   )
@@ -125,9 +151,23 @@ export function bindWorldPreferences(orca, signal, apply) {
   )
 
   void load()
-  return (kind, event) => {
-    if (enabled) {
-      play(kind, event?.isTrusted)
+  return {
+    get: () => current,
+    async patch(patch) {
+      if (save.disabled) {
+        throw new Error('Settings are still loading.')
+      }
+      return persist({ ...current, ...patch }, patch)
+    },
+    arm(event) {
+      if (current.sound) {
+        arm(event)
+      }
+    },
+    play(kind) {
+      if (current.sound) {
+        play(kind)
+      }
     }
   }
 }

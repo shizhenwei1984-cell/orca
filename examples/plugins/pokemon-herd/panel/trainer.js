@@ -13,6 +13,7 @@ const money = (value) => `₽${currency.format(value)}`
 const minutes = (value) => `${Math.ceil(value)} min`
 const sections = ['Party', 'Bag', 'Shop', 'Box', 'Day Care', 'Research', 'Badges', 'Pokédex']
 
+let scope = new AbortController()
 let getTerminals
 let active = 'Bag'
 let game
@@ -94,10 +95,14 @@ async function refresh(force = false) {
   }
   const request = ++requestVersion
   try {
-    const next = await window.orca.plugin.request('trainer.game', {
-      terminalIds: getTerminals(),
-      query
-    })
+    const next = await window.orca.plugin.request(
+      'trainer.game',
+      {
+        terminalIds: getTerminals(),
+        query
+      },
+      { signal: scope.signal }
+    )
     if (request !== requestVersion || !dialog.open) {
       return
     }
@@ -131,21 +136,30 @@ async function submit(action, fromPicker = false) {
   body.inert = true
   status.textContent = ''
   retry.hidden = true
+  const { signal } = scope
   try {
-    const result = await window.orca.plugin.request('trainer.command', pending)
-    pending = undefined
-    await refresh(true)
-    status.textContent = result.ok ? 'Saved.' : result.message
+    const result = await window.orca.plugin.request('trainer.command', pending, { signal })
+    if (!signal.aborted) {
+      pending = undefined
+      await refresh(true)
+      if (!signal.aborted) {
+        status.textContent = result.ok ? 'Saved.' : result.message
+      }
+    }
     return result
   } catch (error) {
-    status.textContent = error.message
-    retry.hidden = false
+    if (!signal.aborted) {
+      status.textContent = error.message
+      retry.hidden = false
+    }
     if (fromPicker) {
       throw error
     }
   } finally {
-    busy = false
-    body.inert = false
+    if (!signal.aborted) {
+      busy = false
+      body.inert = false
+    }
   }
 }
 
@@ -154,31 +168,46 @@ async function changeCompanion(pokemon, opener) {
     return
   }
   picking = true
-  opener.disabled = true
+  const { signal } = scope
+  const isCurrent = () =>
+    !signal.aborted &&
+    dialog.open &&
+    active === 'Party' &&
+    game?.party.some(({ ref }) => ref.slot === pokemon.ref.slot && ref.id === pokemon.ref.id)
+  if (opener) {
+    opener.disabled = true
+  }
   try {
     await openCompanionPicker(
       pokemon,
       game,
       async (action) => {
+        if (!isCurrent()) {
+          throw new Error('That Pokémon is no longer available.')
+        }
         const result = await submit(action, true)
         if (!result.ok) {
           throw new Error(result.message)
         }
       },
-      () =>
-        dialog.open &&
-        active === 'Party' &&
-        game.party.some(({ ref }) => ref.slot === pokemon.ref.slot && ref.id === pokemon.ref.id)
+      isCurrent,
+      signal
     )
   } catch (error) {
-    status.textContent = error.message
+    if (!signal.aborted) {
+      status.textContent = error.message
+    }
   } finally {
-    picking = false
-    opener.disabled = false
-    if (opener.isConnected) {
-      opener.focus()
-    } else if (dialog.open) {
-      tabs.querySelector('[aria-pressed="true"]')?.focus()
+    if (!signal.aborted) {
+      picking = false
+      if (opener) {
+        opener.disabled = false
+      }
+      if (opener?.isConnected) {
+        opener.focus()
+      } else if (dialog.open) {
+        tabs.querySelector('[aria-pressed="true"]')?.focus()
+      }
     }
   }
 }
@@ -285,14 +314,14 @@ function pokemonCard(pokemon) {
 }
 
 function bringOut(pokemon) {
-  let destination
+  let destination = game.party.find(({ terminalId }) => terminalId === focusedTerminal)
   const choice = select(
     'Bring out to',
     [
       ['', 'Choose an agent'],
       ...game.party.map((member) => [member.ref.slot, member.title || member.name])
     ],
-    '',
+    destination?.ref.slot ?? '',
     (id) => {
       destination = game.party.find(({ ref }) => ref.slot === id)
       bring.disabled = !destination
@@ -301,7 +330,7 @@ function bringOut(pokemon) {
   const bring = button(
     'Bring out',
     () => void submit({ type: 'bring-out', target: pokemon.ref, destination: destination.ref }),
-    { disabled: true }
+    { disabled: !destination }
   )
   return toolbar(choice, bring)
 }
@@ -687,7 +716,7 @@ function open(section, terminalId = null) {
   } else {
     body.replaceChildren(node('p', 'Loading trainer…'))
   }
-  void refresh(true)
+  return refresh(true)
 }
 
 export function mountTrainer(getTerminalIds) {
@@ -702,6 +731,36 @@ export function mountTrainer(getTerminalIds) {
   return {
     open,
     openParty: (terminalId) => open('Party', terminalId),
+    openBoxFor: (terminalId) => open('Box', terminalId),
+    async openPicker({ id, ref }) {
+      const current = scope
+      await open('Party', id)
+      if (scope !== current || !dialog.open || active !== 'Party' || focusedTerminal !== id) {
+        return
+      }
+      const pokemon = game?.party.find(
+        (member) =>
+          member.terminalId === id && member.ref.slot === ref.slot && member.ref.id === ref.id
+      )
+      if (pokemon) {
+        await changeCompanion(pokemon)
+      } else {
+        status.textContent = 'That Pokémon is no longer available.'
+      }
+    },
+    reset() {
+      scope.abort()
+      scope = new AbortController()
+      requestVersion++
+      game = pending = undefined
+      busy = picking = body.inert = false
+      status.textContent = ''
+      retry.hidden = true
+      if (dialog.open) {
+        dialog.close()
+      }
+      body.replaceChildren()
+    },
     refresh,
     submit
   }

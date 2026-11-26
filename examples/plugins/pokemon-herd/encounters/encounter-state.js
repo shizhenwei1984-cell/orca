@@ -120,6 +120,7 @@ export function dueOutbreak(state, context) {
 
 export function scheduleVisitor(state, context, first = false) {
   const { now, random, settings } = context
+  state.visitPace = settings.visitors
   const pace = VISIT_EVERY[settings.visitors]
   if (!pace) {
     state.visitAt = null
@@ -177,7 +178,13 @@ export function createVisitor(state, context, deltas) {
     return
   }
   if (!VISIT_EVERY[settings.visitors]) {
+    if (state.visitAt != null || state.visitPace !== settings.visitors) {
+      scheduleVisitor(state, context)
+    }
     return
+  }
+  if (state.visitPace !== settings.visitors) {
+    scheduleVisitor(state, context, state.visitPace == null)
   }
   const outbreak = dueOutbreak(state, context)
   if (outbreak && state.outbreakFrom !== outbreak.from) {

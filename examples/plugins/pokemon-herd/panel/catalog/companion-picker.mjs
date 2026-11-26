@@ -1,9 +1,9 @@
 import { openCatalogPicker } from './picker.mjs'
 
-export async function openCompanionPicker(pokemon, game, onChoose, isCurrent) {
-  const request = (change) => window.orca.plugin.request('catalog.preferences', change)
+export async function openCompanionPicker(pokemon, game, onChoose, isCurrent, signal) {
+  const request = (change) => window.orca.plugin.request('catalog.preferences', change, { signal })
   const { source, favorites } = await request(null)
-  if (isCurrent && !isCurrent()) {
+  if (signal?.aborted || (isCurrent && !isCurrent())) {
     return
   }
   const { caught, shinyUnlocked, ...unlocks } = game.catalog
@@ -17,5 +17,16 @@ export async function openCompanionPicker(pokemon, game, onChoose, isCurrent) {
     onSourceChange: (source) => request({ source }),
     onSelect: (pick) => onChoose({ ...pick, type: 'choose', target: pokemon.ref })
   })
-  return new Promise((resolve) => dialog.addEventListener('close', resolve, { once: true }))
+  return new Promise((resolve) => {
+    const close = () => dialog.close()
+    signal?.addEventListener('abort', close, { once: true })
+    dialog.addEventListener(
+      'close',
+      () => {
+        signal?.removeEventListener('abort', close)
+        resolve()
+      },
+      { once: true }
+    )
+  })
 }

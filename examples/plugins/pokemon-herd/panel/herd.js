@@ -4,6 +4,7 @@ import { encounterSprites } from './encounters/encounter-sprites.js'
 import { species, starterDex } from './pokemon.mjs'
 import { disposeCompanionArt, paintCompanionArt } from './catalog/companion-art.mjs'
 import { mountTrainer } from './trainer.js'
+import { mountWorldCare, mountWorldCries } from './world-care.js'
 import { worldInteractions } from './world-interactions.js'
 import { bindWorldPreferences } from './world-preferences.js'
 import { mountWorld } from './world/world.js'
@@ -34,7 +35,8 @@ const showParty = document.querySelector('#show-party')
 const showSettings = document.querySelector('#show-settings')
 const settings = document.querySelector('#world-settings')
 const actions = document.querySelector('#world-actions')
-const focusButton = document.querySelector('#focus-terminal')
+const showActions = document.querySelector('#show-world-actions')
+const careStatus = document.querySelector('#care-status')
 const focusStatus = document.querySelector('#focus-status')
 const lifetime = new AbortController()
 const { signal } = lifetime
@@ -45,12 +47,24 @@ let progress = new Map()
 let readingProgress = false
 let progressDirty = false
 let focusRequest
+let berries = []
+const care = mountWorldCare(orca, careStatus, (action) => {
+  if (action.type === 'pet') {
+    preferences.play('pet')
+  }
+  void readProgress()
+})
+const cry = mountWorldCries(orca, () => preferences.get())
 const trainerGame = mountTrainer(() => [...(workspace?.terminals ?? [])].slice(0, 50))
 
 function publish(type, detail, cancelable = false) {
   return worldInteractions.dispatchEvent(
     new CustomEvent(type, {
-      detail: { workspaceId: workspace?.context.workspaceId, ...detail },
+      detail: {
+        workspaceId: workspace?.context.workspaceId,
+        signal: workspace?.scope.signal,
+        ...detail
+      },
       cancelable
     })
   )
@@ -59,11 +73,13 @@ function publish(type, detail, cancelable = false) {
 const world = mountWorld(worldContainer, {
   onFocus: focusTerminal,
   onPet(agent, event) {
-    playSound('pet', event)
-    publish('pet', { agent })
+    if (event.isTrusted) {
+      preferences.arm(event)
+      void careFor(agent, { type: 'pet' })
+    }
   },
   onSpar(spar) {
-    playSound('spar')
+    preferences.play('spar')
     publish('spar', spar)
   },
   onDrop: (drop) => publish('drop', drop),
@@ -73,47 +89,61 @@ const world = mountWorld(worldContainer, {
       openActions(menu)
     }
   },
-  onCommand(command, agent) {
-    if (!publish('command', { command, agent }, true)) {
-      return true
-    }
-    if (command === 'settings') {
-      toggleSettings(settings.hidden)
-      return true
-    }
-    return false
-  }
+  onCommand: runCommand
 })
 const encounterContainer = document.querySelector('#encounters')
-let battleSoundChanged = false
 const encounters = mountEncounterGame(encounterContainer, {
-  request: (name, input) => orca.plugin.request(name, input, { signal }),
+  request: (name, input, scope) =>
+    orca.plugin.request(name, input, { signal: scope ? AbortSignal.any([signal, scope]) : signal }),
   interactions: worldInteractions,
   world: worldContainer,
   ...encounterSprites(loadCatalogSprite),
-  onSettings({ battleSounds }) {
-    battleSoundChanged = true
-    return orca.storage.set('battle.sounds', battleSounds)
-  },
+  onRare: (pick, scope) => void cry('cryRare', pick.dex, scope),
+  onSettings: (patch) => preferences.patch(patch),
   signal
 })
-void orca.storage
-  .get('battle.sounds')
-  .then((value) => {
-    if (!battleSoundChanged && typeof value === 'boolean') {
-      encounters.update({ settings: { battleSounds: value } })
-    }
-  })
-  .catch(() => {})
-const playSound = bindWorldPreferences(orca, signal, (settings) => {
+const preferences = bindWorldPreferences(orca, signal, (settings) => {
   world.update({ settings })
   encounters.update({ settings })
 })
+
+function careFor(agent, action) {
+  const ref = progress.get(agent.id)?.ref
+  if (
+    !workspace?.terminals.has(agent.id) ||
+    !ref ||
+    ref.id !== agent.ref?.id ||
+    ref.slot !== agent.ref.slot
+  ) {
+    return
+  }
+  return care(action, agent, workspace.scope.signal, [...workspace.terminals].slice(0, 50))
+}
+
+function runCommand(command, agent) {
+  if (!publish('command', { command, agent }, true)) {
+    return true
+  }
+  if (command === 'settings') {
+    toggleSettings(settings.hidden)
+    return true
+  }
+  if (command === 'bag') {
+    void trainerGame.open('Bag')
+    return true
+  }
+  if (command === 'open-picker' && agent?.ref) {
+    void trainerGame.openPicker(agent)
+    return true
+  }
+  return false
+}
 
 function selectView(party) {
   actions.hidePopover()
   worldContainer.hidden = party
   encounterContainer.hidden = party
+  showActions.hidden = party
   herd.hidden = !party
   showWorld.setAttribute('aria-pressed', String(!party))
   showParty.setAttribute('aria-pressed', String(party))
@@ -134,18 +164,80 @@ function toggleSettings(open) {
 }
 
 function openActions({ agent, x, y, anchor }) {
-  focusButton.hidden = !agent
-  focusButton.onclick = (event) => {
-    actions.hidePopover()
-    void focusTerminal(agent, event)
+  actions.hidePopover()
+  const scope = workspace?.scope.signal
+  const items = agent
+    ? [['Focus terminal', (event) => void focusTerminal(agent, event)]]
+    : ['Box', 'Bag', 'Shop', 'Research', 'Pokédex'].map((section) => [
+        section,
+        () => void trainerGame.open(section)
+      ])
+  if (agent?.ref) {
+    items.push(
+      [
+        'Pet',
+        (event) => {
+          preferences.arm(event)
+          void careFor(agent, { type: 'pet' })
+        }
+      ],
+      ...berries.map((item) => [
+        item === 'berry' ? 'Feed Oran Berry' : 'Feed Sitrus Berry',
+        () => void careFor(agent, { type: 'use', item })
+      ]),
+      ['Pokémon details', () => void trainerGame.openParty(agent.id)],
+      ['Bring out from Box', () => void trainerGame.openBoxFor(agent.id)],
+      ['Change Pokémon', () => runCommand('open-picker', agent)]
+    )
+  } else if (!agent) {
+    items.push(...encounters.menuActions())
+    if (workspace) {
+      const choose = preferences.get().chooseMoves
+      items.push([
+        choose ? 'Choose moves automatically' : 'Choose moves manually',
+        () => {
+          void preferences.patch({ chooseMoves: !choose }).catch((error) => {
+            careStatus.textContent = error.message
+          })
+        }
+      ])
+    }
+    items.push(['Settings', () => toggleSettings(true)])
   }
-  const source = anchor.closest('button') ?? anchor
-  if (!actions.matches(':popover-open')) {
-    actions.showPopover({ source })
+  actions.setAttribute('aria-label', agent ? `${agent.species} actions` : 'World actions')
+  actions.replaceChildren(
+    ...items.map(([label, run]) => {
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = label
+      button.onclick = (event) => {
+        actions.hidePopover()
+        if (event.isTrusted && !scope?.aborted) {
+          run(event)
+        }
+      }
+      return button
+    })
+  )
+  if (!agent) {
+    actions.append(
+      ...encounters.captureControls(preferences.get(), (patch) => {
+        if (scope?.aborted) {
+          return
+        }
+        void preferences
+          .patch(patch)
+          .then(() => actions.hidePopover())
+          .catch((error) => {
+            careStatus.textContent = error.message
+          })
+      })
+    )
   }
+  actions.showPopover({ source: anchor.closest('button') ?? anchor })
   actions.style.left = `${Math.max(0, Math.min(x, innerWidth - actions.offsetWidth))}px`
   actions.style.top = `${Math.max(0, Math.min(y, innerHeight - actions.offsetHeight))}px`
-  actions.querySelector('button:not([hidden])').focus()
+  actions.firstElementChild.focus()
 }
 
 async function focusTerminal(agent, event) {
@@ -241,6 +333,10 @@ function paintRoster() {
         label,
         species: member?.name ?? species[member?.dex ?? starter]?.name,
         appearance,
+        ref: member?.ref,
+        hungry: member?.hungry,
+        careNote: member?.careNote,
+        evolvedAt: member?.evolvedAt,
         state: agent.state,
         stateStartedAt: agent.stateStartedAt
       })
@@ -312,6 +408,7 @@ async function readProgress() {
       trainer.hidden = false
       progressError.hidden = true
       updateRetry()
+      berries = view.berries
       progress = new Map(view.companions.map((member) => [member.terminalId, member]))
       paintRoster()
     } catch (error) {
@@ -344,6 +441,7 @@ async function readAgents(current) {
       if (current.read.signal.aborted) {
         return
       }
+      const previous = new Map(roster.map((agent) => [agent.terminalId, agent.state]))
       const seen = new Set()
       roster = agents.filter(({ terminalId }) => {
         if (!terminalId) {
@@ -355,6 +453,24 @@ async function readAgents(current) {
         seen.add(terminalId)
         return true
       })
+      for (const agent of roster) {
+        if (!previous.has(agent.terminalId) || previous.get(agent.terminalId) === agent.state) {
+          continue
+        }
+        const preference =
+          agent.state === 'done'
+            ? 'cryDone'
+            : agent.state === 'blocked' || agent.state === 'waiting'
+              ? 'cryBlocked'
+              : null
+        if (preference && !worldContainer.hidden) {
+          void cry(
+            preference,
+            progress.get(agent.terminalId)?.dex ?? starterDex(agent),
+            current.scope.signal
+          )
+        }
+      }
       current.error = false
       paintRoster()
       showRosterStatus()
@@ -393,6 +509,8 @@ function refresh(context) {
     previous?.scope.abort()
     focusRequest?.abort()
     focusStatus.hidden = true
+    careStatus.textContent = ''
+    trainerGame.reset()
     roster = []
     progress = new Map()
     world.update({ agents: [], visitor: null })
@@ -416,7 +534,14 @@ function refresh(context) {
 showWorld.onclick = () => selectView(false)
 showParty.onclick = () => selectView(true)
 showSettings.onclick = () => toggleSettings(settings.hidden)
-document.querySelector('#world-action-settings').onclick = () => toggleSettings(true)
+showActions.onclick = () => {
+  if (actions.matches(':popover-open')) {
+    actions.hidePopover()
+    return
+  }
+  const { left, bottom } = showActions.getBoundingClientRect()
+  openActions({ x: left, y: bottom, anchor: showActions })
+}
 settings.addEventListener(
   'keydown',
   (event) => {
@@ -456,6 +581,7 @@ window.addEventListener(
   'pagehide',
   () => {
     lifetime.abort()
+    trainerGame.reset()
     focusRequest?.abort()
     workspace?.read.abort()
     workspace?.scope.abort()

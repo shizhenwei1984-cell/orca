@@ -104,8 +104,15 @@ small,
 #settings-status:empty {
   display: none;
 }
-#world-actions {
+#care-status:empty {
   margin: 0;
+}
+#world-actions {
+  inset: auto;
+  margin: 0;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+  overflow: auto;
   padding: 4px;
   border: 1px solid var(--orca-border);
   border-radius: var(--orca-radius);
