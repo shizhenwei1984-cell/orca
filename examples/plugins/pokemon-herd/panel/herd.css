@@ -1,0 +1,120 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 12px;
+  font: 13px var(--orca-font-sans, sans-serif);
+  color: var(--orca-foreground);
+  background: var(--orca-background);
+}
+header,
+.caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+h1 {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+#count,
+small,
+#message {
+  color: var(--orca-muted-foreground);
+}
+#count,
+.state {
+  white-space: nowrap;
+  font-size: 12px;
+}
+ul {
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+li {
+  overflow: hidden;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+}
+.field {
+  height: 84px;
+  position: relative;
+  overflow: hidden;
+  image-rendering: pixelated;
+  background:
+    url('./sprites/tree-summer.png') right 4px bottom / auto 68px no-repeat,
+    url('./sprites/flowers-yellow.png') left 8px bottom / auto 16px no-repeat,
+    var(--orca-muted);
+}
+.trail {
+  position: absolute;
+  bottom: 0;
+  left: 12%;
+  width: 58%;
+}
+.sprite {
+  width: 80px;
+  height: 80px;
+  background-repeat: no-repeat;
+  background-size: auto 100%;
+  animation: frames var(--duration) steps(var(--frames)) infinite;
+}
+li[data-state='working'] .trail {
+  animation: patrol 5s ease-in-out infinite alternate;
+}
+.caption {
+  padding: 8px 12px;
+  border-top: 1px solid var(--orca-border);
+}
+.identity {
+  min-width: 0;
+}
+strong,
+small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+small {
+  font-size: 12px;
+  margin-top: 2px;
+}
+li[data-state='blocked'] .state {
+  color: var(--orca-destructive);
+}
+button {
+  font: inherit;
+  padding: 4px 10px;
+  color: var(--orca-secondary-foreground);
+  background: var(--orca-secondary);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+@keyframes frames {
+  to {
+    background-position-x: calc(-80px * var(--frames));
+  }
+}
+@keyframes patrol {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(65%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sprite,
+  li[data-state='working'] .trail {
+    animation: none;
+  }
+}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pokémon Herd</title>
+    <link rel="stylesheet" href="./herd.css" />
+  </head>
+  <body>
+    <header>
+      <h1 id="workspace">Pokémon Herd</h1>
+      <span id="count"></span>
+    </header>
+    <p role="status" id="message">Loading agents…</p>
+    <button id="retry" hidden>Retry</button>
+    <ul id="herd" aria-label="Agent Pokémon"></ul>
+    <template id="companion">
+      <li>
+        <div class="field" aria-hidden="true">
+          <div class="trail"><div class="sprite"></div></div>
+        </div>
+        <div class="caption">
+          <div class="identity"><strong></strong><small></small></div>
+          <span class="state"></span>
+        </div>
+      </li>
+    </template>
+    <script type="module" src="./herd.js"></script>
+  </body>
+</html>
