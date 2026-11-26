@@ -166,23 +166,7 @@ function terminalActions(row) {
   }
   if (pokemon) {
     if (plugin.openPanel && index.activeWorkspace === workspace.id) {
-      for (const [label, action] of [
-        ['Its card in the Box', 'box'],
-        ['Its items and care', 'care']
-      ]) {
-        items.push([
-          label,
-          () =>
-            plugin
-              .openPanel({
-                panel: 'pokemon-herd',
-                action,
-                workspaceId: scopedView.activationTarget(workspace),
-                input: [terminalId, pokemon.ref.slot, pokemon.ref.id]
-              })
-              .catch(announce)
-        ])
-      }
+      items.push(...scopedView.companionActions(workspace, terminalId, pokemon.ref))
     }
     items.push([
       'Choose another Pokémon…',

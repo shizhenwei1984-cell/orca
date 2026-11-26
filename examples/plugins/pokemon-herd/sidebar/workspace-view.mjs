@@ -189,10 +189,26 @@ export function workspaceView({ onChange, announce, ask }) {
     view?.workspaceId === workspace.id && view.hostId === workspace.hostId
   return {
     refresh: () => available && void read(false),
-    activationTarget: (workspace) =>
-      view?.grant && !view.workspaceId && view.hostId === workspace.hostId
-        ? view.workspace
-        : workspace.id,
+    companionActions(workspace, terminalId, ref) {
+      const legacy = view && !view.workspaceId && view.hostId === workspace.hostId
+      if (legacy && !view.grant) {
+        return accessItems(view)
+      }
+      const workspaceId = legacy ? view.workspace : workspace.id
+      const open = (action) =>
+        window.orca.plugin
+          .openPanel({
+            panel: 'pokemon-herd',
+            action,
+            workspaceId,
+            input: [terminalId, ref.slot, ref.id]
+          })
+          .catch(announce)
+      return [
+        ['Its card in the Box', () => open('box')],
+        ['Its items and care', () => open('care')]
+      ]
+    },
     forWorkspace: (workspace) => (matches(workspace) ? view : null),
     current: () => view,
     matches,
