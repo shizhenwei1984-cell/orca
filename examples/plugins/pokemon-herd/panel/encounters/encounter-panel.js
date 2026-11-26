@@ -179,9 +179,12 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
   const content = text('section', null, 'encounter-panel')
   const live = text('p', null, 'encounter-live')
   live.setAttribute('role', 'status')
+  const readError = text('p', null, 'encounter-error')
+  readError.setAttribute('role', 'status')
+  readError.hidden = true
   const stage = text('section', null, 'encounter-stage')
   stage.hidden = true
-  root.replaceChildren(sheet, live, stage, content)
+  root.replaceChildren(sheet, live, stage, readError, content)
   let model
   let pending = false
   let error = ''
@@ -451,7 +454,7 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
           actions.append(
             button(
               `Use ${item.name} · ${item.count}`,
-              { type: 'heal', id: visitor?.id, slot: current.slot, item: item.id },
+              { type: 'heal', slot: current.slot, item: item.id },
               busy
             )
           )
@@ -523,6 +526,12 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
   return {
     stage,
     submit,
+    showReadError(message) {
+      readError.textContent = message
+        ? `Could not load encounters. ${message}`
+        : 'Could not load encounters.'
+      readError.hidden = false
+    },
     sound(value) {
       if (sound === value) {
         return
@@ -560,10 +569,12 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
       model = null
       selected = ''
       error = ''
+      readError.hidden = true
       content.replaceChildren()
       live.textContent = ''
     },
     render(snapshot) {
+      readError.hidden = true
       model = snapshot
       draw()
     },

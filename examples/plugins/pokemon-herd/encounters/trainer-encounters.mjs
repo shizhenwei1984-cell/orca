@@ -237,7 +237,7 @@ function requestScope(input) {
 function snapshotFor(save, context) {
   const state = stateFor(save, context.workspaceId) ?? createEncounterState(context.at)
   const snapshot = renderEncounterSnapshot(state, rulesFor(save, context))
-  return {
+  const view = {
     ...snapshot,
     workspaceId: context.workspaceId,
     revision: state.revision ?? 0,
@@ -246,6 +246,8 @@ function snapshotFor(save, context) {
       return { ...pick, pokemonId: pokemonId(pokemon, pick.slot), terminalId }
     })
   }
+  // The IPC accepts JSON; battle timelines and optional Pokémon traits can contain undefined.
+  return JSON.parse(JSON.stringify(view))
 }
 
 function verifyAction(save, state, context, action) {
