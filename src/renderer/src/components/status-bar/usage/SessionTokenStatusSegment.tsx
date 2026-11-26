@@ -35,7 +35,10 @@ export function SessionTokenStatusSegment(): React.JSX.Element | null {
   if (!tab || !target) {
     return null
   }
-  if (tab.contentType === 'agent-session' && isAgentSessionHandleProvider(tab.agentSessionAgent)) {
+  if (
+    tab.contentType === 'agent-session' &&
+    (isAgentSessionHandleProvider(tab.agentSessionAgent) || tab.agentSessionAgent === 'antigravity')
+  ) {
     return (
       <ChatTokens
         key={JSON.stringify([owner, tab.entityId])}

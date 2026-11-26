@@ -56,7 +56,7 @@ export class AcpSessionRuntime {
     output: Writable,
     private readonly options: AcpSessionRuntimeOptions = {}
   ) {
-    this.prompts = new AcpPromptRequest(options.retryBusyPrompts === true)
+    this.prompts = new AcpPromptRequest(options)
     this.peer = new AcpJsonRpcPeer(
       input,
       output,
@@ -173,7 +173,8 @@ export class AcpSessionRuntime {
 
   async prompt(prompt: PromptRequest['prompt'], meta?: Meta): Promise<PromptResponse> {
     const params: PromptRequest = { sessionId: this.sessionId(), prompt, ...withMeta(meta) }
-    return this.prompts.run(() => this.call('session/prompt', params, PromptResponseSchema))
+    const request = () => this.call('session/prompt', params, PromptResponseSchema)
+    return this.prompts.run(params.sessionId, request)
   }
 
   /** Stop and steering share this notification; the adapter owns their completion policy. */

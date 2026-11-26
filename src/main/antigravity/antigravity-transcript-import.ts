@@ -1,3 +1,4 @@
+import { ANTIGRAVITY_ACP_HOME } from '../../shared/agent-session/lifecycle/provider-handles/antigravity-session-origin'
 import { stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
@@ -35,6 +36,18 @@ function isAgyHome(path: string): boolean {
   return isAntigravityHostAccountHome({ variable: 'GEMINI_HOME', path })
 }
 
+function transcriptLogs(store: string, sessionId: string): string | null {
+  return CONVERSATION_ID.test(sessionId)
+    ? join(store, 'brain', sessionId, '.system_generated', 'logs')
+    : null
+}
+
+export function antigravityFullTranscriptPath(home: string, sessionId: string): string | null {
+  const store = join(home, isAgyHome(home) ? AGY_CONVERSATION_FOLDER : ANTIGRAVITY_ACP_HOME)
+  const logs = transcriptLogs(store, sessionId)
+  return logs && join(logs, FULL_TRANSCRIPT)
+}
+
 const directories = directoryTranscriptImport({
   // Orca's managed Antigravity server keeps a separate home that never holds these conversations.
   conversationStore: ({ accountHomePath }) =>
@@ -49,10 +62,10 @@ const directories = directoryTranscriptImport({
     ])
   ],
   findTranscript: async ({ providerSessionId, store }) => {
-    if (!CONVERSATION_ID.test(providerSessionId)) {
+    const logs = transcriptLogs(store, providerSessionId)
+    if (!logs) {
       return null
     }
-    const logs = join(store, 'brain', providerSessionId, '.system_generated', 'logs')
     for (const name of [FULL_TRANSCRIPT, COMPACT_TRANSCRIPT]) {
       if (await isFile(join(logs, name))) {
         return join(logs, name)

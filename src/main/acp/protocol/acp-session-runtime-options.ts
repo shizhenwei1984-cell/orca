@@ -6,6 +6,7 @@ import type { AcpPermissionHandler } from './acp-permission-requests'
 export type AcpSessionRuntimeOptions = {
   /** OMP's typed busy refusal confirms this prompt never ran. */
   retryBusyPrompts?: boolean
+  onPromptOutput?: (sessionId: string, output: number, durationMs: number) => void
   clientInfo?: InitializeRequest['clientInfo']
   clientCapabilities?: Pick<ClientCapabilities, 'elicitation' | '_meta'>
   peer?: AcpPeerOptions

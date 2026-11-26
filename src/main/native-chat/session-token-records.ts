@@ -1,3 +1,4 @@
+import type { parseClaudeUsageSourceRecord } from '../claude-usage/transcript-record-parser'
 import type { SessionTokenCounts } from '../../shared/agent-usage/session-token-metrics'
 import { readRecord } from '../codex/app-server/codex-item-field-readers'
 import {
@@ -168,4 +169,42 @@ function readCodexTokenCount(
       measurement: measured ?? turn.measurement
     })
   }
+}
+
+type ClaudeRecord = NonNullable<ReturnType<typeof parseClaudeUsageSourceRecord>>
+export type ClaudeCounts = { input: number; output: number; cacheRead: number; cacheWrite: number }
+
+export function addClaudeRecord(
+  state: { counts: SessionTokenCounts | null; requests: Map<string, ClaudeCounts> },
+  seen: Map<string, ClaudeCounts>,
+  row: ClaudeRecord
+): void {
+  const key = row.dedupeKey
+  const counts = {
+    input: row.inputTokens,
+    output: row.outputTokens,
+    cacheRead: row.cacheReadTokens,
+    cacheWrite: row.cacheWriteTokens
+  }
+  const old = key ? (seen.get(key) ?? state.requests.get(key)) : undefined
+  const maxima = old
+    ? {
+        input: Math.max(old.input, counts.input),
+        output: Math.max(old.output, counts.output),
+        cacheRead: Math.max(old.cacheRead, counts.cacheRead),
+        cacheWrite: Math.max(old.cacheWrite, counts.cacheWrite)
+      }
+    : counts
+  if (key) {
+    seen.set(key, maxima)
+  }
+  state.counts = addSessionTokenCounts(state.counts, {
+    input:
+      maxima.input +
+      maxima.cacheRead +
+      maxima.cacheWrite -
+      (old ? old.input + old.cacheRead + old.cacheWrite : 0),
+    output: maxima.output - (old?.output ?? 0),
+    cacheRead: maxima.cacheRead - (old?.cacheRead ?? 0)
+  })
 }

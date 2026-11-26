@@ -12,7 +12,7 @@ export type SessionOutputRate = {
 
 /** Returned by the runtime that owns this provider conversation. */
 export type SessionTokenMetrics = {
-  agent: 'claude' | 'codex'
+  agent: 'claude' | 'codex' | 'antigravity'
   providerSessionId: string
   counts: SessionTokenCounts | null
   outputRate: SessionOutputRate | null

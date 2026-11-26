@@ -1,3 +1,4 @@
+import type { AcpSessionRuntimeOptions } from './acp-session-runtime-options'
 import { delayUnlessAborted } from '../../../shared/concurrency/abort-aware-delay'
 import { AcpAgentError } from '../transport/acp-errors'
 import type { PromptResponse } from '../generated/acp-protocol.generated'
@@ -19,13 +20,15 @@ export class AcpPromptRequest {
   private closedWith?: Error
   private waiting = false
 
-  constructor(private readonly retryBusy: boolean) {}
+  constructor(
+    private readonly options: Pick<AcpSessionRuntimeOptions, 'retryBusyPrompts' | 'onPromptOutput'>
+  ) {}
 
   get waitingToRetry(): boolean {
     return this.waiting
   }
 
-  async run(request: () => Promise<PromptResponse>): Promise<PromptResponse> {
+  async run(sessionId: string, request: () => Promise<PromptResponse>): Promise<PromptResponse> {
     if (this.active) {
       throw new Error('ACP prompt already in progress')
     }
@@ -42,9 +45,18 @@ export class AcpPromptRequest {
         }
         try {
           this.waiting = false
-          return await request()
+          const startedAt = performance.now()
+          const result = await request()
+          if (result.usage) {
+            this.options.onPromptOutput?.(
+              sessionId,
+              result.usage.outputTokens,
+              performance.now() - startedAt
+            )
+          }
+          return result
         } catch (error) {
-          if (!this.retryBusy || !sessionBusy(error)) {
+          if (!this.options.retryBusyPrompts || !sessionBusy(error)) {
             throw error
           }
         }

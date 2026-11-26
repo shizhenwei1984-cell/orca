@@ -1,3 +1,7 @@
+import {
+  antigravityMeasuredOutput,
+  recordAntigravityStep
+} from '../antigravity/antigravity-token-metrics'
 import type {
   SessionOutputRate,
   SessionTokenCounts,
@@ -32,6 +36,8 @@ import { resolveSessionFilePath, type ResolveSessionFileOptions } from './sessio
 import { parseSshTranscriptPath } from './transcript-filesystem/ssh-transcript-path'
 import {
   addSessionTokenCounts,
+  addClaudeRecord,
+  type ClaudeCounts,
   readCodexSessionTokenRecord,
   type CodexSessionTokenState
 } from './session-token-records'
@@ -40,9 +46,8 @@ type Source = Pick<SessionTokenMetrics, 'agent' | 'providerSessionId'> & {
   location: ResolveSessionFileOptions
   copiedEntries?: ReadonlySet<string>
 }
-type ClaudeRecord = NonNullable<ReturnType<typeof parseClaudeUsageSourceRecord>>
-type ClaudeCounts = { input: number; output: number; cacheRead: number; cacheWrite: number }
 type TokenState = {
+  antigravity: { counts: SessionTokenCounts | null; steps: Map<number, SessionTokenCounts | null> }
   codex: CodexSessionTokenState
   claude: {
     counts: SessionTokenCounts | null
@@ -63,6 +68,7 @@ const lastRates = new Map<string, { rate: SessionOutputRate; hadTranscript: bool
 
 function freshState(): TokenState {
   return {
+    antigravity: { counts: null, steps: new Map() },
     codex: {
       matches: false,
       previous: null,
@@ -79,47 +85,16 @@ function freshState(): TokenState {
   }
 }
 
-function addClaudeRecord(
-  state: TokenState['claude'],
-  seen: Map<string, ClaudeCounts>,
-  row: ClaudeRecord
-): void {
-  const key = row.dedupeKey
-  const counts = {
-    input: row.inputTokens,
-    output: row.outputTokens,
-    cacheRead: row.cacheReadTokens,
-    cacheWrite: row.cacheWriteTokens
-  }
-  const old = key ? (seen.get(key) ?? state.requests.get(key)) : undefined
-  const maxima = old
-    ? {
-        input: Math.max(old.input, counts.input),
-        output: Math.max(old.output, counts.output),
-        cacheRead: Math.max(old.cacheRead, counts.cacheRead),
-        cacheWrite: Math.max(old.cacheWrite, counts.cacheWrite)
-      }
-    : counts
-  if (key) {
-    seen.set(key, maxima)
-  }
-  state.counts = addSessionTokenCounts(state.counts, {
-    input:
-      maxima.input +
-      maxima.cacheRead +
-      maxima.cacheWrite -
-      (old ? old.input + old.cacheRead + old.cacheWrite : 0),
-    output: maxima.output - (old?.output ?? 0),
-    cacheRead: maxima.cacheRead - (old?.cacheRead ?? 0)
-  })
-}
-
 async function readSource(
   source: Source,
   retained: CachedSource | undefined
 ): Promise<CachedSource | null> {
   const { agent, providerSessionId, location } = source
-  const path = retained?.path ?? (await resolveSessionFilePath(agent, providerSessionId, location))
+  const resolvePath = () =>
+    agent === 'antigravity'
+      ? location.transcriptPath
+      : resolveSessionFilePath(agent, providerSessionId, location)
+  const path = retained?.path ?? (await resolvePath())
   if (!path || isWslUncPath(path) || parseSshTranscriptPath(path)) {
     return null
   }
@@ -127,7 +102,7 @@ async function readSource(
     if (!retained) {
       throw error
     }
-    const nextPath = await resolveSessionFilePath(agent, providerSessionId, location)
+    const nextPath = await resolvePath()
     if (
       !nextPath ||
       nextPath === path ||
@@ -149,6 +124,7 @@ async function readSource(
     const original = checkpoint && retained ? retained.state : freshState()
     const output = original.claude.output
     const state: TokenState = {
+      antigravity: { ...original.antigravity, steps: new Map(original.antigravity.steps) },
       codex: { ...original.codex, turns: new Map(original.codex.turns) },
       claude: {
         ...original.claude,
@@ -175,6 +151,8 @@ async function readSource(
             providerSessionId,
             source.copiedEntries
           )
+        } else if (agent === 'antigravity') {
+          recordAntigravityStep(state.antigravity.steps, readRecord(JSON.parse(row.line)))
         } else {
           const usage = parseClaudeUsageSourceRecord(row.line, null, {
             rootSessionId: providerSessionId,
@@ -210,6 +188,16 @@ async function readSource(
     if (!(await validateJsonlFileReader(reader, checkpoint))) {
       return null
     }
+    if (agent === 'antigravity') {
+      state.antigravity.counts = null
+      for (const counts of state.antigravity.steps.values()) {
+        if (!counts) {
+          state.antigravity.counts = null
+          break
+        }
+        state.antigravity.counts = addSessionTokenCounts(state.antigravity.counts, counts)
+      }
+    }
     for (const [id, usage] of claudeSeen) {
       state.claude.requests.set(id, usage)
     }
@@ -233,6 +221,13 @@ function* measuredTurns(
     return
   }
 
+  if (agent === 'antigravity') {
+    const measurement = antigravityMeasuredOutput(providerSessionId)
+    if (measurement) {
+      yield measurement
+    }
+    return
+  }
   yield* measuredClaudeTurns(providerSessionId, state?.claude.output, copiedEntries)
 }
 

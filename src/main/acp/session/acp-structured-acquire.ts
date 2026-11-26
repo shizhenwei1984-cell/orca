@@ -1,5 +1,6 @@
 // Publish and track the child before handshaking so startup cancellation can reach it.
 
+import { recordAntigravityPromptOutput } from '../../antigravity/antigravity-token-metrics'
 import { initializeAcpStructuredSession } from './start/acp-structured-handshake'
 import '../../native-chat/agent-session-wire/providers/structured-agent-session-adapter'
 import { AgentSessionPreSpawnError } from '../../native-chat/agent-session-wire/providers/structured-agent-session-adapter-errors'
@@ -107,6 +108,7 @@ export async function acquireAcpStructuredSession(input: {
       clientInfo: acpClientInfo(spec, launch.version ?? null),
       // Only a chat can show a URL request's card, so other connections never advertise it.
       clientCapabilities: withAcpUrlElicitation(spec.dialect.clientCapabilities),
+      onPromptOutput: spec.agent === 'antigravity' ? recordAntigravityPromptOutput : undefined,
       retryBusyPrompts: spec.agent === 'omp',
       ...(spec.signIn ? { signIn: spec.signIn } : {}),
       onPermission: acpStructuredPermissionHandler(() => session, spec, prompts),

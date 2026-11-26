@@ -1,3 +1,4 @@
+import { antigravityFullTranscriptPath } from '../../../../../antigravity/antigravity-transcript-import'
 import { join } from 'node:path'
 import { SessionTokenMetricsParams } from '../../../../../../shared/rpc-contract/structured-agent-session/session-token-metrics-params'
 import { agentSessionAccountHomePath } from '../../../../../../shared/agent-session/lifecycle/accounts/agent-session-account-home'
@@ -45,7 +46,7 @@ export const SESSION_TOKEN_METRICS_METHOD = defineMethod({
     if (
       !record ||
       !handle ||
-      !isAgentSessionHandleProvider(record.provider) ||
+      (!isAgentSessionHandleProvider(record.provider) && record.provider !== 'antigravity') ||
       handle.agent !== record.provider ||
       record.location.wslDistro
     ) {
@@ -65,6 +66,17 @@ export const SESSION_TOKEN_METRICS_METHOD = defineMethod({
       record.providerHandleChain.some(
         (link) => link.origin === 'forked' && link.handle.nativeId === handle.nativeId
       )
+    if (agent === 'antigravity') {
+      const transcriptPath = antigravityFullTranscriptPath(accountHome, handle.nativeId)
+      if (!transcriptPath || forked) {
+        return null
+      }
+      return readSessionTokenMetrics({
+        agent,
+        providerSessionId: handle.nativeId,
+        location: { transcriptPath }
+      })
+    }
     const copiedEntries = forked
       ? nativeCopyCoverage(
           await host.reads.sessionHistoryOrigin(record.sessionId),
