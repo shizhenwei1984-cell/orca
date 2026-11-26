@@ -5,7 +5,8 @@ import {
   settleEncounterWork
 } from './encounters/trainer-encounters.mjs'
 import { dueCare, recordStatus, sampleCare, trainerView, workingMinutes } from './trainer.mjs'
-import { pokemonId, trainerAction } from './trainer-actions.mjs'
+import { pokemonId, readMoveEditor, trainerAction } from './trainer-actions.mjs'
+import { MAX_MOVES } from './encounters/rules/moves.js'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
 import { readTrainer, writeTrainer } from './trainer-save.mjs'
 import { gameView } from './trainer-view.mjs'
@@ -143,6 +144,36 @@ function actionOf(input) {
 const exchangeFields = ['slot', 'id', 'terminalId', 'sessionId', 'assignment']
 const exchangeRef = (ref) => exchangeFields.map((field) => ref?.[field])
 
+function moveRef(target) {
+  const { slot, id, location, version } = target ?? {}
+  if (
+    typeof slot !== 'string' ||
+    slot.length > 2048 ||
+    typeof id !== 'string' ||
+    id.length > 4096 ||
+    !['party', 'box'].includes(location) ||
+    typeof version !== 'string' ||
+    version.length > 4096
+  ) {
+    throw new Error('Invalid move editor target.')
+  }
+  return [slot, id, location, version]
+}
+
+function moveCommandToken({ target, form, moves }) {
+  if (
+    typeof form !== 'string' ||
+    form.length > 12 ||
+    (moves !== null &&
+      (!Array.isArray(moves) ||
+        moves.length > MAX_MOVES ||
+        moves.some((name) => typeof name !== 'string' || name.length > 30)))
+  ) {
+    throw new Error('Invalid move selection.')
+  }
+  return JSON.stringify([moveRef(target), form, moves])
+}
+
 function partySlots(save, ids, workspaceId) {
   const wanted = new Set(ids)
   const slots = new Map()
@@ -226,6 +257,23 @@ export function activateTrainer(
     const workspaceId =
       room ?? (candidateWorkspaces.size === 1 ? candidateWorkspaces.values().next().value : null)
     return { slots, closed, workspaceId, listed: lists.get(workspaceId)?.ids }
+  }
+
+  async function getMoveScope(save, ids, catalog, target) {
+    if (target.location === 'box') {
+      return getScope(save, ids, catalog, { fresh: true })
+    }
+    const active = await orca.host.call('workspace.readContext')
+    const current = new Set(active?.terminals.map(({ id }) => id))
+    return getScope(
+      save,
+      ids.filter((id) => current.has(id)),
+      catalog,
+      {
+        fresh: true,
+        requested: active?.workspaceId
+      }
+    )
   }
 
   async function exchangeTargets(save, scope, active) {
@@ -400,6 +448,14 @@ export function activateTrainer(
       return { save: next, result: gameView(next, { ...scope, at: Date.now(), query, settings }) }
     })
   })
+  orca.panels.handle('trainer.moves', (input) => {
+    const ids = terminalIds(input)
+    moveRef(input.target)
+    return store.transact(async (save, catalog) => {
+      const scope = await getMoveScope(save, ids, catalog, input.target)
+      return { save, result: readMoveEditor(save, input.target, scope) }
+    })
+  })
   orca.panels.handle('trainer.companion-menu', (input) => {
     const ids = terminalIds(input)
     return store.transact(async (save, catalog) => {
@@ -436,16 +492,22 @@ export function activateTrainer(
     const ids = terminalIds(input)
     const { client, sequence, action } = actionOf(input)
     const exchange = action.type === 'swap-companions'
+    const teaching = action.type === 'teach-moves'
     const swapToken = exchange
       ? JSON.stringify([exchangeRef(action.target), exchangeRef(action.destination)])
       : undefined
+    const moveToken = teaching ? moveCommandToken(action) : undefined
     const at = Date.now()
     return store.transact(
       async (save, catalog) => {
         const receipt = save.receipts[client]
         if (receipt && sequence <= receipt.sequence) {
-          if (receipt.swapToken !== swapToken || (exchange && sequence !== receipt.sequence)) {
-            return { save, result: { ok: false, message: 'That companion command has expired.' } }
+          if (
+            receipt.swapToken !== swapToken ||
+            receipt.moveToken !== moveToken ||
+            ((exchange || teaching) && sequence !== receipt.sequence)
+          ) {
+            return { save, result: { ok: false, message: 'That trainer command has expired.' } }
           }
           return {
             save,
@@ -460,10 +522,12 @@ export function activateTrainer(
             : null
         const scope = inventoryOnly
           ? { slots: [], closed: new Set(), workspaceId: null }
-          : await getScope(save, ids, catalog, {
-              fresh: true,
-              requested: exchange ? catalog.resolve(active?.workspaceId) : undefined
-            })
+          : teaching
+            ? await getMoveScope(save, ids, catalog, action.target)
+            : await getScope(save, ids, catalog, {
+                fresh: true,
+                requested: exchange ? catalog.resolve(active?.workspaceId) : undefined
+              })
         const context = {
           ...scope,
           settings: inventoryOnly ? undefined : await preferences(save.settings),
@@ -508,7 +572,12 @@ export function activateTrainer(
             ...next,
             receipts: {
               ...next.receipts,
-              [client]: { sequence, result, ...(exchange && { swapToken }) }
+              [client]: {
+                sequence,
+                result,
+                ...(exchange && { swapToken }),
+                ...(teaching && { moveToken })
+              }
             }
           },
           result

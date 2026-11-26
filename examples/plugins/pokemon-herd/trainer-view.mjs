@@ -18,6 +18,7 @@ import { canPurify, nameFor, needsText } from './encounters/rules/picks.js'
 import {
   dexByRegion,
   DEX_TOTAL,
+  fighterKey,
   goalText,
   natureOf,
   nextGoal,
@@ -25,8 +26,9 @@ import {
   taskPay,
   taskText
 } from './encounters/rules/trainer.js'
-import { boxedPokemon, itemOptions, pokemonId } from './trainer-actions.mjs'
+import { boxedPokemon, itemOptions, moveTargetOf, pokemonId } from './trainer-actions.mjs'
 import { today, trainerBadges, trainerPick, trainerShinyOdds } from './trainer-game.mjs'
+import { movesetOf } from './encounters/rules/moves.js'
 
 const BOX_PAGE = 18
 const fold = (value) =>
@@ -39,6 +41,8 @@ export function showPokemon(pokemon, slot, save, at, member, hpOf) {
   const pick = trainerPick(pokemon)
   return {
     ref: { slot, id: pokemonId(pokemon, slot) },
+    moveTarget: moveTargetOf(pokemon, slot, member ? 'party' : 'box', save.party[slot]),
+    moves: movesetOf(fighterKey(pick.dex, { form: pick.form }), pick.moves).map(({ name }) => name),
     name: nameFor(pick),
     dex: pick.dex,
     appearance: appearanceOf(pick),

@@ -24,12 +24,11 @@ body {
 .herd-strip #world {
   order: -1;
 }
-.herd-strip #world-settings {
+.herd-strip #herd-settings {
   position: fixed;
   inset: var(--herd-settings-top, 38px) 8px 4px;
   z-index: 3;
   margin: 0;
-  overflow: auto;
 }
 header,
 .caption {
@@ -85,13 +84,43 @@ small,
   background: var(--orca-accent);
   color: var(--orca-accent-foreground);
 }
-#world-settings {
+#herd-settings {
   margin-block: 12px;
   padding: 12px;
   background: var(--orca-card);
   color: var(--orca-card-foreground);
   border: 1px solid var(--orca-border);
   border-radius: var(--orca-radius);
+}
+#herd-settings:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+}
+.settings-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.settings-pages button[aria-pressed='true'] {
+  border-color: currentColor;
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+.settings-content {
+  overflow: auto;
+}
+#herd-guide h2,
+#herd-guide h3 {
+  margin: 0;
+  font-size: 14px;
+}
+#herd-guide section {
+  margin-block-start: 12px;
+}
+#herd-guide p {
+  margin-block: 4px 0;
+  max-width: 68ch;
 }
 #world-settings fieldset {
   display: grid;
@@ -120,6 +149,9 @@ small,
 }
 #world-settings select {
   width: 100%;
+}
+#world-settings small {
+  white-space: normal;
 }
 #settings-status {
   margin: 8px 0 0;
@@ -287,9 +319,9 @@ input:focus-visible {
     animation: none;
   }
 }
-#trainer-game button,
-#trainer-game input,
-#trainer-game select {
+.trainer-dialog button,
+.trainer-dialog input:not([type='checkbox']),
+.trainer-dialog select {
   min-height: 28px;
   border: 1px solid var(--orca-border);
   border-radius: var(--orca-radius);
@@ -303,8 +335,8 @@ button:not(:disabled) {
   cursor: pointer;
 }
 
-#trainer-game button:hover:not(:disabled),
-#trainer-game button[aria-pressed='true'] {
+.trainer-dialog button:hover:not(:disabled),
+.trainer-dialog button[aria-pressed='true'] {
   background: var(--orca-muted);
 }
 
@@ -312,7 +344,7 @@ button:disabled {
   opacity: 0.55;
 }
 
-#trainer-game {
+.trainer-dialog {
   width: calc(100% - 16px);
   max-width: 560px;
   max-height: calc(100% - 16px);
@@ -324,35 +356,71 @@ button:disabled {
   overflow: hidden;
 }
 
-#trainer-game[open] {
+.trainer-dialog[open] {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-#trainer-game::backdrop {
+.trainer-dialog::backdrop {
   background: color-mix(in srgb, var(--orca-foreground) 12%, transparent);
 }
 
-#trainer-game h2,
-#trainer-game h3 {
+.trainer-dialog h2,
+.trainer-dialog h3 {
   margin: 0;
   font-size: 14px;
 }
 
-#trainer-game p {
+.trainer-dialog p {
   margin: 0;
   color: var(--orca-muted-foreground);
 }
 
-#trainer-game input,
-#trainer-game select {
+.trainer-dialog input,
+.trainer-dialog select {
   max-width: 100%;
   min-width: 0;
 }
 
 #trainer-game input[type='number'] {
   width: 64px;
+}
+
+#move-editor-form:not([hidden]) {
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+}
+#move-editor-form-field[hidden],
+#move-editor-status:empty {
+  display: none;
+}
+#move-editor fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+#move-editor-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
+  gap: 4px;
+  max-block-size: 190px;
+  overflow: auto;
+  margin-block-start: 4px;
+}
+#move-editor-options label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  overflow-wrap: anywhere;
+}
+#move-editor-options small {
+  display: block;
+  white-space: normal;
 }
 
 #trainer-tabs,

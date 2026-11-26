@@ -27,94 +27,154 @@
       <button id="show-party" aria-controls="herd" aria-pressed="false">Party</button>
       <button
         id="show-settings"
-        aria-controls="world-settings"
+        aria-controls="herd-settings"
         aria-expanded="false"
         aria-keyshortcuts="S"
       >
         Settings
       </button>
     </nav>
-    <form id="world-settings" aria-label="World settings" hidden>
-      <fieldset>
-        <legend>Scenery</legend>
-        <label
-          >Rows
-          <select name="rows">
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-          </select>
-        </label>
-        <label
-          >Pokémon size
-          <select name="scale">
-            <option value="0.5">Small</option>
-            <option value="0.75" selected>Medium</option>
-            <option value="1">Large</option>
-            <option value="1.25">Extra large</option>
-          </select>
-        </label>
-        <label
-          >Background
-          <select name="background">
-            <option value="scenery">Scenery</option>
-            <option value="plain">Plain</option>
-          </select>
-        </label>
-        <label
-          >Sky
-          <select name="sky">
-            <option value="muted">Muted</option>
-            <option value="bright">Bright</option>
-          </select>
-        </label>
-        <label><input type="checkbox" name="weather" checked /> Weather</label>
-        <label><input type="checkbox" name="campfire" checked /> Campfire</label>
-        <label><input type="checkbox" name="tags" checked /> Name tags</label>
-      </fieldset>
-      <fieldset>
-        <legend>Encounters</legend>
-        <label
-          >Wild visitors
-          <select name="visitors">
-            <option value="off">Off</option>
-            <option value="rare">Rare (10–25 min)</option>
-            <option value="often" selected>Often (3–8 min)</option>
-            <option value="lots">Frequent (1–3 min)</option>
-          </select>
-        </label>
-        <label><input type="checkbox" name="outbreaks" checked /> Mass outbreaks</label>
-        <label><input type="checkbox" name="raids" checked /> New raids</label>
-        <label><input type="checkbox" name="spar" checked /> World sparring</label>
-        <label><input type="checkbox" name="family" checked /> Show sub-agents</label>
-        <label><input type="checkbox" name="chooseMoves" /> Choose moves against trainers</label>
-      </fieldset>
-      <fieldset>
-        <legend>Companion care</legend>
-        <label><input type="checkbox" name="evolve" checked /> Evolve through work</label>
-        <label><input type="checkbox" name="pickup" checked /> Pick up items while idle</label>
-      </fieldset>
-      <fieldset>
-        <legend>Companion selection</legend>
-        <label><input type="checkbox" name="trainer" /> Trainer mode</label>
-        <label><input type="checkbox" name="legendsOpen" /> Open legendary Pokémon</label>
-        <small>Trainer mode limits new companions to caught species and the Kanto starters.</small>
-      </fieldset>
-      <fieldset>
-        <legend>Audio</legend>
-        <label><input type="checkbox" name="battleSounds" /> Battle sounds</label>
-        <label><input type="checkbox" name="cryBlocked" /> Cry when an agent needs input</label>
-        <label><input type="checkbox" name="cryDone" /> Cry when an agent finishes</label>
-        <label><input type="checkbox" name="cryRare" /> Cry when a rare visitor appears</label>
-        <label><input type="checkbox" name="sound" /> Pet and sparring sounds</label>
-        <button type="button" id="preview-sound">Preview sound</button>
-      </fieldset>
-      <button type="submit">Save settings</button>
-      <p role="status" id="settings-status"></p>
-    </form>
+    <section id="herd-settings" aria-label="Pokémon Herd settings" hidden>
+      <nav class="settings-pages" aria-label="Settings pages">
+        <button type="button" aria-controls="herd-guide" aria-pressed="false">Guide</button>
+        <button type="button" aria-controls="world-settings" aria-pressed="false">Settings</button>
+      </nav>
+      <div class="settings-content">
+        <article id="herd-guide" aria-labelledby="guide-title" hidden>
+          <h2 id="guide-title">How to play</h2>
+          <section>
+            <h3>Meet your companions</h3>
+            <p>
+              Each agent has a Pokémon. Click it in the World to focus its terminal. Right-click it,
+              or press Shift+F10 with it focused, to pet it, use an item, or teach moves. Agent work
+              earns Pokédollars and can trigger evolution.
+            </p>
+          </section>
+          <section>
+            <h3>Catch wild Pokémon</h3>
+            <p>
+              Click a visitor to collect its gift, then again to throw a ball. Set your ball or
+              Berry in World actions. Drag a companion onto the visitor to weaken it, or use the
+              encounter’s Battle controls. Low health helps you catch it. Stop before the visitor
+              faints.
+            </p>
+          </section>
+          <section>
+            <h3>Prepare for battle</h3>
+            <p>
+              Use Teach moves on a companion or a Trainer Party or Box card. Keep up to four moves
+              and save them for the selected form. Use Reset to default to restore its original set.
+              Turn on Choose moves against trainers to pick attacks yourself.
+            </p>
+            <p>
+              Use Spar in the encounter controls to train with another companion. When a raid egg
+              hatches, send a companion against the boss. Defeat it for a chance to catch it.
+            </p>
+          </section>
+          <section>
+            <h3>Explore the Trainer pages</h3>
+            <p>
+              Open Trainer or press B with the World focused. Buy balls in Shop, bring a Pokémon out
+              of the Box, or complete all three daily Research tasks to earn Ultra Balls and an
+              Azure Flute that calls a legendary visitor.
+            </p>
+          </section>
+          <section>
+            <h3>Make the Herd yours</h3>
+            <p>
+              Use Settings to adjust scenery, visitor frequency, evolution, and sounds. Trainer mode
+              limits new companions to caught species and the Kanto starters. Press S with the World
+              focused to reopen Settings.
+            </p>
+          </section>
+        </article>
+        <form id="world-settings" aria-label="World settings" hidden>
+          <fieldset>
+            <legend>Scenery</legend>
+            <label
+              >Rows
+              <select name="rows">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+            <label
+              >Pokémon size
+              <select name="scale">
+                <option value="0.5">Small</option>
+                <option value="0.75" selected>Medium</option>
+                <option value="1">Large</option>
+                <option value="1.25">Extra large</option>
+              </select>
+            </label>
+            <label
+              >Background
+              <select name="background">
+                <option value="scenery">Scenery</option>
+                <option value="plain">Plain</option>
+              </select>
+            </label>
+            <label
+              >Sky
+              <select name="sky">
+                <option value="muted">Muted</option>
+                <option value="bright">Bright</option>
+              </select>
+            </label>
+            <label><input type="checkbox" name="weather" checked /> Weather</label>
+            <label><input type="checkbox" name="campfire" checked /> Campfire</label>
+            <label><input type="checkbox" name="tags" checked /> Name tags</label>
+          </fieldset>
+          <fieldset>
+            <legend>Encounters</legend>
+            <label
+              >Wild visitors
+              <select name="visitors">
+                <option value="off">Off</option>
+                <option value="rare">Rare (10–25 min)</option>
+                <option value="often" selected>Often (3–8 min)</option>
+                <option value="lots">Frequent (1–3 min)</option>
+              </select>
+            </label>
+            <label><input type="checkbox" name="outbreaks" checked /> Mass outbreaks</label>
+            <label><input type="checkbox" name="raids" checked /> New raids</label>
+            <label><input type="checkbox" name="spar" checked /> World sparring</label>
+            <label><input type="checkbox" name="family" checked /> Show sub-agents</label>
+            <label
+              ><input type="checkbox" name="chooseMoves" /> Choose moves against trainers</label
+            >
+          </fieldset>
+          <fieldset>
+            <legend>Companion care</legend>
+            <label><input type="checkbox" name="evolve" checked /> Evolve through work</label>
+            <label><input type="checkbox" name="pickup" checked /> Pick up items while idle</label>
+          </fieldset>
+          <fieldset>
+            <legend>Companion selection</legend>
+            <label><input type="checkbox" name="trainer" /> Trainer mode</label>
+            <label><input type="checkbox" name="legendsOpen" /> Open legendary Pokémon</label>
+            <small
+              >Trainer mode limits new companions to caught species and the Kanto starters.</small
+            >
+          </fieldset>
+          <fieldset>
+            <legend>Audio</legend>
+            <label><input type="checkbox" name="battleSounds" /> Battle sounds</label>
+            <label><input type="checkbox" name="cryBlocked" /> Cry when an agent needs input</label>
+            <label><input type="checkbox" name="cryDone" /> Cry when an agent finishes</label>
+            <label><input type="checkbox" name="cryRare" /> Cry when a rare visitor appears</label>
+            <label><input type="checkbox" name="sound" /> Pet and sparring sounds</label>
+            <button type="button" id="preview-sound">Preview sound</button>
+          </fieldset>
+          <button type="submit">Save settings</button>
+          <p role="status" id="settings-status"></p>
+        </form>
+      </div>
+    </section>
     <p role="status" id="message">Loading agents…</p>
     <button id="retry" hidden>Retry</button>
-    <dialog id="trainer-game" aria-labelledby="trainer-game-title">
+    <dialog id="trainer-game" class="trainer-dialog" aria-labelledby="trainer-game-title">
       <header>
         <h2 id="trainer-game-title">Trainer</h2>
         <strong id="trainer-game-wallet"></strong>
@@ -126,6 +186,29 @@
         <span role="status" id="trainer-feedback"></span>
         <button type="button" id="trainer-action-retry" hidden>Retry action</button>
       </footer>
+    </dialog>
+    <dialog id="move-editor" class="trainer-dialog" aria-labelledby="move-editor-title">
+      <header>
+        <h2 id="move-editor-title">Teach moves</h2>
+        <button type="button" id="close-move-editor">Close</button>
+      </header>
+      <form id="move-editor-form">
+        <label class="trainer-field" id="move-editor-form-field">
+          Form
+          <select name="form"></select>
+        </label>
+        <fieldset>
+          <legend>Learnable moves</legend>
+          <p id="move-editor-count" aria-live="polite"></p>
+          <div id="move-editor-options"></div>
+        </fieldset>
+        <div class="trainer-toolbar">
+          <button type="submit">Save moves</button>
+          <button type="button" id="reset-moves">Reset to default</button>
+          <button type="button" id="retry-moves" hidden>Retry action</button>
+        </div>
+      </form>
+      <p id="move-editor-status" role="status"></p>
     </dialog>
     <div id="world"></div>
     <p id="care-status" role="status"></p>

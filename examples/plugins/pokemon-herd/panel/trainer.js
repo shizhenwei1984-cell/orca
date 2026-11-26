@@ -1,4 +1,5 @@
 import { openCompanionPicker } from './catalog/companion-picker.mjs'
+import { openMoveEditor } from './move-editor.js'
 
 const dialog = document.querySelector('#trainer-game')
 const tabs = document.querySelector('#trainer-tabs')
@@ -214,6 +215,33 @@ async function changeCompanion(pokemon, opener) {
   }
 }
 
+function teachMoves(pokemon) {
+  if (pending || busy) {
+    retry.focus()
+    return
+  }
+  return openMoveEditor(pokemon, {
+    load: (target, signal) =>
+      window.orca.plugin.request(
+        'trainer.moves',
+        { target, terminalIds: getTerminals() },
+        { signal }
+      ),
+    submit: (action) => submit(action, true),
+    signal: scope.signal,
+    restoreFocus: () => {
+      const opener = [...body.querySelectorAll('[data-move-target]')].find(
+        (control) =>
+          control.dataset.moveTarget === pokemon.moveTarget.slot &&
+          control.dataset.moveId === pokemon.moveTarget.id
+      )
+      const fallback = tabs.querySelector('[aria-pressed="true"]')
+      const focus = opener ?? fallback
+      focus?.focus()
+    }
+  })
+}
+
 function act(label, action, options) {
   return button(label, () => void submit(action), options)
 }
@@ -257,6 +285,10 @@ function pokemonCard(pokemon) {
   ].filter(Boolean)
   const entry = card(pokemon.name, [pokemon.title, ...traits].filter(Boolean).join(' · '))
   entry.append(node('p', `Friendship ${pokemon.friendship}/100 · ${pokemon.jobs} jobs`))
+  const teach = button('Teach moves', () => void teachMoves(pokemon))
+  teach.dataset.moveTarget = pokemon.moveTarget.slot
+  teach.dataset.moveId = pokemon.moveTarget.id
+  entry.append(node('p', `Moves · ${pokemon.moves.join(' · ')}`), toolbar(teach))
   if (pokemon.held) {
     entry.append(node('p', `Holding ${itemLabel(pokemon.held)}`))
   }
@@ -770,6 +802,13 @@ export function mountTrainer(getTerminalIds) {
     openParty: (terminalId) => open('Party', { terminalId }),
     openBoxFor: (terminalId) => open('Box', { terminalId }),
     openCompanion: (section, terminalId, companion) => open(section, { terminalId, companion }),
+    async openCompanionMoves(pokemon) {
+      const current = scope
+      await open('Party', { terminalId: pokemon.terminalId, companion: pokemon.ref })
+      if (scope === current && dialog.open && focusedCompanion === pokemon.ref) {
+        await teachMoves(pokemon)
+      }
+    },
     async openPicker({ id = null, ref } = {}) {
       const current = scope
       await open('Party', { terminalId: id, choose: !ref })

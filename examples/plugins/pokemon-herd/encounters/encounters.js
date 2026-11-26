@@ -1,4 +1,5 @@
-import { battleExchange, battleKey, boostMove, chosenMoves } from './battle.js'
+import { battleExchange, battleKey, boostMove } from './battle.js'
+import { chosenMoves } from './move-loadouts.js'
 import {
   canFight,
   clearVisitor,

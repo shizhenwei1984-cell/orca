@@ -260,6 +260,7 @@ export function companionMenu(save, context, slot, source, targets) {
       types: mega?.types ?? entry?.types ?? [],
       ability: (key && abilityName(megaAbility(key))) || card.ability,
       moves,
+      activeMoveForm: key === null ? null : String(key),
       hp: health(slot),
       hasMega: !!form
     },
