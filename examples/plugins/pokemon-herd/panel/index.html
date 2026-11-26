@@ -16,11 +16,14 @@
       <strong id="wallet"></strong>
       <span id="work"></span>
       <span id="candy" hidden></span>
-      <button type="button" id="open-trainer">Trainer</button>
+      <button type="button" id="open-trainer" aria-keyshortcuts="B Alt+Shift+B">Trainer</button>
     </section>
     <p role="status" id="progress-error" hidden></p>
     <nav aria-label="Herd views" class="toolbar">
       <button id="show-world" aria-controls="world" aria-pressed="true">World</button>
+      <button id="show-world-actions" aria-haspopup="true" aria-controls="world-actions">
+        World actions
+      </button>
       <button id="show-party" aria-controls="herd" aria-pressed="false">Party</button>
       <button
         id="show-settings"
@@ -67,11 +70,35 @@
         </label>
         <label><input type="checkbox" name="weather" checked /> Weather</label>
         <label><input type="checkbox" name="campfire" checked /> Campfire</label>
-        <label><input type="checkbox" name="spar" checked /> Sparring</label>
         <label><input type="checkbox" name="tags" checked /> Name tags</label>
       </fieldset>
       <fieldset>
+        <legend>Encounters</legend>
+        <label
+          >Wild visitors
+          <select name="visitors">
+            <option value="off">Off</option>
+            <option value="rare">Rare (10–25 min)</option>
+            <option value="often" selected>Often (3–8 min)</option>
+            <option value="lots">Frequent (1–3 min)</option>
+          </select>
+        </label>
+        <label><input type="checkbox" name="outbreaks" checked /> Mass outbreaks</label>
+        <label><input type="checkbox" name="raids" checked /> New raids</label>
+        <label><input type="checkbox" name="spar" checked /> World sparring</label>
+        <label><input type="checkbox" name="chooseMoves" /> Choose moves against trainers</label>
+      </fieldset>
+      <fieldset>
+        <legend>Companion care</legend>
+        <label><input type="checkbox" name="evolve" checked /> Evolve through work</label>
+        <label><input type="checkbox" name="pickup" checked /> Pick up items while idle</label>
+      </fieldset>
+      <fieldset>
         <legend>Audio</legend>
+        <label><input type="checkbox" name="battleSounds" /> Battle sounds</label>
+        <label><input type="checkbox" name="cryBlocked" /> Cry when an agent needs input</label>
+        <label><input type="checkbox" name="cryDone" /> Cry when an agent finishes</label>
+        <label><input type="checkbox" name="cryRare" /> Cry when a rare visitor appears</label>
         <label><input type="checkbox" name="sound" /> Pet and sparring sounds</label>
         <button type="button" id="preview-sound">Preview sound</button>
       </fieldset>
@@ -94,13 +121,11 @@
       </footer>
     </dialog>
     <div id="world"></div>
-    <section id="encounters" aria-label="Encounters"></section>
+    <p id="care-status" role="status"></p>
     <p id="focus-status" role="status" hidden></p>
+    <section id="encounters" aria-label="Encounters"></section>
     <ul id="herd" aria-label="Agent Pokémon" hidden></ul>
-    <div id="world-actions" popover="auto" role="group" aria-label="World actions">
-      <button id="focus-terminal">Focus terminal</button>
-      <button id="world-action-settings">Settings</button>
-    </div>
+    <div id="world-actions" popover="auto" role="group" aria-label="World actions"></div>
     <template id="companion">
       <li>
         <div class="field" aria-hidden="true">

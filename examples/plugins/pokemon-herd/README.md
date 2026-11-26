@@ -1,6 +1,10 @@
 # Pokémon Herd for Orca
 
-Open **Pokémon Herd** in the desktop right sidebar. In **World**, each linked terminal agent in the current workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and rests when done. Click a companion or press Enter on it to return to its terminal. Open **Settings** to change the rows, scenery, Pokémon size and sound.
+Open **Pokémon Herd** in the desktop right sidebar. In **World**, each linked terminal agent in the current workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and rests when done. Click a companion or press Enter on it to pet it and return to its terminal. Press P on a focused companion to pet it without leaving the panel. Friendship rewards have a cooldown.
+
+Open **World actions** or right-click the ground for the Box, Bag, Shop, Research, Pokédex, and encounter controls. Press B or Alt+Shift+B while the world has focus to open the Bag. Right-click a companion, press Shift+F10 while it has focus, or touch and hold to open its actions. Use this menu to feed a Berry, see its details, bring out a Pokémon from the Box, or open the species picker. Alt+Shift+P opens the picker for the focused companion.
+
+Open **Settings** to change scenery, weather, the campfire, or the visitor rate. You can turn off outbreaks, new raids, world sparring, item pickup, and evolution through work. Active raids can finish after you turn off new raids. You can also choose moves manually against trainers. Battle sounds, companion cries, and pet and sparring sounds start muted.
 
 The trainer summary shows Pokédollars, time worked, finished jobs and Rare Candy. Open **Party** to see each companion's work, friendship and evolution progress.
 

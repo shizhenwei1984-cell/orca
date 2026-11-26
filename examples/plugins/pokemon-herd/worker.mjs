@@ -3,7 +3,7 @@ import {
   registerEncounterHandlers,
   settleEncounterWork
 } from './encounters/trainer-encounters.mjs'
-import { recordStatus, trainerView, workingMinutes } from './trainer.mjs'
+import { dueCare, recordStatus, sampleCare, trainerView, workingMinutes } from './trainer.mjs'
 import { trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
 import { readTrainer, writeTrainer } from './trainer-save.mjs'
@@ -12,6 +12,7 @@ import { registerSidebar } from './sidebar/worker.mjs'
 import { registerTerminalFocus } from './terminal-focus.mjs'
 import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
 import { initialCatalogPick, registerCatalogPreferences } from './catalog/trainer-catalog.mjs'
+import { defaultHerdSettings, readHerdSettings } from './world-settings.mjs'
 
 function terminalIds(input) {
   const ids = input?.terminalIds
@@ -80,9 +81,20 @@ export function createTrainerStore(orca) {
   }
 }
 
+async function callInWorkspace(orca, method, workspaceId, hostWorkspaceId) {
+  try {
+    return await orca.host.call(method, { workspaceId })
+  } catch (error) {
+    if (!hostWorkspaceId || hostWorkspaceId === workspaceId) {
+      throw error
+    }
+    return orca.host.call(method, { workspaceId: hostWorkspaceId })
+  }
+}
+
 function getTerminalLists(orca) {
   const cache = new Map()
-  return async (workspaceId, fresh = false) => {
+  return async (workspaceId, fresh = false, hostWorkspaceId) => {
     if (!workspaceId) {
       return null
     }
@@ -91,7 +103,7 @@ function getTerminalLists(orca) {
       return known.list
     }
     try {
-      const result = await orca.host.call('terminal.list', { workspaceId })
+      const result = await callInWorkspace(orca, 'terminal.list', workspaceId, hostWorkspaceId)
       const list = {
         ids: new Set(result.terminals.map(({ id }) => id)),
         truncated: result.truncated
@@ -169,15 +181,32 @@ export function activateTrainer(
   const store = createTrainerStore(orca)
   registerSidebar(orca, store)
   const list = getTerminalLists(orca)
+  let settings = defaultHerdSettings
+  async function preferences() {
+    try {
+      settings = await readHerdSettings(orca.storage)
+    } catch (error) {
+      orca.log(error.message)
+    }
+    return settings
+  }
 
   async function getScope(save, ids, fresh = false) {
     const candidates = partySlots(save, ids)
     const members = Object.entries(save.party).filter(([, member]) => member.pokemon)
-    const workspaces = [...new Set(members.map(([, member]) => member.workspaceId).filter(Boolean))]
+    const route = new Map()
+    for (const [, member] of members) {
+      if (member.workspaceId && (member.hostWorkspaceId || !route.has(member.workspaceId))) {
+        route.set(member.workspaceId, member.hostWorkspaceId)
+      }
+    }
+    const workspaces = [...route.keys()]
     const lists = new Map()
     for (let start = 0; start < workspaces.length; start += 4) {
       const batch = workspaces.slice(start, start + 4)
-      const results = await Promise.all(batch.map((workspace) => list(workspace, fresh)))
+      const results = await Promise.all(
+        batch.map((workspace) => list(workspace, fresh, route.get(workspace)))
+      )
       for (const [index, workspace] of batch.entries()) {
         lists.set(workspace, results[index])
       }
@@ -201,7 +230,7 @@ export function activateTrainer(
     return { slots, closed, workspaceId }
   }
 
-  function settleWork(before, after, at, slots, workspaceId) {
+  function settleWork(before, after, at, slots, workspaceId, settings) {
     if (!settleEncounterWork || after.daily === before.daily) {
       return after
     }
@@ -209,7 +238,13 @@ export function activateTrainer(
     if ((after.daily?.count.work ?? 0) <= start) {
       return after
     }
-    return settleEncounterWork(before, after, { at, slots, workspaceId, rnd: Math.random })
+    return settleEncounterWork(before, after, {
+      at,
+      slots,
+      workspaceId,
+      settings,
+      rnd: Math.random
+    })
   }
 
   orca.events.on('agent.status.changed', (event) =>
@@ -222,16 +257,19 @@ export function activateTrainer(
           return { save }
         }
         const workspaceId = event.workspaceListId ?? event.workspaceId ?? prior?.workspaceId ?? null
-        const room = await list(workspaceId)
+        const room = await list(workspaceId, false, event.workspaceId ?? prior?.hostWorkspaceId)
         const slots = [...new Set([...partySlots(save, room?.ids ?? []), event.paneKey])]
-        const initialPick = prior?.pokemon
-          ? undefined
-          : await catalogPreferences().then(
-              (preferences) => initialCatalogPick(save, preferences, Math.random),
-              (error) => orca.log(error.message)
-            )
-        const after = recordStatus(save, event, { slots, initialPick })
-        return { save: await settleWork(save, after, event.receivedAt, slots, workspaceId) }
+        const [settings, initialPick] = await Promise.all([
+          preferences(),
+          prior?.pokemon
+            ? undefined
+            : catalogPreferences().then(
+                (catalog) => initialCatalogPick(save, catalog, Math.random),
+                (error) => orca.log(error.message)
+              )
+        ])
+        const after = recordStatus(save, event, { slots, initialPick, evolve: settings.evolve })
+        return { save: settleWork(save, after, event.receivedAt, slots, workspaceId, settings) }
       },
       (before, after) =>
         Object.keys(after.party).length !== Object.keys(before.party).length ||
@@ -247,16 +285,17 @@ export function activateTrainer(
     )
   )
 
-  async function countActiveWork(save) {
+  async function sampleLiveAgents(save) {
     const at = Date.now()
+    const settings = await preferences()
     const rooms = new Map()
     for (const [slot, member] of Object.entries(save.party)) {
-      if (
-        member.run?.state !== 'working' ||
-        at - member.run.phaseSince - (member.run.credited ?? 0) < MINUTE ||
-        !member.workspaceId ||
-        !member.terminalId
-      ) {
+      if (!member.run || !member.workspaceId || !member.terminalId) {
+        continue
+      }
+      const { run } = member
+      const workDue = run.state === 'working' && at - run.phaseSince - (run.credited ?? 0) >= MINUTE
+      if (!workDue && !dueCare(member, at, settings)) {
         continue
       }
       if (!rooms.has(member.workspaceId)) {
@@ -268,7 +307,10 @@ export function activateTrainer(
     for (const [workspaceId, candidates] of rooms) {
       let agents
       try {
-        ;({ agents } = await orca.host.call('agents.list', { workspaceId }))
+        const hostWorkspaceId = candidates
+          .map((slot) => save.party[slot].hostWorkspaceId)
+          .find(Boolean)
+        ;({ agents } = await callInWorkspace(orca, 'agents.list', workspaceId, hostWorkspaceId))
       } catch {
         continue
       }
@@ -277,20 +319,25 @@ export function activateTrainer(
         const { terminalId, sessionId, run } = save.party[slot]
         const agent = byTerminal.get(terminalId)
         return (
-          agent?.state === 'working' &&
+          agent?.state === run.state &&
           (!sessionId || agent.sessionId === sessionId) &&
           agent.stateStartedAt <= run.phaseSince
         )
       })
       const slots = partySlots(save, byTerminal.keys())
       const after = workingMinutes(next, at, confirmed, { slots })
-      next = await settleWork(next, after, at, slots, workspaceId)
+      next = sampleCare(
+        settleWork(next, after, at, slots, workspaceId, settings),
+        at,
+        confirmed.filter((slot) => slots.includes(slot)),
+        settings
+      )
     }
     return { save: next }
   }
 
   timer = setInterval(() => {
-    void store.transact(countActiveWork).catch((error) => orca.log(error.message))
+    void store.transact(sampleLiveAgents).catch((error) => orca.log(error.message))
   }, MINUTE)
   timer.unref()
 
@@ -325,10 +372,32 @@ export function activateTrainer(
         const scope = inventoryOnly
           ? { slots: [], closed: new Set(), workspaceId: null }
           : await getScope(save, ids, true)
-        const context = { ...scope, at, key: `${client}:${sequence}`, rnd: Math.random }
+        const context = {
+          ...scope,
+          settings: inventoryOnly ? undefined : await preferences(),
+          at,
+          key: `${client}:${sequence}`,
+          rnd: Math.random
+        }
         let next = save
         let result
         try {
+          if (action.worldTerminalId !== undefined) {
+            const slot = action.target?.slot
+            const terminalId = action.worldTerminalId
+            const active = await orca.host.call('workspace.readContext')
+            if (
+              !['use', 'pet'].includes(action.type) ||
+              !scope.slots.includes(slot) ||
+              save.party[slot].terminalId !== terminalId ||
+              !active?.terminals.some(({ id }) => id === terminalId)
+            ) {
+              return {
+                save,
+                result: { ok: false, message: 'That Pokémon is no longer available.' }
+              }
+            }
+          }
           next =
             (await encounterTrainerAction?.(save, action, context)) ??
             trainerAction(save, action, context)
@@ -349,5 +418,5 @@ export function activateTrainer(
         before.boosts !== after.boosts
     )
   })
-  registerEncounterHandlers?.(orca, { store, getScope })
+  registerEncounterHandlers?.(orca, { store, getScope, preferences })
 }

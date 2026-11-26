@@ -25,17 +25,27 @@ export function bindWorldInput(root, options, actions, signal) {
     })
   }
 
+  function menuAfterRelease(actor, x, y) {
+    setTimeout(() => {
+      if (!signal.aborted && root.isConnected && (!actor || root.contains(actor.button))) {
+        menu(actor, x, y)
+      }
+    }, 0)
+  }
+
   function finish(event, commit) {
     if (!pointer || event.pointerId !== pointer.id) {
       return
     }
     clearTimeout(held)
-    const { actor, dragged, id, button, flips } = pointer
+    const { actor, dragged, id, button, flips, menu: heldForMenu, x, y } = pointer
     pointer = null
     if (button.hasPointerCapture(id)) {
       button.releasePointerCapture(id)
     }
-    if (dragged) {
+    if (heldForMenu && commit) {
+      menuAfterRelease(actor, x, y)
+    } else if (dragged) {
       suppressClick = true
       actions.drop(actor, event, flips, commit)
     }
@@ -74,7 +84,6 @@ export function bindWorldInput(root, options, actions, signal) {
           }
           suppressClick = true
           pointer.menu = true
-          menu(actor, event.clientX, event.clientY)
         }, 550)
       }
     },
@@ -158,7 +167,15 @@ export function bindWorldInput(root, options, actions, signal) {
       if (pointer?.menu) {
         return
       }
-      menu(from(event.target), event.clientX, event.clientY)
+      const actor = from(event.target)
+      const { clientX, clientY } = event
+      const open = () => menuAfterRelease(actor, clientX, clientY)
+      // Opening before pointerup lets the same right click dismiss the popover.
+      if (event.buttons & 2) {
+        root.ownerDocument.addEventListener('pointerup', open, { signal, once: true })
+      } else {
+        open()
+      }
     },
     { signal }
   )
@@ -166,11 +183,23 @@ export function bindWorldInput(root, options, actions, signal) {
   root.addEventListener(
     'keydown',
     (event) => {
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey) {
         return
       }
       const actor = from(event.target)
       const key = event.key.toLowerCase()
+      if (event.altKey) {
+        const command = key === 'b' ? 'bag' : key === 'p' ? 'open-picker' : null
+        if (
+          event.shiftKey &&
+          !event.repeat &&
+          command &&
+          options.onCommand?.(command, actor?.entity) === true
+        ) {
+          event.preventDefault()
+        }
+        return
+      }
       if (
         options.onMenu &&
         (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))

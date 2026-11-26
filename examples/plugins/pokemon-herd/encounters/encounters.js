@@ -363,12 +363,17 @@ function settleTimed(state, context, deltas, allowAutomaticMove) {
   const tr = v?.trainer
   if (
     v &&
-    ((!run && !tr?.tower && settings.visitors === 'off') || (tr?.tower && !state.tower.run))
+    ((!run && !tr?.tower && !v.raid && settings.visitors === 'off') ||
+      (tr?.tower && !state.tower.run))
   ) {
     clearVisitor(state, context)
   } else if (tr?.fought && !Object.keys(party).some((slot) => canFight(state, party, slot, now))) {
     loseTrainer(state, context)
-  } else if (tr?.choice && now >= tr.choice.until && canFight(state, party, tr.choice.slot, now)) {
+  } else if (
+    tr?.choice &&
+    (!settings.chooseMoves || now >= tr.choice.until) &&
+    canFight(state, party, tr.choice.slot, now)
+  ) {
     runExchange(state, context, tr.choice.slot, null)
   } else if (
     allowAutomaticMove &&
