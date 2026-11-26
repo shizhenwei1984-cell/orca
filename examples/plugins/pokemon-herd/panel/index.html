@@ -17,9 +17,74 @@
       <span id="candy" hidden></span>
     </section>
     <p role="status" id="progress-error" hidden></p>
+    <nav aria-label="Herd views" class="toolbar">
+      <button id="show-world" aria-controls="world" aria-pressed="true">World</button>
+      <button id="show-party" aria-controls="herd" aria-pressed="false">Party</button>
+      <button
+        id="show-settings"
+        aria-controls="world-settings"
+        aria-expanded="false"
+        aria-keyshortcuts="S"
+      >
+        Settings
+      </button>
+    </nav>
+    <form id="world-settings" aria-label="World settings" hidden>
+      <fieldset>
+        <legend>Scenery</legend>
+        <label
+          >Rows
+          <select name="rows">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+          </select>
+        </label>
+        <label
+          >Pokémon size
+          <select name="scale">
+            <option value="0.5">Small</option>
+            <option value="0.75" selected>Medium</option>
+            <option value="1">Large</option>
+            <option value="1.25">Extra large</option>
+          </select>
+        </label>
+        <label
+          >Background
+          <select name="background">
+            <option value="scenery">Scenery</option>
+            <option value="plain">Plain</option>
+          </select>
+        </label>
+        <label
+          >Sky
+          <select name="sky">
+            <option value="muted">Muted</option>
+            <option value="bright">Bright</option>
+          </select>
+        </label>
+        <label><input type="checkbox" name="weather" checked /> Weather</label>
+        <label><input type="checkbox" name="campfire" checked /> Campfire</label>
+        <label><input type="checkbox" name="spar" checked /> Sparring</label>
+        <label><input type="checkbox" name="tags" checked /> Name tags</label>
+      </fieldset>
+      <fieldset>
+        <legend>Audio</legend>
+        <label><input type="checkbox" name="sound" /> Pet and sparring sounds</label>
+        <button type="button" id="preview-sound">Preview sound</button>
+      </fieldset>
+      <button type="submit">Save settings</button>
+      <p role="status" id="settings-status"></p>
+    </form>
     <p role="status" id="message">Loading agents…</p>
     <button id="retry" hidden>Retry</button>
-    <ul id="herd" aria-label="Agent Pokémon"></ul>
+    <div id="world"></div>
+    <p id="focus-status" role="status" hidden></p>
+    <ul id="herd" aria-label="Agent Pokémon" hidden></ul>
+    <div id="world-actions" popover="auto" role="group" aria-label="World actions">
+      <button id="focus-terminal">Focus terminal</button>
+      <button id="world-action-settings">Settings</button>
+    </div>
     <template id="companion">
       <li>
         <div class="field" aria-hidden="true">

@@ -1,8 +1,10 @@
 import { loadTrainer, recordStatus, trainerView } from './trainer.mjs'
+import { registerTerminalFocus } from './terminal-focus.mjs'
 
 const SAVE = 'trainer'
 
 export default function activate(orca) {
+  registerTerminalFocus(orca)
   let save
   let tail = Promise.resolve()
   let writeError

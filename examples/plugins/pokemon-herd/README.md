@@ -1,8 +1,10 @@
 # Pokémon Herd for Orca
 
-Open **Pokémon Herd** in the desktop right sidebar. Each terminal agent in the focused workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and sleeps when done. The panel shows the trainer's Pokédollars, time worked, finished jobs and Rare Candy. Each companion shows its own work and friendship, plus the jobs it needs to evolve.
+Open **Pokémon Herd** in the desktop right sidebar. In **World**, each linked terminal agent in the current workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and rests when done. Click a companion or press Enter on it to return to its terminal. Open **Settings** to change the rows, scenery, Pokémon size and sound.
 
-Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the worker, workspace and agent read access, and plugin storage grant. Then run `orca plugin open local.pokemon-herd`.
+The trainer summary shows Pokédollars, time worked, finished jobs and Rare Candy. Open **Party** to see each companion's work, friendship and evolution progress.
+
+Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the trusted worker, workspace and agent read access, and plugin storage grants. Orca includes terminal focus in its workspace write grant. The plugin uses that grant to focus the companion's terminal when you activate it. Then run `orca plugin open local.pokemon-herd`.
 
 The worker starts tracking when it receives live agent status. Waiting for input pauses a job. Done completes it and pays by active time, with fractional Pokédollars carried across jobs. A job with at least 30 active minutes earns a Rare Candy. Quick answers build friendship and extended waits can reduce it. Starters that evolve through work need 15 jobs for the first evolution and 30 more for the second. The card shows the current species name beside the starter's artwork.
 
