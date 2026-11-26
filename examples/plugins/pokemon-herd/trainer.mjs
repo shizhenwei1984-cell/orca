@@ -1,26 +1,46 @@
+import { fullName } from './encounters/rules/dex.js'
 import { species, starterDex } from './panel/pokemon.mjs'
+import { loadCare } from './trainer-rules/breed.mjs'
+import { genderFrom } from './encounters/rules/gender.js'
+import { addItem, addMoney, CANDY_JOB_MS, jobPay, loadBag } from './encounters/rules/items.js'
+import { FRIEND, expShareTarget, gainJob, hash, withFriend } from './encounters/rules/picks.js'
+import { loadDex } from './encounters/rules/trainer.js'
+import {
+  MINUTE,
+  creditResearch,
+  creditWork,
+  isNight,
+  registerEvolution,
+  registerSeen,
+  savedPokemon,
+  settleBadges,
+  trainerPick
+} from './trainer-game.mjs'
 
-const MINUTE = 60_000
-const DOLLAR = MINUTE / 5
-const MAX_MONEY = 999_999
-const MAX_ITEMS = 999
-const MAX_FRIENDSHIP = 100
 const QUICK_COOLDOWN = 10 * MINUTE
 const HUNGRY_AFTER = 5 * MINUTE
 
 export function loadTrainer(raw) {
-  if (raw === null) {
-    return {
-      version: 1,
-      bag: { money: 0, change: 0, items: {}, marks: {} },
-      work: { jobs: 0, ms: 0 },
-      party: {}
-    }
-  }
-  if (raw?.version !== 1 || !raw.bag || !raw.work || !raw.party) {
+  if (raw !== null && (raw?.version !== 1 || !raw.bag || !raw.work || !raw.party)) {
     throw new Error('Unsupported trainer save')
   }
-  return raw
+  return {
+    ...raw,
+    version: 1,
+    bag: loadBag(raw?.bag && { ...raw.bag, v: 1 }),
+    work: raw?.work ?? { jobs: 0, ms: 0 },
+    party: raw?.party ?? {},
+    box: raw?.box ?? {},
+    dex: loadDex(
+      raw?.dex ?? {
+        v: 1,
+        seen: Object.values(raw?.party ?? {}).map((member) => member.pokemon?.dex)
+      }
+    ),
+    care: loadCare(raw?.care),
+    receipts: raw?.receipts ?? {},
+    visitors: raw?.visitors ?? false
+  }
 }
 
 function needsInput(state) {
@@ -39,12 +59,16 @@ function trackRun(previous, event) {
   let input = needsInput(state) ? (prior?.input ?? { since: at, hungry: false }) : null
   let friend = 0
   let berry = 0
-  let quickAt = previous?.quickAt ?? 0
+  let quickAt =
+    state === 'done' || state === 'working'
+      ? Math.max(previous?.quickAt ?? 0, previous?.petAt ?? 0)
+      : (previous?.quickAt ?? 0)
+  let quick = false
   if (prior?.input) {
     const waited = at - prior.input.since
     const hungry = prior.input.hungry || (waited >= HUNGRY_AFTER && held !== 'leftovers')
     if (hungry && !prior.input.hungry) {
-      friend -= 10
+      friend += FRIEND.hungry
     }
     if (input) {
       input = { ...input, hungry }
@@ -52,89 +76,150 @@ function trackRun(previous, event) {
       berry = 1
     } else if (waited < MINUTE && at - quickAt > QUICK_COOLDOWN) {
       quickAt = at
-      friend += 4
+      friend += FRIEND.quick
+      quick = true
     }
   }
-  const run = { state, phaseSince, taskMs: state === 'done' ? 0 : taskMs, input }
-  return { run, ms, task, friend, berry, quickAt }
+  const credited = prior?.credited ?? 0
+  const uncredited = ms ? Math.max(0, ms - credited) : 0
+  const run = {
+    state,
+    phaseSince,
+    taskMs: state === 'done' ? 0 : taskMs,
+    input,
+    credited: state === 'working' && prior?.state === state ? credited : 0
+  }
+  return { run, ms, uncredited, task, friend, berry, quick, quickAt }
 }
 
 function gainFriendship(pokemon, points) {
-  const gained = points > 0 && pokemon.held === 'soothe-bell' ? points * 2 : points
-  const friendship = Math.max(0, Math.min(MAX_FRIENDSHIP, pokemon.friendship + gained))
-  return { ...pokemon, friendship }
+  return savedPokemon(withFriend(trainerPick(pokemon), points), pokemon)
 }
 
-function finishJob(pokemon, at) {
-  const stageJobs = pokemon.stageJobs + (pokemon.held === 'lucky-egg' ? 2 : 1)
-  const counted = { ...pokemon, jobs: pokemon.jobs + 1, stageJobs }
-  const evolution = species[pokemon.dex]?.evolution
-  if (pokemon.stay || !evolution?.jobs || stageJobs < evolution.jobs) {
-    return counted
+export function workingMinutes(
+  save,
+  at,
+  confirmedSlots,
+  { slots = confirmedSlots, rnd = Math.random } = {}
+) {
+  let total = 0
+  const party = { ...save.party }
+  for (const slot of confirmedSlots) {
+    const member = party[slot]
+    const run = member?.run
+    if (run?.state !== 'working') {
+      continue
+    }
+    const ran = at - run.phaseSince
+    const add = ran - (run.credited ?? 0)
+    if (add < MINUTE) {
+      continue
+    }
+    total += add
+    party[slot] = { ...member, run: { ...run, credited: ran } }
   }
-  return { ...counted, dex: evolution.dex, stageJobs: 0, evolvedAt: at }
+  return total ? creditWork({ ...save, party }, at, slots, total, boxedPicks(save), rnd) : save
 }
 
-function reward(bag, task, held, evolved, at) {
-  const multiplier = held === 'amulet-coin' ? 2 : 1
-  // Carry the rounding difference across the whole trainer, including jobs on other panes.
-  const units = Math.min(300 * DOLLAR, DOLLAR + task) * multiplier + bag.change
-  const pay = Math.round(units / DOLLAR)
-  const change = units - pay * DOLLAR
-  const money = Math.min(MAX_MONEY, bag.money + pay)
-  const items =
-    task >= 30 * MINUTE
-      ? { ...bag.items, 'rare-candy': Math.min(MAX_ITEMS, (bag.items['rare-candy'] ?? 0) + 1) }
-      : bag.items
-  const marks = {
-    ...bag.marks,
-    nightJob: bag.marks.nightJob || new Date(at).getHours() < 5,
-    evolutions: (bag.marks.evolutions ?? 0) + Number(evolved)
-  }
-  return { ...bag, money, change, items, marks }
+function boxedPicks(save) {
+  return Object.fromEntries(
+    Object.entries(save.box).map(([slot, pokemon]) => [slot, trainerPick(pokemon)])
+  )
 }
 
-export function recordStatus(save, event) {
+export function recordStatus(save, event, { slots = [event.paneKey], rnd = Math.random } = {}) {
   const { paneKey, receivedAt: at } = event
   const previous = Object.hasOwn(save.party, paneKey) ? save.party[paneKey] : undefined
   if (previous ? at <= previous.lastAt : !event.workspaceId && !event.terminalId) {
     return save
   }
-  const { run, ms, task, friend, berry, quickAt } = trackRun(previous, event)
-  let bag = save.bag
+  const { run, ms, uncredited, task, friend, berry, quick, quickAt } = trackRun(previous, event)
   let pokemon = previous?.pokemon ?? null
   if (!pokemon && (event.sessionId || event.terminalId || task)) {
-    const starter = starterDex(event)
-    pokemon = { starter, dex: starter, jobs: 0, stageJobs: 0, friendship: 0 }
-  }
-  if (pokemon && friend) {
-    pokemon = gainFriendship(pokemon, friend)
-  }
-  if (pokemon && berry && bag.items.berry > 0) {
-    bag = { ...bag, items: { ...bag.items, berry: bag.items.berry - 1 } }
-    pokemon = gainFriendship(pokemon, 10)
-  }
-  if (task) {
-    pokemon = finishJob(pokemon, at)
-    bag = reward(bag, task, pokemon.held, pokemon.evolvedAt === at, at)
+    const dex = starterDex(event)
+    pokemon = savedPokemon(
+      { dex, gender: genderFrom(dex, hash(`${paneKey}:gender`)) },
+      null,
+      `starter:${paneKey}:${at}`
+    )
   }
   const companion = {
+    ...previous,
     terminalId: event.terminalId ?? previous?.terminalId ?? null,
+    workspaceId: event.workspaceListId ?? event.workspaceId ?? previous?.workspaceId ?? null,
+    title: event.title ?? previous?.title ?? null,
     sessionId: event.sessionId ?? previous?.sessionId ?? null,
     lastAt: at,
     quickAt,
     pokemon,
     run,
     workMs: (previous?.workMs ?? 0) + ms,
-    lastReward: task ? bag.money - save.bag.money : (previous?.lastReward ?? 0)
+    lastReward: previous?.lastReward ?? 0
   }
-  return {
+  let next = {
     ...save,
-    bag,
     work:
       ms || task ? { jobs: save.work.jobs + Number(task > 0), ms: save.work.ms + ms } : save.work,
     party: { ...save.party, [paneKey]: companion }
   }
+  if (pokemon && !previous?.pokemon) {
+    next = registerSeen(next, [pokemon.dex])
+  }
+  if (pokemon && friend) {
+    pokemon = gainFriendship(pokemon, friend)
+  }
+  if (pokemon && berry && next.bag.items.berry > 0) {
+    next = { ...next, bag: addItem(next.bag, 'berry', -1) }
+    pokemon = gainFriendship(pokemon, FRIEND.meal)
+    next = creditResearch(next, at, slots, 'berry', 1)
+  }
+  if (quick) {
+    next = creditResearch(next, at, slots, 'quick', 1)
+  }
+  if (uncredited) {
+    next = creditWork(next, at, slots, uncredited, boxedPicks(next), rnd)
+  }
+  if (task) {
+    next = creditResearch(next, at, slots, 'job', 1, pokemon.dex)
+    const pay = jobPay(task, pokemon.held === 'amulet-coin')
+    const { bag } = next
+    let paid = addMoney(bag, pay)
+    companion.lastReward = paid.money - bag.money
+    if (task >= CANDY_JOB_MS) {
+      paid = addItem(paid, 'rare-candy')
+    }
+    if (new Date(at).getHours() < 5) {
+      paid.marks = { ...paid.marks, nightJob: true }
+    }
+    next = { ...next, bag: paid }
+    const pick = trainerPick(pokemon)
+    const how = { night: isNight(at) }
+    const result = gainJob(pick, paneKey, how, at)
+    pokemon = savedPokemon(result.pick, pokemon, undefined, pokemon.jobs + 1)
+    if (result.evolved) {
+      next = registerEvolution(next, pokemon)
+    }
+    if (pick.held === 'exp-share') {
+      const picks = Object.fromEntries(
+        slots.flatMap((slot) => {
+          const active = next.party[slot]?.pokemon
+          return active ? [[slot, trainerPick(active)]] : []
+        })
+      )
+      const slot = expShareTarget(picks, paneKey)
+      if (slot) {
+        const member = next.party[slot]
+        const shared = gainJob(picks[slot], slot, how, at)
+        const grown = savedPokemon(shared.pick, member.pokemon)
+        next.party[slot] = { ...member, pokemon: grown }
+        if (shared.evolved) {
+          next = registerEvolution(next, grown)
+        }
+      }
+    }
+  }
+  companion.pokemon = pokemon
+  return settleBadges(next, slots, pokemon)
 }
 
 export function trainerView(save, terminalIds) {
@@ -147,11 +232,12 @@ export function trainerView(save, terminalIds) {
     }
   }
   const companions = Array.from(matches, ([terminalId, member]) => {
-    const { starter, dex, jobs, stageJobs, friendship } = member.pokemon
+    const { starter, dex, form, jobs, stageJobs, friendship } = member.pokemon
     return {
       terminalId,
       starter,
       dex,
+      ...(form || !Object.hasOwn(species, dex) ? { name: fullName(dex, form) } : {}),
       jobs,
       stageJobs,
       friendship,

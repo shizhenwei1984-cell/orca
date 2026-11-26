@@ -117,14 +117,6 @@ small {
 li[data-state='blocked'] .state {
   color: var(--orca-destructive);
 }
-button {
-  font: inherit;
-  padding: 4px 10px;
-  color: var(--orca-secondary-foreground);
-  background: var(--orca-secondary);
-  border: 1px solid var(--orca-border);
-  border-radius: var(--orca-radius);
-}
 @keyframes frames {
   to {
     background-position-x: calc(-80px * var(--frames));
@@ -143,4 +135,138 @@ button {
   li[data-state='working'] .trail {
     animation: none;
   }
+}
+
+button,
+#trainer-game input,
+#trainer-game select {
+  min-height: 28px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  padding: 4px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--orca-background);
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:hover:not(:disabled),
+button[aria-pressed='true'] {
+  background: var(--orca-muted);
+}
+
+button:disabled {
+  opacity: 0.55;
+}
+
+#trainer-game {
+  width: calc(100% - 16px);
+  max-width: 560px;
+  max-height: calc(100% - 16px);
+  padding: 12px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+  overflow: hidden;
+}
+
+#trainer-game[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#trainer-game::backdrop {
+  background: color-mix(in srgb, var(--orca-foreground) 12%, transparent);
+}
+
+#trainer-game h2,
+#trainer-game h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+#trainer-game p {
+  margin: 0;
+  color: var(--orca-muted-foreground);
+}
+
+#trainer-game input,
+#trainer-game select {
+  max-width: 100%;
+  min-width: 0;
+}
+
+#trainer-game input[type='number'] {
+  width: 64px;
+}
+
+#trainer-tabs,
+.trainer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 4px;
+}
+
+#trainer-tabs button[aria-pressed='true'] {
+  border-color: currentColor;
+}
+
+#trainer-view {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+}
+
+.trainer-entry,
+#trainer-view details {
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+
+.trainer-entry {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#trainer-view details > .trainer-entry {
+  border: 0;
+  border-top: 1px solid var(--orca-border);
+  border-radius: 0;
+}
+
+#trainer-view summary {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.trainer-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+#trainer-game progress {
+  width: 100%;
+}
+
+#trainer-game footer span:empty {
+  display: none;
+}
+
+#trainer-game footer:not(:has(button:not([hidden]), span:not(:empty))) {
+  display: none;
+}
+
+.trainer-destructive {
+  color: var(--orca-destructive);
 }

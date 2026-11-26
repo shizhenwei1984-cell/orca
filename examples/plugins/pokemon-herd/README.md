@@ -1,12 +1,16 @@
 # Pokémon Herd for Orca
 
-Open **Pokémon Herd** in the desktop right sidebar. Each terminal agent in the focused workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and sleeps when done. The panel shows the trainer's Pokédollars, time worked, finished jobs and Rare Candy. Each companion shows its own work and friendship, plus the jobs it needs to evolve.
+Open **Pokémon Herd** in the desktop right sidebar. Each terminal agent in the focused workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and sleeps when done.
 
 Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the worker, workspace and agent read access, and plugin storage grant. Then run `orca plugin open local.pokemon-herd`.
 
-The worker starts tracking when it receives live agent status. Waiting for input pauses a job. Done completes it and pays by active time, with fractional Pokédollars carried across jobs. A job with at least 30 active minutes earns a Rare Candy. Quick answers build friendship and extended waits can reduce it. Starters that evolve through work need 15 jobs for the first evolution and 30 more for the second. The card shows the current species name beside the starter's artwork.
+Open **Trainer** to use the Bag and Shop, browse the Box and Pokédex, or check Research and badges. Use **Care** on a Pokémon's card to pet it, give it an item, rename it, or move it to the Box. In the Box, choose **Put in Day Care** to leave a parent. Compatible parents can lay an egg as your agents work. Hatched Pokémon join the Box and Pokédex.
 
-The worker tracks every workspace, including folders, while the panel is closed. It stores the purse, party and in-flight jobs together under the versioned `trainer` key. `trainer.mjs` owns the state transitions. The panel reads `trainer.read` by terminal ID and refreshes on `trainer.changed`.
+Waiting for input pauses the current job. Done pays by active time and rounds each job independently. A job with at least 30 active minutes earns a Rare Candy. Quick answers build friendship and extended waits can reduce it. Evolution follows the species' jobs, friendship, time of day, or item requirements.
+
+The worker tracks agent status across workspaces, including folders, while the panel is closed. It saves the purse, party, in-flight jobs, and trainer records together. It can resume the saved run after a restart when it receives another live status event. The host has no durable replay for status changes the worker missed.
+
+See [Trainer integration](./trainer-integration.md) for the worker contracts and remaining cross-feature wiring.
 
 ## Credits
 

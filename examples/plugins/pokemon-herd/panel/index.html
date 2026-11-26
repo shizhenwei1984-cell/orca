@@ -15,11 +15,25 @@
       <strong id="wallet"></strong>
       <span id="work"></span>
       <span id="candy" hidden></span>
+      <button type="button" id="open-trainer">Trainer</button>
     </section>
     <p role="status" id="progress-error" hidden></p>
     <p role="status" id="message">Loading agents…</p>
     <button id="retry" hidden>Retry</button>
     <ul id="herd" aria-label="Agent Pokémon"></ul>
+    <dialog id="trainer-game" aria-labelledby="trainer-game-title">
+      <header>
+        <h2 id="trainer-game-title">Trainer</h2>
+        <strong id="trainer-game-wallet"></strong>
+        <button type="button" id="close-trainer">Close</button>
+      </header>
+      <nav id="trainer-tabs" aria-label="Trainer pages"></nav>
+      <div id="trainer-view"></div>
+      <footer>
+        <span role="status" id="trainer-feedback"></span>
+        <button type="button" id="trainer-action-retry" hidden>Retry action</button>
+      </footer>
+    </dialog>
     <template id="companion">
       <li>
         <div class="field" aria-hidden="true">
@@ -32,6 +46,7 @@
         <div class="progress" hidden>
           <span class="career"></span>
           <span class="growth"></span>
+          <button type="button" class="care">Care</button>
         </div>
       </li>
     </template>
