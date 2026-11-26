@@ -7,6 +7,7 @@ import { getKeybindingConflictIdentity } from '../../../shared/keybindings/match
 import type { KeybindingOverrides } from '../../../shared/keybindings/types'
 import type { PluginManifest } from '../../../shared/plugins/manifest/plugin-manifest'
 import type { PluginCommandContribution } from '../../../shared/plugins/contributions/plugin-command-contribution'
+import type { PluginHostListEntry } from '../../../shared/plugins/plugin-list-entry'
 import type { PluginKeybindingContribution } from '../../../shared/plugins/contributions/plugin-content-pack-contributions'
 import {
   isInvalidDiscoveredPlugin,
@@ -24,7 +25,7 @@ export type PluginCommandRegistration = {
   id: string
   title: string
   context: 'global' | 'workspace'
-  handler: { type: 'built-in'; action: PluginCommandAliasActionId } | { type: 'worker' }
+  handler: PluginHostListEntry['commands'][number]['handler']
   keybindings: PluginCommandKeybinding[]
   /** The built-in action this worker command runs in place of. */
   replaces?: PluginCommandAliasActionId
@@ -141,15 +142,21 @@ function registrationsForManifest(
     id: command.id,
     title: command.title,
     context: command.when ?? 'global',
-    handler:
-      command.action === undefined
-        ? { type: 'worker' as const }
-        : { type: 'built-in' as const, action: command.action as PluginCommandAliasActionId },
+    handler: commandHandler(command),
     keybindings: keybindingsForCommand(command, bindingsByCommand.get(command.id) ?? []),
     ...(command.replaces !== undefined && isPluginCommandAliasActionId(command.replaces)
       ? { replaces: command.replaces }
       : {})
   }))
+}
+
+function commandHandler(command: PluginCommandContribution): PluginCommandRegistration['handler'] {
+  if (command.openPanel) {
+    return { type: 'panel', ...command.openPanel }
+  }
+  return command.action === undefined
+    ? { type: 'worker' }
+    : { type: 'built-in', action: command.action }
 }
 
 function keybindingsForCommand(

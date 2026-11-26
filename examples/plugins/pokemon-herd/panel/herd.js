@@ -562,6 +562,39 @@ retry.onclick = () => {
 
 mountHerdStrip(orca, worldContainer, signal)
 
+let activationSubscription
+
+function onWorkspaceChanged({ context }) {
+  refresh(context)
+  activationSubscription?.dispose()
+  if (context && orca.plugin.onActivate) {
+    activationSubscription = orca.plugin.onActivate(
+      async ({ action, terminalId, workspaceId, input }) => {
+        const origin = workspace
+        if (!origin) {
+          return
+        }
+        if (workspaceId && workspaceId !== origin.context.workspaceId) {
+          if (origin.context.workspaceId || action === 'box' || action === 'care') {
+            return
+          }
+        }
+        if (action === 'bag') {
+          runCommand('bag')
+        } else if (action === 'pick') {
+          await trainerGame.openPicker({ id: origin.terminals.has(terminalId) ? terminalId : null })
+        } else if (action === 'care' || action === 'box') {
+          const [term, slot, id] = input ?? []
+          if (origin.terminals.has(term)) {
+            await trainerGame.openCompanion(action === 'care' ? 'Party' : 'Box', term, { slot, id })
+          }
+        }
+      },
+      context.workspaceId
+    )
+  }
+}
+
 // workspace.changed replays the current context when the panel subscribes.
 const subscriptions = [
   orca.plugin.on('trainer.changed', () => {
@@ -578,7 +611,7 @@ const subscriptions = [
       void readAgents(workspace)
     }
   }),
-  orca.on('workspace.changed', ({ context }) => refresh(context))
+  orca.on('workspace.changed', onWorkspaceChanged)
 ]
 window.addEventListener(
   'pagehide',
@@ -588,6 +621,7 @@ window.addEventListener(
     focusRequest?.abort()
     workspace?.read.abort()
     workspace?.scope.abort()
+    activationSubscription?.dispose()
     for (const subscription of subscriptions) {
       subscription.dispose()
     }

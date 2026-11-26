@@ -13,6 +13,8 @@ import {
 } from '../manifest/plugin-schema-field-docs'
 
 export const PLUGIN_PANEL_LIMIT = 64
+export const PLUGIN_PANEL_ACTIVATION_SINCE = '1.4.274'
+export const pluginPanelActionIdSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/)
 
 /** Icons a panel (and a component panel's controls) may name; the renderer bundles exactly
  *  these. One vocabulary for manifests and components. Grow additively, with a since below. */
@@ -131,6 +133,18 @@ export const pluginPanelContributionSchema = z
         ['dist/panel.html']
       )
     ),
+    actions: z
+      .array(pluginPanelActionIdSchema)
+      .min(1)
+      .max(16)
+      .optional()
+      .meta(
+        pluginFieldDoc(
+          'Action IDs accepted by this HTML panel. A command can target one, as can another panel of this plugin during a person’s click or key press.',
+          PLUGIN_PANEL_ACTIVATION_SINCE,
+          [['show-report']]
+        )
+      ),
     ui: z
       .enum(PLUGIN_PANEL_UI_KINDS)
       .optional()
@@ -157,6 +171,15 @@ export const pluginPanelContributionSchema = z
     path: ['entry'],
     message: 'a components panel entry must be a .js, .mjs, .ts, .tsx, .mts or .jsx module'
   })
+  .refine(
+    (panel) =>
+      !panel.actions ||
+      (panel.ui !== 'components' && new Set(panel.actions).size === panel.actions.length),
+    {
+      path: ['actions'],
+      message: 'actions must be unique and belong to an HTML panel'
+    }
+  )
   .meta({
     id: 'PanelContribution',
     description: 'A sidebar panel. Requires the `sandboxed-ui` execution profile or higher.'

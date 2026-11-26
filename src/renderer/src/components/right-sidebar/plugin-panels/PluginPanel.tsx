@@ -61,6 +61,7 @@ function PluginPanelContent({
   const panelFrameKey = entry.status === 'ready' ? `${tabKey}:${entry.revision}` : null
   const { onFrameLoad } = usePluginFrameHost({
     surface: 'panel',
+    panelTabKey: panel?.tabKey,
     frameRef,
     // Why null: a declarative panel's own host wires its hidden guest instead.
     frameKey: declarative ? null : panelFrameKey,

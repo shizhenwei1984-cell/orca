@@ -183,23 +183,11 @@ export function bindWorldInput(root, options, actions, signal) {
   root.addEventListener(
     'keydown',
     (event) => {
-      if (event.defaultPrevented || event.ctrlKey || event.metaKey) {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
         return
       }
       const actor = from(event.target)
       const key = event.key.toLowerCase()
-      if (event.altKey) {
-        const command = key === 'b' ? 'bag' : key === 'p' ? 'open-picker' : null
-        if (
-          event.shiftKey &&
-          !event.repeat &&
-          command &&
-          options.onCommand?.(command, actor?.entity) === true
-        ) {
-          event.preventDefault()
-        }
-        return
-      }
       if (
         options.onMenu &&
         (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10'))

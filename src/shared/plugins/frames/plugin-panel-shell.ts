@@ -1,4 +1,9 @@
-import { EDITOR_METHODS, FRAME_EVENTS, type PluginFrameTheme } from './plugin-frame-bridge'
+import {
+  EDITOR_METHODS,
+  FRAME_EVENTS,
+  OPEN_PLUGIN_PANEL_METHOD,
+  type PluginFrameTheme
+} from './plugin-frame-bridge'
 import { PLUGIN_ERROR_CODES, PLUGIN_PROTOCOL_VERSION } from './plugin-protocol'
 import { PLUGIN_DECLARATIVE_POST_GLOBAL, PLUGIN_FRAME_TRANSPORT_GLOBAL } from './plugin-frame-guest'
 import { PLUGIN_HOST_API_MAJOR } from '../workers/plugin-host-api-major'
@@ -55,6 +60,7 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
     // Iframes get no user-gesture API at all: Orca cannot verify their gestures. A components
     // panel's hidden guest never has activation; its `orca` module routes these through the
     // press grant with host.call instead.
+    openPanel: surface === 'panel' && transport === 'guest' ? OPEN_PLUGIN_PANEL_METHOD : null,
     user: transport === 'guest' ? PLUGIN_FRAME_USER_METHODS : null,
     tokensStyleId: PANEL_SHELL_TOKENS_STYLE_ID,
     maxPending: 256,
@@ -178,6 +184,8 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
       applyTheme(m.payload)
     } else if (m.kind === 'evt' && m.event === E.push) {
       receivePush(m.payload)
+    } else if (m.kind === 'evt' && m.event === E.panelActivated) {
+      Promise.all(emit(E.panelActivated, m.payload)).catch(function (error) { console.error(error) })
     } else if (m.kind === 'evt' && m.event === E.editorDocument && C.surface === 'editor') {
       latest = Object.freeze(m.payload)
       waiting.splice(0).forEach(function (resolve) { resolve(latest) })

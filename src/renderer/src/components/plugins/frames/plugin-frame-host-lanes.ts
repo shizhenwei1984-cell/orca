@@ -1,3 +1,4 @@
+import { OPEN_PLUGIN_PANEL_METHOD } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import { PLUGIN_DECLARATIVE_RENDER_LANE } from '../../../../../shared/plugins/declarative/plugin-declarative-limits'
 import { PLUGIN_DECLARATIVE_MESSAGES } from '../../../../../shared/plugins/declarative/plugin-declarative-message-names'
 import type { PluginFrameHello } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
@@ -90,7 +91,10 @@ export function createPluginFrameGestureGate(
 ): (method: string, context: PluginFrameMessageContext) => boolean {
   let consumed = 0
   return (method, context) => {
-    if (getPluginHostMethodSpec(method)?.userActivation !== true) {
+    if (
+      method !== OPEN_PLUGIN_PANEL_METHOD &&
+      getPluginHostMethodSpec(method)?.userActivation !== true
+    ) {
       return true
     }
     if (consumeHostActivation) {

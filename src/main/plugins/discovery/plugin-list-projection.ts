@@ -207,7 +207,8 @@ export async function buildPluginList(
           title: panel.title,
           ...(panel.icon ? { icon: panel.icon } : {}),
           ...(panel.defaultPlacement ? { defaultPlacement: panel.defaultPlacement } : {}),
-          tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id)
+          tabKey: pluginPanelTabKey(plugin.pluginKey, panel.id),
+          ...(panel.actions ? { actions: panel.actions } : {})
         })),
         customEditors: plugin.manifest.contributes.customEditors.map((editor, index) => ({
           id: editor.id,

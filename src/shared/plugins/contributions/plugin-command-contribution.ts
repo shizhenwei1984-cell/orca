@@ -5,12 +5,23 @@ import {
   PLUGIN_COMMAND_ALIAS_ACTION_IDS
 } from './plugin-command-actions'
 import { PLUGIN_ENUM_SINCE_KEY } from '../manifest/plugin-engine-floor-keys'
-import { pluginCommandIdSchema } from '../manifest/plugin-manifest-fields'
+import {
+  PLUGIN_PANEL_ACTIVATION_SINCE,
+  pluginPanelActionIdSchema
+} from './plugin-panel-contribution'
+import { pluginCommandIdSchema, pluginIdSchema } from '../manifest/plugin-manifest-fields'
 import {
   pluginFieldDoc,
   PLUGIN_MANIFEST_V2_SINCE,
   PLUGIN_SCHEMA_SINCE_V1
 } from '../manifest/plugin-schema-field-docs'
+
+export const pluginCommandPanelTargetSchema = z.strictObject({
+  panel: pluginIdSchema,
+  action: pluginPanelActionIdSchema,
+  activeTerminal: z.literal(true).optional()
+})
+export type PluginCommandPanelTarget = z.infer<typeof pluginCommandPanelTargetSchema>
 
 export const PLUGIN_COMMAND_LIMIT = 256
 /** First release that reads `commands[].replaces`. */
@@ -52,7 +63,7 @@ export const pluginCommandContributionSchema = z
     }),
     action: pluginCommandIdSchema.optional().meta({
       ...pluginFieldDoc(
-        'Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker; one without needs `main`.',
+        'Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker. A worker command needs `main`.',
         PLUGIN_SCHEMA_SINCE_V1,
         ['view.tasks']
       ),
@@ -60,6 +71,15 @@ export const pluginCommandContributionSchema = z
       enum: [...PLUGIN_COMMAND_ALIAS_ACTION_IDS],
       [PLUGIN_ENUM_SINCE_KEY]: PLUGIN_COMMAND_ACTION_SINCE
     }),
+    openPanel: pluginCommandPanelTargetSchema
+      .optional()
+      .meta(
+        pluginFieldDoc(
+          'Reveal this plugin’s HTML panel and deliver its action after the panel subscribes. Requires `when: "workspace"`. With `workspace:read`, set `activeTerminal: true` to include the current terminal ID when available.',
+          PLUGIN_PANEL_ACTIVATION_SINCE,
+          [{ panel: 'dashboard', action: 'show-report' }]
+        )
+      ),
     replaces: pluginCommandIdSchema.optional().meta({
       ...pluginFieldDoc(
         'Built-in Orca action this worker command runs in place of, from its shortcut, the palette or a menu. To also run Orca’s own, the command calls `commands.run` with the action (`workspace:write`); that never reaches a replacement. If the worker fails or takes over 2 s, Orca runs its own. The person sees it before approving and can turn it off in Settings; when two plugins replace one action, the one installed first does.',

@@ -56,7 +56,13 @@ export const PLUGIN_FRAME_FACADES_SCRIPT = `
       }
       return call('plugin.request', params, { signal: o.signal }).then(pick('output'))
     },
-    on: function (event, fn) { return listen(pluginListeners, String(event), fn) }
+    on: function (event, fn) { return listen(pluginListeners, String(event), fn) },
+    openPanel: C.openPanel ? function (params) { return userCall(C.openPanel, params) } : undefined,
+    onActivate: function (fn, workspaceId) {
+      var subscription = on(E.panelActivated, fn)
+      post({ kind: 'evt', event: E.panelActivationReady, payload: workspaceId })
+      return subscription
+    }
   })
   orca.storage = Object.freeze({
     get: function (key) {

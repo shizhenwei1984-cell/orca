@@ -588,6 +588,22 @@
             "dist/panel.html"
           ]
         },
+        "actions": {
+          "description": "Action IDs accepted by this HTML panel. A command can target one, as can another panel of this plugin during a person’s click or key press.",
+          "x-orca-since": "1.4.274",
+          "examples": [
+            [
+              "show-report"
+            ]
+          ],
+          "minItems": 1,
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          }
+        },
         "ui": {
           "description": "How the panel draws its UI. `html` (default) shows `entry` as a web page in an isolated frame; `components` runs `entry` as a hidden module and Orca draws the component tree it returns with its own controls.",
           "x-orca-since": "1.4.246",
@@ -660,7 +676,7 @@
           ]
         },
         "action": {
-          "description": "Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker; one without needs `main`.",
+          "description": "Built-in Orca action this command runs. A command with an action is declarative and never starts the plugin worker. A worker command needs `main`.",
           "x-orca-since": "1.4.160",
           "examples": [
             "view.tasks"
@@ -703,6 +719,37 @@
           "minLength": 1,
           "maxLength": 256,
           "pattern": "^[A-Za-z0-9]+(?:[._-][A-Za-z0-9]+)*$"
+        },
+        "openPanel": {
+          "description": "Reveal this plugin’s HTML panel and deliver its action after the panel subscribes. Requires `when: \"workspace\"`. With `workspace:read`, set `activeTerminal: true` to include the current terminal ID when available.",
+          "x-orca-since": "1.4.274",
+          "examples": [
+            {
+              "panel": "dashboard",
+              "action": "show-report"
+            }
+          ],
+          "type": "object",
+          "properties": {
+            "panel": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            },
+            "action": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+            },
+            "activeTerminal": {
+              "type": "boolean",
+              "const": true
+            }
+          },
+          "required": [
+            "panel",
+            "action"
+          ],
+          "additionalProperties": false
         },
         "replaces": {
           "description": "Built-in Orca action this worker command runs in place of, from its shortcut, the palette or a menu. To also run Orca’s own, the command calls `commands.run` with the action (`workspace:write`); that never reaches a replacement. If the worker fails or takes over 2 s, Orca runs its own. The person sees it before approving and can turn it off in Settings; when two plugins replace one action, the one installed first does.",

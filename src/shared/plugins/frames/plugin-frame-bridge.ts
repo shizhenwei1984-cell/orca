@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { pluginIdSchema } from '../manifest/plugin-manifest-fields'
+import { pluginPanelActionIdSchema } from '../contributions/plugin-panel-contribution'
 import { isPluginJsonObject } from '../manifest/plugin-json-object'
 import { PLUGIN_PROTOCOL_VERSION } from './plugin-protocol'
 
@@ -31,7 +33,9 @@ export const FRAME_EVENTS = {
   /** frame → host, once: its document session merges outside changes into unsaved work. */
   editorMerges: 'editor.merges',
   /** host → frame, payload `PluginPanelPush`: a worker post, an event or a data change. */
-  push: 'plugin.push'
+  push: 'plugin.push',
+  panelActivationReady: 'panel.activationReady',
+  panelActivated: 'panel.activated'
 } as const
 
 /** Frame-local methods a custom editor handles or calls on the same envelope. */
@@ -56,6 +60,14 @@ export type PluginFrameHello = {
 
 /** Per-plugin bridge budgets, enforced host-side. Why 120: a panel loading its storage atoms,
  *  settings and first worker requests makes a burst of small calls. */
+export const OPEN_PLUGIN_PANEL_METHOD = 'panel.open'
+export const openPluginPanelParamsSchema = z.strictObject({
+  panel: pluginIdSchema,
+  action: pluginPanelActionIdSchema,
+  workspaceId: z.string().min(1).max(1024),
+  input: z.array(z.string().min(1).max(1024)).max(3).optional()
+})
+
 export const PANEL_MESSAGE_MAX_BYTES = 64 * 1024
 export const PANEL_MESSAGE_RATE_LIMIT = { maxMessages: 120, perMs: 10_000 }
 
