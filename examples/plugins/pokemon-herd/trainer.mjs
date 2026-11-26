@@ -1,4 +1,5 @@
 import { fullName } from './encounters/rules/dex.js'
+import { appearanceOf } from './catalog/trainer-catalog.mjs'
 import { species, starterDex } from './panel/pokemon.mjs'
 import { loadCare } from './trainer-rules/breed.mjs'
 import { genderFrom } from './encounters/rules/gender.js'
@@ -127,7 +128,11 @@ function boxedPicks(save) {
   )
 }
 
-export function recordStatus(save, event, { slots = [event.paneKey], rnd = Math.random } = {}) {
+export function recordStatus(
+  save,
+  event,
+  { slots = [event.paneKey], rnd = Math.random, initialPick } = {}
+) {
   const { paneKey, receivedAt: at } = event
   const previous = Object.hasOwn(save.party, paneKey) ? save.party[paneKey] : undefined
   if (previous ? at <= previous.lastAt : !event.workspaceId && !event.terminalId) {
@@ -136,9 +141,9 @@ export function recordStatus(save, event, { slots = [event.paneKey], rnd = Math.
   const { run, ms, uncredited, task, friend, berry, quick, quickAt } = trackRun(previous, event)
   let pokemon = previous?.pokemon ?? null
   if (!pokemon && (event.sessionId || event.terminalId || task)) {
-    const dex = starterDex(event)
+    const { dex, form } = initialPick ?? { dex: starterDex(event) }
     pokemon = savedPokemon(
-      { dex, gender: genderFrom(dex, hash(`${paneKey}:gender`)) },
+      { dex, ...(form ? { form } : {}), gender: genderFrom(dex, hash(`${paneKey}:gender`)) },
       null,
       `starter:${paneKey}:${at}`
     )
@@ -237,6 +242,7 @@ export function trainerView(save, terminalIds) {
       terminalId,
       starter,
       dex,
+      appearance: appearanceOf(member.pokemon),
       ...(form || !Object.hasOwn(species, dex) ? { name: fullName(dex, form) } : {}),
       jobs,
       stageJobs,

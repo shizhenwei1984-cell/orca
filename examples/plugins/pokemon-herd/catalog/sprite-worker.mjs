@@ -1,4 +1,5 @@
 import { entryOf, genderChoices, spriteVariants } from './dex.mjs'
+import { createSpriteCache, PNG_LIMIT } from './sprite-cache.mjs'
 
 export const SPRITE_REQUEST = 'catalog.sprite'
 const REVISION = 'ced880d7598b9d505a267dbed5d05482197b05ff'
@@ -80,9 +81,9 @@ function spriteFromPng(bytes, animation, variant, pose) {
   if (!width || !height || width > 4096 || height > 4096 || width * height > 4_194_304) {
     throw new Error('SpriteCollab image dimensions exceed the limit')
   }
-  const cols = Math.floor(width / animation.width)
-  const rows = Math.floor(height / animation.height)
-  if (!cols || !rows) {
+  const cols = width / animation.width
+  const rows = height / animation.height
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 1 || rows < 1) {
     throw new Error('SpriteCollab frame dimensions exceed the sheet')
   }
   const times = animation.times.length ? animation.times.slice(0, cols) : [160]
@@ -91,7 +92,9 @@ function spriteFromPng(bytes, animation, variant, pose) {
     width: animation.width,
     height: animation.height,
     times,
-    row: pose === 'walk' && rows >= 8 ? 2 : 0,
+    cols,
+    rows,
+    row: pose === 'walk' && rows >= 8 ? 6 : 0,
     shiny: variant.shiny,
     credits: `${CREDITS}/${variant.folder}/credits.txt`
   }
@@ -117,58 +120,66 @@ function spriteRequest(input) {
   return { variants: spriteVariants(pick, { working, season }), pose }
 }
 
-/** @param {{panels: {handle: (name: string, handle: (input: unknown) => Promise<unknown>) => unknown}}} orca */
 export function registerCatalogSprites(orca) {
   const animations = new Map()
-  const sprites = new Map()
   const pending = new Map()
+  const sprites = createSpriteCache(orca.storage, REVISION)
 
-  async function load(variants, pose) {
-    for (const variant of variants) {
-      const { folder } = variant
-      if (!animations.has(folder)) {
-        const bytes = await fetchAsset(`${folder}/AnimData.xml`, 128 * 1024)
-        if (animations.size >= 64) {
-          animations.delete(animations.keys().next().value)
-        }
-        animations.set(folder, bytes && animationIndex(bytes.toString('utf8')))
+  async function download(variant, pose) {
+    const { folder } = variant
+    if (!animations.has(folder)) {
+      const bytes = await fetchAsset(`${folder}/AnimData.xml`, 128 * 1024)
+      if (animations.size >= 64) {
+        animations.delete(animations.keys().next().value)
       }
-      const index = animations.get(folder)
-      const animation = index && animationFor(index, pose)
-      if (animation) {
-        const bytes = await fetchAsset(`${folder}/${animation.name}-Anim.png`, 512 * 1024)
-        if (bytes) {
-          return spriteFromPng(bytes, animation, variant, pose)
-        }
-      }
+      animations.set(folder, bytes && animationIndex(bytes.toString('utf8')))
     }
-    return null
+    const index = animations.get(folder)
+    const animation = index && animationFor(index, pose)
+    const bytes = animation && (await fetchAsset(`${folder}/${animation.name}-Anim.png`, PNG_LIMIT))
+    return bytes ? spriteFromPng(bytes, animation, variant, pose) : null
   }
 
-  return orca.panels.handle(SPRITE_REQUEST, async (input) => {
-    const { variants, pose } = spriteRequest(input)
-    const key = `${variants.map(({ folder }) => folder).join('|')}:${pose}`
-    if (sprites.has(key)) {
-      return sprites.get(key)
-    }
+  async function load(variant, pose) {
+    const key = `${variant.folder}:${pose}`
+    const cached = await sprites.get(key)
     if (pending.has(key)) {
       return pending.get(key)
+    }
+    if (cached) {
+      return cached
     }
     if (pending.size >= 8) {
       throw new Error('Sprite downloads are busy')
     }
-    const result = load(variants, pose)
-      .then((sprite) => {
+    const result = download(variant, pose)
+      .then(async (sprite) => {
         if (sprite) {
-          if (sprites.size >= 32) {
-            sprites.delete(sprites.keys().next().value)
-          }
-          sprites.set(key, sprite)
+          await sprites.set(key, sprite)
         }
         return sprite
       })
       .finally(() => pending.delete(key))
     pending.set(key, result)
     return result
+  }
+
+  return orca.panels.handle(SPRITE_REQUEST, async (input) => {
+    const { variants, pose } = spriteRequest(input)
+    let failure
+    for (const variant of variants) {
+      try {
+        const sprite = await load(variant, pose)
+        if (sprite) {
+          return sprite
+        }
+      } catch (error) {
+        failure = error
+      }
+    }
+    if (failure) {
+      throw failure
+    }
+    return null
   })
 }

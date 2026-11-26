@@ -77,7 +77,10 @@ function setLabel(actor, status, tags) {
   tag.hidden = !tags
 }
 
-export function paintActors(list, { width, rowHeight, ground, now, settings, reduced, hovered }) {
+export function paintActors(
+  list,
+  { width, rowHeight, ground, now, settings, reduced, hovered, season }
+) {
   const rows = Array.from({ length: settings.rows }, () => [])
   const heads = Array.from({ length: settings.rows }, () => [])
   for (const [rank, actor] of list.entries()) {
@@ -136,7 +139,8 @@ export function paintActors(list, { width, rowHeight, ground, now, settings, red
         now,
         scale,
         reduced,
-        hovered: hovered === actor
+        hovered: hovered === actor,
+        season: season && (season.t < 0.5 ? season.a : season.b)
       })
       const grab = Math.max(28, Math.round(w * 0.74))
       const visibleHeight = Math.max(24, Math.round(h * 0.74))

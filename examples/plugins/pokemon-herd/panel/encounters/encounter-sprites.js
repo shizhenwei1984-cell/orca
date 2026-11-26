@@ -5,32 +5,20 @@ export function encounterSprites(loadCatalogSprite) {
     if (!sprite) {
       return null
     }
-    const { src, width, height, times, row } = sprite
+    const { src, width, height, row } = sprite
     const image = new Image()
     image.src = src
     await image.decode()
     const canvas = document.createElement('canvas')
-    canvas.width = width * times.length
+    canvas.width = width
     canvas.height = height
     const context = canvas.getContext('2d')
-    context.drawImage(image, 0, row * height, canvas.width, height, 0, 0, canvas.width, height)
-    const sheet = {
-      src: canvas.toDataURL(),
-      width,
-      height,
-      frames: times.length,
-      duration: times.reduce((total, frame) => total + frame, 0),
-      frameDurations: times
-    }
-    canvas.width = width
     context.drawImage(image, 0, row * height, width, height, 0, 0, width, height)
-    return { sheet, portrait: canvas.toDataURL() }
+    return canvas.toDataURL()
   }
 
-  function art(pick, pose) {
-    const key = [pick.dex, pick.form, pick.gender, pick.shiny, pick.mega, pick.megaKind, pose].join(
-      ':'
-    )
+  function sprite(pick) {
+    const key = [pick.dex, pick.form, pick.gender, pick.shiny, pick.mega, pick.megaKind].join(':')
     if (cache.has(key)) {
       return cache.get(key)
     }
@@ -38,7 +26,7 @@ export function encounterSprites(loadCatalogSprite) {
       cache.delete(cache.keys().next().value)
     }
     const pending = Promise.resolve()
-      .then(() => loadCatalogSprite(pick, pose, { working: pick.mega === 'auto' }))
+      .then(() => loadCatalogSprite(pick, 'idle', { working: pick.mega === 'auto' }))
       .then(crop)
       .catch(() => {
         cache.delete(key)
@@ -48,15 +36,5 @@ export function encounterSprites(loadCatalogSprite) {
     return pending
   }
 
-  return {
-    async sprite(pick) {
-      return (await art(pick, 'idle'))?.portrait
-    },
-    async sprites(pick) {
-      const entries = await Promise.all(
-        ['idle', 'walk', 'sleep'].map(async (pose) => [pose, (await art(pick, pose))?.sheet])
-      )
-      return Object.fromEntries(entries.filter(([, sheet]) => sheet))
-    }
-  }
+  return { sprite }
 }

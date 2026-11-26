@@ -8,6 +8,8 @@ Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. R
 
 Open **Trainer** to use the Bag and Shop, browse the Box and Pokédex, or check Research and badges. Use **Care** on a Pokémon's card to pet it, give it an item, rename it, or move it to the Box. In the Box, choose **Put in Day Care** to leave a parent. Compatible parents can lay an egg as your agents work. Hatched Pokémon join the Box and Pokédex.
 
+In the trainer's **Party**, use **Change Pokémon** to find a species or form and preview its appearance. Favorites and the source for new companions are saved across sessions. The picker and world share bundled sprites and a bounded offline cache. See the [catalog guide](./catalog/README.md) for cache limits and sprite credits.
+
 Waiting for input pauses the current job. Done pays by active time and rounds each job independently. A job with at least 30 active minutes earns a Rare Candy. Quick answers build friendship and extended waits can reduce it. Evolution follows the species' jobs, friendship, time of day, or item requirements.
 
 The worker tracks agent status across workspaces, including folders, while the panel is closed. It saves the purse, party, in-flight jobs, and trainer records together. It can resume the saved run after a restart when it receives another live status event. The host has no durable replay for status changes the worker missed.

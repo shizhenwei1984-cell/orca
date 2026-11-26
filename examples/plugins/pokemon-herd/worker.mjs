@@ -1,15 +1,16 @@
-import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
 import {
   encounterTrainerAction,
   registerEncounterHandlers,
   settleEncounterWork
 } from './encounters/trainer-encounters.mjs'
-import { registerTerminalFocus } from './terminal-focus.mjs'
 import { recordStatus, trainerView, workingMinutes } from './trainer.mjs'
 import { trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
 import { readTrainer, writeTrainer } from './trainer-save.mjs'
 import { gameView } from './trainer-view.mjs'
+import { registerTerminalFocus } from './terminal-focus.mjs'
+import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
+import { initialCatalogPick, registerCatalogPreferences } from './catalog/trainer-catalog.mjs'
 
 function terminalIds(input) {
   const ids = input?.terminalIds
@@ -154,8 +155,6 @@ export function deactivate() {
 }
 
 export default function activate(orca) {
-  registerTerminalFocus(orca)
-  registerCatalogSprites(orca)
   activateTrainer(orca, { registerEncounterHandlers, encounterTrainerAction, settleEncounterWork })
 }
 
@@ -163,6 +162,9 @@ export function activateTrainer(
   orca,
   { registerEncounterHandlers, encounterTrainerAction, settleEncounterWork } = {}
 ) {
+  registerTerminalFocus(orca)
+  registerCatalogSprites(orca)
+  const catalogPreferences = registerCatalogPreferences(orca)
   const store = createTrainerStore(orca)
   const list = getTerminalLists(orca)
 
@@ -220,7 +222,13 @@ export function activateTrainer(
         const workspaceId = event.workspaceListId ?? event.workspaceId ?? prior?.workspaceId ?? null
         const room = await list(workspaceId)
         const slots = [...new Set([...partySlots(save, room?.ids ?? []), event.paneKey])]
-        const after = recordStatus(save, event, { slots })
+        const initialPick = prior?.pokemon
+          ? undefined
+          : await catalogPreferences().then(
+              (preferences) => initialCatalogPick(save, preferences, Math.random),
+              (error) => orca.log(error.message)
+            )
+        const after = recordStatus(save, event, { slots, initialPick })
         return { save: await settleWork(save, after, event.receivedAt, slots, workspaceId) }
       },
       (before, after) =>

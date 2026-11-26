@@ -1,3 +1,4 @@
+import { appearanceOf } from '../../catalog/trainer-catalog.mjs'
 import { mountBattleStage } from './battle-stage.js'
 import { mountEncounterPanel } from './encounter-panel.js'
 
@@ -9,7 +10,7 @@ const center = (rect) => rect.left + rect.width / 2
 
 export function mountEncounterGame(
   root,
-  { request, sprite, sprites, cry, onVisitor, onSettings, interactions, world, signal }
+  { request, sprite, cry, onVisitor, onSettings, interactions, world, signal }
 ) {
   const document = root.ownerDocument
   const view = document.defaultView
@@ -128,6 +129,7 @@ export function mountEncounterGame(
       id: visitorId,
       label,
       species: pick?.name ?? label,
+      appearance: pick ? appearanceOf(pick) : undefined,
       from: start,
       to: end,
       startedAt: motion.startedAt,
@@ -135,29 +137,8 @@ export function mountEncounterGame(
       row: 0,
       icon
     }
-    const spriteKey =
-      pick && [pick.dex, pick.form, pick.shiny, pick.gender, pick.mega, pick.megaKind].join(':')
-    if (spriteKey && sprites && spriteKey !== motion.spriteKey) {
-      motion.spriteKey = spriteKey
-      motion.sprites = undefined
-      const active = scope
-      Promise.resolve()
-        .then(() => sprites(pick))
-        .then((sheets) => {
-          if (
-            scope === active &&
-            visitorMotion === motion &&
-            motion.spriteKey === spriteKey &&
-            sheets
-          ) {
-            motion.sprites = sheets
-            sendVisitor({ ...motion.entity, sprites: sheets })
-          }
-        })
-        .catch(() => {})
-    }
     motion.entity = entity
-    sendVisitor(motion.sprites ? { ...entity, sprites: motion.sprites } : entity)
+    sendVisitor(entity)
   }
 
   function partyMember(actor) {

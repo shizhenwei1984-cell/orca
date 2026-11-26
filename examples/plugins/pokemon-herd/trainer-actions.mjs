@@ -23,8 +23,8 @@ import {
   withBoost
 } from './encounters/rules/items.js'
 import { duplicates, releasePay } from './trainer-rules/box.mjs'
-import { allowance, dayOf, isLocked, shinyUnlocked, TIP } from './encounters/rules/trainer.js'
-import { hasForm, hasShiny, isWalkable } from './encounters/rules/dex.js'
+import { allowance, dayOf, TIP } from './encounters/rules/trainer.js'
+import { validateChoice } from './catalog/trainer-catalog.mjs'
 import { genderFrom } from './encounters/rules/gender.js'
 import { KEPT_ITEMS } from './encounters/rules/form-items.js'
 import {
@@ -144,35 +144,25 @@ function bringOut(save, { slot, pokemon }, target, { at, key, battles }) {
 
 function choose(save, { slot, pokemon }, action, { at, slots, key, rnd, battles }) {
   const { dex, form } = action
-  if (
-    !Number.isInteger(dex) ||
-    !isWalkable(dex) ||
-    (form && !hasForm(dex, form)) ||
-    isLocked(dex, save.dex)
-  ) {
-    throw new Error('That Pokémon is unavailable.')
+  const { same, gender, mega, megaKind, shiny } = validateChoice(save, pokemon, action)
+  if (same) {
+    return putPokemon(save, slot, {
+      ...pokemon,
+      ...(gender ? { gender } : {}),
+      ...(mega ? { mega } : {}),
+      ...(megaKind !== undefined ? { megaKind } : {}),
+      ...(shiny !== undefined ? { shiny } : {})
+    })
   }
-  if (dex === pokemon.dex && (form ?? null) === (pokemon.form ?? null) && !action.fresh) {
-    const chosen = { ...pokemon }
-    if (['on', 'off', 'auto'].includes(action.mega)) {
-      chosen.mega = action.mega
-    }
-    if (['X', 'Y'].includes(action.megaKind)) {
-      chosen.megaKind = action.megaKind
-    }
-    if (action.shiny === true && shinyUnlocked(save.dex, dex) && hasShiny(dex, form)) {
-      chosen.shiny = true
-    }
-    return putPokemon(save, slot, chosen)
-  }
-  const mode = ['on', 'off', 'auto'].includes(action.mega) ? action.mega : (pokemon.mega ?? 'auto')
-  const kind = ['X', 'Y'].includes(action.megaKind) ? action.megaKind : undefined
-  const shiny =
-    (action.shiny === true && shinyUnlocked(save.dex, dex)) ||
-    rnd() * trainerShinyOdds(save, slots) < 1
-  const pick = switchedPick(trainerPick(pokemon), { dex, form }, mode, kind, shiny)
+  const mode = mega ?? pokemon.mega ?? 'auto'
+  const rolledShiny = shiny === true || rnd() * trainerShinyOdds(save, slots) < 1
+  const pick = switchedPick(trainerPick(pokemon), { dex, form }, mode, megaKind, rolledShiny)
   const incoming = savedPokemon(
-    { ...pick, gender: genderFrom(dex, hash(`${slot}:gender`)) },
+    {
+      ...pick,
+      gender: gender ?? genderFrom(dex, hash(`${slot}:gender`)),
+      ...(megaKind !== undefined ? { megaKind } : {})
+    },
     null,
     `chosen:${key}`
   )
@@ -337,7 +327,7 @@ export function trainerAction(save, action, context) {
     }
     const selection =
       type === 'box'
-        ? { ...action, dex: target.pokemon.dex, form: target.pokemon.form, fresh: true }
+        ? { dex: target.pokemon.dex, form: target.pokemon.form ?? undefined, fresh: true }
         : action
     return choose(save, target, selection, context)
   }

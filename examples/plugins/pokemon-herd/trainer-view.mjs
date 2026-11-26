@@ -1,4 +1,5 @@
 import { abilityName, abilityOf } from './encounters/rules/abilities.js'
+import { appearanceOf, catalogUnlocks } from './catalog/trainer-catalog.mjs'
 import { canBreed, LAY, LAY_MIN, whyNot } from './trainer-rules/breed.mjs'
 import { duplicates, releasePay, sortBox } from './trainer-rules/box.mjs'
 import { nameOf, regionOf } from './encounters/rules/dex.js'
@@ -40,6 +41,7 @@ function showPokemon(pokemon, slot, save, at, member) {
     ref: { slot, id: pokemonId(pokemon, slot) },
     name: nameFor(pick),
     dex: pick.dex,
+    appearance: appearanceOf(pick),
     form: pick.form ?? null,
     terminalId: member?.terminalId ?? null,
     title: member?.title ?? null,
@@ -168,6 +170,7 @@ export function gameView(save, { at, slots, closed, query }) {
   const daily = today(save, at, slots)
   return {
     money: save.bag.money,
+    catalog: catalogUnlocks(save),
     items: grouped(Object.keys(ITEMS)).map((id) => ({
       id,
       name: ITEMS[id].name,

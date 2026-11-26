@@ -9,7 +9,7 @@ const BUNDLED = {
 const DURATIONS = { walk: 640, idle: 1000, sleep: 1800 }
 
 /** @typedef {'idle' | 'walk' | 'sleep'} Pose */
-/** @typedef {{src: string, width: number, height: number, times: number[], row: number, shiny: boolean, credits: string}} Sprite */
+/** @typedef {{src: string, width: number, height: number, times: number[], row: number, cols: number, rows: number, facing?: string, shiny: boolean, credits: string}} Sprite */
 
 function bundledSprite(folder, pose) {
   const entry = BUNDLED[folder]
@@ -24,9 +24,17 @@ function bundledSprite(folder, pose) {
     height: 40,
     times: Array(count).fill(DURATIONS[pose] / count),
     row: 0,
+    cols: count,
+    rows: 1,
+    facing: pose === 'walk' ? 'r' : 'd',
     shiny: false,
     credits: `https://github.com/PMDCollab/SpriteCollab/blob/ced880d7598b9d505a267dbed5d05482197b05ff/sprite/${folder}/credits.txt`
   }
+}
+
+export function localCatalogSprite(pick, pose, options) {
+  const [variant] = spriteVariants(pick, options)
+  return variant ? bundledSprite(variant.folder, pose) : null
 }
 
 /**
