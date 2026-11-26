@@ -306,6 +306,7 @@ export function mountWorld(container, callbacks = {}) {
       )
     }
     const list = actorList()
+    battles.prepare(list, timestamp)
     const heads = paintActors(list, { ...field, now: timestamp, hovered })
     battles.paint(list, timestamp, field.reduced, field.settings.battleSounds)
     if (force || frame - lastScenery >= 125) {

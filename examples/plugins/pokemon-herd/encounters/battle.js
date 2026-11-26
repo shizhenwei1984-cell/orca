@@ -203,6 +203,9 @@ function strike(a, b, move, answer, first, flinched, takeHit, weather, random) {
     return { ...event, move: null, notes: ['It must recharge!'] }
   }
   const skipped = statusSkip(att, random)
+  if (skipped) {
+    event.statusAction = skipped
+  }
   if (skipped === 'thaw') {
     event.notes.push(SKIP_SAY.thaw)
   } else if (skipped || flinched) {
@@ -302,6 +305,7 @@ function strike(a, b, move, answer, first, flinched, takeHit, weather, random) {
 function finishTurn(fighter) {
   const { side, types, by } = fighter
   const notes = endTurn(side).map(sayName).filter(Boolean)
+  let statusTick
   if (side.hp > FAINTED) {
     const heal = leftovers(side)
     if (heal) {
@@ -311,6 +315,9 @@ function finishTurn(fighter) {
     const status = statusEnd(side)
     if (status.delta) {
       notes.push(status.word)
+      if (status.delta < 0) {
+        statusTick = side.status
+      }
     }
     side.hp = clampHp(side.hp + status.delta)
     const orb = orbStatus(side, types)
@@ -319,7 +326,14 @@ function finishTurn(fighter) {
       notes.push(STATUS_SAY[orb])
     }
   }
-  return notes.length ? { side: by, notes, ownHp: side.hp } : null
+  return notes.length ? { side: by, notes, ownHp: side.hp, statusTick } : null
+}
+
+function battleStatuses(own, wild) {
+  return {
+    own: own.hp > FAINTED ? own.status : null,
+    opponent: wild.hp > FAINTED ? wild.status : null
+  }
 }
 
 function averageDamage(a, b, take = 1) {
@@ -390,6 +404,7 @@ export function battleExchange(v, { party, slot, hp, move, itemTurn, weather, pe
   wild.hp = wildPick.hp ?? 1
   own.status = v.statuses?.[slot] ?? null
   wild.status = wildPick.status ?? null
+  const statusBefore = battleStatuses(own, wild)
   own.fallen = trainer?.fallen ?? 0
   wild.fallen = trainer?.idx ?? 0
   const potion =
@@ -549,14 +564,18 @@ export function battleExchange(v, { party, slot, hp, move, itemTurn, weather, pe
       weather?.id,
       random
     )
-    turns.push(turn)
+    turns.push({ ...turn, ailments: battleStatuses(own, wild) })
   }
-  const end = [finishTurn(a), finishTurn(b)].filter(Boolean)
+  const end = [a, b].flatMap((fighter) => {
+    const tick = finishTurn(fighter)
+    return tick ? [{ ...tick, ailments: battleStatuses(own, wild) }] : []
+  })
   v.statuses = { ...v.statuses, [slot]: own.status ?? null }
   wildPick.status = wild.status ?? null
   wildPick.hp = wild.hp
   return {
     entry,
+    statusBefore,
     turns,
     end,
     hp: own.hp,

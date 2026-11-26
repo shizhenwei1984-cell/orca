@@ -1,3 +1,4 @@
+import { COUNTER_LAND_MS } from '../../encounters/rules/events.js'
 import { FLY, hitSound, launchSound, power } from './fx.js'
 
 export const oppositeSide = (side) => (side === 'own' ? 'opponent' : 'own')
@@ -13,20 +14,32 @@ export function battleTimeline(result) {
     effectiveness: blow.eff,
     targetHp
   })
-  const turns = hit
-    ? [
-        raidTurn(hit, 'own', result.hp),
-        ...(hit.back
-          ? [raidTurn(hit.back, 'opponent', Math.max(0, (result.ownBefore ?? 1) - hit.back.dmg))]
-          : [])
-      ]
-    : result.turns
+  if (hit) {
+    const land = result.at + 475
+    const beats = [battleBeat(raidTurn(hit, 'own', result.hp), result.at, land - FLY, land)]
+    if (hit.back) {
+      const turn = raidTurn(
+        hit.back,
+        'opponent',
+        Math.max(0, (result.ownBefore ?? 1) - hit.back.dmg)
+      )
+      const counter = result.at + COUNTER_LAND_MS
+      beats.push(battleBeat(turn, counter - 475, counter - FLY, counter))
+    }
+    return beats
+  }
   const exchange = result.kind === 'exchange' || result.kind === 'wild-fainted'
   const start = result.at + (exchange && result.entry?.length ? 900 : 0)
-  return turns.map((turn, index) => {
+  const beats = result.turns.map((turn, index) => {
     const at = start + index * (exchange ? 1100 : 1050)
     return battleBeat(turn, at, at + 475 - FLY, at + 475)
   })
+  const end = (beats.at(-1)?.land ?? start) + 750
+  for (const [index, tick] of (result.end ?? []).entries()) {
+    const at = end + index * 180
+    beats.push(battleBeat(tick, at, at, at))
+  }
+  return beats
 }
 
 export function battleBeat(turn, at, launch, land) {

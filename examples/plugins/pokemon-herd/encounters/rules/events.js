@@ -202,6 +202,7 @@ export function laysEgg(before, after, phase, laid = 0) {
 // knocks it away (BOSS_PUSH px from the boss): no one crowds round it.
 export const COUNTER_MS = 1200,
   BOSS_PUSH = 150 // (its own move gathers first: fx.js CHARGE_MS)
+export const COUNTER_LAND_MS = 1640
 export const RAID_BACK = 0.6 // the boss's answer hurts 0.6 of a wild one's hit back (its moves have STAB and coverage)
 export const RAID_REST = 3 * 60000 // fainted in a raid: back in 3 minutes (not a wild fight's 10); a Revive at once
 export function raidHit(r, key, pane, type, now, rnd = Math.random, how = {}) {
