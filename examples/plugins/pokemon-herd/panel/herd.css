@@ -51,12 +51,80 @@ small,
 #progress-error {
   color: var(--orca-destructive);
 }
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block: 12px;
+}
+.toolbar button[aria-pressed='true'],
+.toolbar button[aria-expanded='true'] {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+#world-settings {
+  margin-block: 12px;
+  padding: 12px;
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+#world-settings fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 116px), 1fr));
+  gap: 8px 12px;
+  border: 0;
+  margin: 0 0 12px;
+  padding: 0;
+}
+#world-settings legend {
+  padding: 0;
+  margin-block-end: 8px;
+  font-weight: 600;
+}
+#world-settings fieldset:last-of-type {
+  grid-template-columns: 1fr;
+}
+#preview-sound {
+  justify-self: start;
+}
+#world-settings label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+#world-settings select {
+  width: 100%;
+}
+#settings-status {
+  margin: 8px 0 0;
+}
+#settings-status:empty {
+  display: none;
+}
+#world-actions {
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-popover);
+  color: var(--orca-popover-foreground);
+}
+#world-actions:popover-open {
+  display: grid;
+  gap: 4px;
+}
+#world-actions button {
+  text-align: start;
+}
 #count,
 .state {
   white-space: nowrap;
   font-size: 12px;
 }
-ul {
+ul:not([hidden]) {
   padding: 0;
   margin: 12px 0;
   list-style: none;
@@ -117,6 +185,26 @@ small {
 li[data-state='blocked'] .state {
   color: var(--orca-destructive);
 }
+button:not(.pokemon-world__actor),
+select {
+  font: inherit;
+  min-height: 28px;
+  padding: 4px 10px;
+  color: var(--orca-secondary-foreground);
+  background: var(--orca-secondary);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+button:not(.pokemon-world__actor):hover:not(:disabled) {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--orca-ring);
+  outline-offset: 1px;
+}
 @keyframes frames {
   to {
     background-position-x: calc(-80px * var(--frames));
@@ -137,7 +225,7 @@ li[data-state='blocked'] .state {
   }
 }
 
-button,
+#trainer-game button,
 #trainer-game input,
 #trainer-game select {
   min-height: 28px;
@@ -153,8 +241,8 @@ button:not(:disabled) {
   cursor: pointer;
 }
 
-button:hover:not(:disabled),
-button[aria-pressed='true'] {
+#trainer-game button:hover:not(:disabled),
+#trainer-game button[aria-pressed='true'] {
   background: var(--orca-muted);
 }
 

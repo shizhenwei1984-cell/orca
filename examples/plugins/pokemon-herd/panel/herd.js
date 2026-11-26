@@ -1,5 +1,8 @@
 import { species, starterDex } from './pokemon.mjs'
 import { mountTrainer } from './trainer.js'
+import { worldInteractions } from './world-interactions.js'
+import { bindWorldPreferences } from './world-preferences.js'
+import { mountWorld } from './world/world.js'
 
 const poses = {
   working: ['Working', 'walk', '640ms'],
@@ -19,15 +22,131 @@ const work = document.querySelector('#work')
 const candy = document.querySelector('#candy')
 const progressError = document.querySelector('#progress-error')
 const number = new Intl.NumberFormat()
-let revision = 0
-let context
-let agentReadFailed = false
-let terminals = new Set()
-const companions = new Map()
+const orca = window.orca
+const worldContainer = document.querySelector('#world')
+const showWorld = document.querySelector('#show-world')
+const showParty = document.querySelector('#show-party')
+const showSettings = document.querySelector('#show-settings')
+const settings = document.querySelector('#world-settings')
+const actions = document.querySelector('#world-actions')
+const focusButton = document.querySelector('#focus-terminal')
+const focusStatus = document.querySelector('#focus-status')
+const lifetime = new AbortController()
+const { signal } = lifetime
+const cards = new Map()
+let workspace
+let roster = []
 let progress = new Map()
 let readingProgress = false
 let progressDirty = false
-const trainerGame = mountTrainer(() => [...terminals].slice(0, 50))
+const trainerGame = mountTrainer(() => [...(workspace?.terminals ?? [])].slice(0, 50))
+let focusRequest
+
+function publish(type, detail, cancelable = false) {
+  return worldInteractions.dispatchEvent(
+    new CustomEvent(type, {
+      detail: { workspaceId: workspace?.context.workspaceId, ...detail },
+      cancelable
+    })
+  )
+}
+
+const world = mountWorld(worldContainer, {
+  onFocus: focusTerminal,
+  onPet(agent, event) {
+    playSound('pet', event)
+    publish('pet', { agent })
+  },
+  onSpar(spar) {
+    playSound('spar')
+    publish('spar', spar)
+  },
+  onDrop: (drop) => publish('drop', drop),
+  onWild: (visitor) => publish('wild', { visitor }),
+  onMenu(menu) {
+    if (publish('menu', menu, true)) {
+      openActions(menu)
+    }
+  },
+  onCommand(command, agent) {
+    if (!publish('command', { command, agent }, true)) {
+      return true
+    }
+    if (command === 'settings') {
+      toggleSettings(settings.hidden)
+      return true
+    }
+    return false
+  }
+})
+const playSound = bindWorldPreferences(orca, signal, (settings) => world.update({ settings }))
+
+function selectView(party) {
+  actions.hidePopover()
+  worldContainer.hidden = party
+  herd.hidden = !party
+  showWorld.setAttribute('aria-pressed', String(!party))
+  showParty.setAttribute('aria-pressed', String(party))
+  if (!workspace?.error) {
+    showRosterStatus()
+  }
+}
+
+function toggleSettings(open) {
+  actions.hidePopover()
+  settings.hidden = !open
+  showSettings.setAttribute('aria-expanded', String(open))
+  if (open) {
+    settings.querySelector('select:enabled, input:enabled, button:enabled').focus()
+  } else {
+    showSettings.focus()
+  }
+}
+
+function openActions({ agent, x, y, anchor }) {
+  focusButton.hidden = !agent
+  focusButton.onclick = (event) => {
+    actions.hidePopover()
+    void focusTerminal(agent, event)
+  }
+  const source = anchor.closest('button') ?? anchor
+  if (!actions.matches(':popover-open')) {
+    actions.showPopover({ source })
+  }
+  actions.style.left = `${Math.max(0, Math.min(x, innerWidth - actions.offsetWidth))}px`
+  actions.style.top = `${Math.max(0, Math.min(y, innerHeight - actions.offsetHeight))}px`
+  actions.querySelector('button:not([hidden])').focus()
+}
+
+async function focusTerminal(agent, event) {
+  if (!event.isTrusted || !workspace?.terminals.has(agent.id)) {
+    return
+  }
+  focusRequest?.abort()
+  const request = new AbortController()
+  focusRequest = request
+  focusStatus.hidden = true
+  const { workspaceId } = workspace.context
+  try {
+    const result = await orca.plugin.request(
+      'terminal.focus',
+      {
+        terminalId: agent.id,
+        ...(workspaceId ? { workspaceId } : {})
+      },
+      { signal: request.signal }
+    )
+    if (!result.focused && !request.signal.aborted) {
+      focusStatus.textContent = 'Orca could not focus this terminal.'
+      focusStatus.hidden = false
+    }
+  } catch (error) {
+    if (!request.signal.aborted) {
+      focusStatus.textContent = `Could not focus this terminal. ${error.message}`
+      focusStatus.hidden = false
+    }
+  }
+}
 
 function duration(ms) {
   const sec = Math.floor(ms / 1000)
@@ -77,63 +196,90 @@ function paintCompanion({ row, starter, state }, member) {
   }
 }
 
-function addAgent(agent) {
-  const row = template.content.firstElementChild.cloneNode(true)
-  const companion = {
-    row,
-    starter: starterDex(agent),
-    state: agent.state,
-    lastAt: agent.receivedAt ?? 0
+function paintRoster() {
+  const entities = []
+  const stale = new Set(cards.keys())
+  for (const agent of roster) {
+    const key = agent.terminalId ?? agent
+    const row = cards.get(key) ?? template.content.firstElementChild.cloneNode(true)
+    if (!cards.has(key)) {
+      cards.set(key, row)
+      herd.append(row)
+    }
+    stale.delete(key)
+    const label = agent.title || agent.agent || 'Agent'
+    const name = row.querySelector('strong')
+    name.textContent = name.title = label
+    row.querySelector('.care').onclick = () => trainerGame.openParty(agent.terminalId)
+    const member = progress.get(agent.terminalId)
+    const starter = starterDex(agent)
+    paintCompanion({ row, starter, state: agent.state }, member)
+    if (workspace?.terminals.has(agent.terminalId)) {
+      entities.push({
+        id: agent.terminalId,
+        label,
+        species: member?.name ?? species[member?.dex ?? starter]?.name ?? `#${member?.dex}`,
+        spriteSpecies: species[member?.starter ?? starter]?.name,
+        state: agent.state,
+        stateStartedAt: agent.stateStartedAt
+      })
+    }
   }
-  const title = agent.title || agent.agent || 'Agent'
-  const name = row.querySelector('strong')
-  name.textContent = name.title = title
-  row.querySelector('.care').onclick = () => trainerGame.openParty(agent.terminalId)
-  paintCompanion(companion, progress.get(agent.terminalId))
-  if (agent.terminalId) {
-    companions.set(agent.terminalId, companion)
+  for (const key of stale) {
+    cards.get(key).remove()
+    cards.delete(key)
   }
-  herd.append(row)
+  world.update({ agents: entities })
+  if (workspace) {
+    const scope = workspace.scope
+    publish('roster', {
+      agents: entities,
+      signal: scope.signal,
+      setVisitor(visitor) {
+        if (!scope.signal.aborted) {
+          world.update({ visitor })
+        }
+      }
+    })
+  }
 }
 
-function updateCount() {
-  const size = herd.childElementCount
+function showRosterStatus() {
+  const size = roster.length
   count.textContent = size ? `${size} ${size === 1 ? 'agent' : 'agents'}` : ''
   message.hidden = size > 0
-  if (!size) {
-    message.textContent = context
-      ? 'Start a terminal agent in this workspace to meet its Pokémon.'
-      : 'Open a workspace to see its Pokémon.'
+  message.textContent = workspace
+    ? 'Start a terminal agent in this workspace to meet its Pokémon.'
+    : 'Open a workspace to see its Pokémon.'
+  if (roster.some(({ terminalId }) => !workspace.terminals.has(terminalId))) {
+    message.hidden = worldContainer.hidden
+    message.textContent = 'Open Party to see agents Orca could not match to a listed terminal.'
   }
 }
 
-function applyStatus(event) {
-  const companion = companions.get(event.terminalId)
-  if (companion) {
-    if (event.receivedAt > companion.lastAt) {
-      companion.lastAt = event.receivedAt
-      companion.state = event.state
-      paintCompanion(companion, progress.get(event.terminalId))
-    }
-  } else {
-    addAgent(event)
-  }
+function updateRetry() {
+  retry.hidden = progressError.hidden && !workspace?.error
 }
 
 async function readProgress() {
+  if (signal.aborted) {
+    return
+  }
   progressDirty = true
   if (readingProgress) {
     return
   }
   readingProgress = true
-  while (progressDirty) {
+  while (progressDirty && !signal.aborted) {
     progressDirty = false
-    const version = revision
+    const current = workspace
     try {
-      const view = await window.orca.plugin.request('trainer.read', {
-        terminalIds: [...terminals].slice(0, 50)
-      })
-      if (version !== revision) {
+      const view = await orca.plugin.request(
+        'trainer.read',
+        { terminalIds: [...(current?.terminals ?? [])].slice(0, 50) },
+        { signal }
+      )
+      if (signal.aborted || current !== workspace) {
         continue
       }
       wallet.textContent = `₽${number.format(view.money)}`
@@ -142,115 +288,155 @@ async function readProgress() {
       candy.hidden = view.candy === 0
       trainer.hidden = false
       progressError.hidden = true
-      retry.hidden = !agentReadFailed
+      updateRetry()
       progress = new Map(view.companions.map((member) => [member.terminalId, member]))
-      for (const [id, companion] of companions) {
-        paintCompanion(companion, progress.get(id))
-      }
+      paintRoster()
     } catch (error) {
-      if (version === revision) {
+      if (!signal.aborted && current === workspace) {
         progressError.hidden = false
         progressError.textContent = `Could not read trainer progress. ${error.message}`
-        retry.hidden = false
+        updateRetry()
       }
     }
   }
   readingProgress = false
 }
 
-// Events received during a snapshot also apply to its result.
-let pendingStates = null
-async function refresh(nextContext) {
-  const version = ++revision
-  context = nextContext
-  terminals = new Set(context?.terminals.map((terminal) => terminal.id))
+async function readAgents(current) {
+  current.dirty = true
+  if (current.reading) {
+    return
+  }
+  current.reading = true
+  while (current.dirty && !current.read.signal.aborted) {
+    current.dirty = false
+    try {
+      const { agents } = await orca.host.call(
+        'agents.list',
+        current.context.workspaceId && orca.api.minor >= 10
+          ? { workspaceId: current.context.workspaceId }
+          : {},
+        { signal: current.read.signal }
+      )
+      if (current.read.signal.aborted) {
+        return
+      }
+      const seen = new Set()
+      roster = agents.filter(({ terminalId }) => {
+        if (!terminalId) {
+          return true
+        }
+        if (seen.has(terminalId)) {
+          return false
+        }
+        seen.add(terminalId)
+        return true
+      })
+      current.error = false
+      paintRoster()
+      showRosterStatus()
+    } catch (error) {
+      if (!current.read.signal.aborted) {
+        current.error = true
+        message.hidden = false
+        message.textContent = `Could not read agents. ${error.message}`
+      }
+    }
+    updateRetry()
+  }
+  current.reading = false
+}
+
+function refresh(context) {
+  const previous = workspace
+  const terminals = new Set(context?.terminals.map(({ id }) => id))
+  const sameWorkspace =
+    previous &&
+    context &&
+    (context.workspaceId
+      ? context.workspaceId === previous.context.workspaceId
+      : [...terminals].some((id) => previous.terminals.has(id)))
+  previous?.read.abort()
+  workspace = context
+    ? {
+        context,
+        terminals,
+        scope: sameWorkspace ? previous.scope : new AbortController(),
+        read: new AbortController()
+      }
+    : undefined
+  actions.hidePopover()
+  if (!sameWorkspace) {
+    previous?.scope.abort()
+    focusRequest?.abort()
+    focusStatus.hidden = true
+    roster = []
+    progress = new Map()
+    world.update({ agents: [], visitor: null })
+  } else {
+    roster = roster.filter(({ terminalId }) => terminals.has(terminalId))
+  }
   heading.textContent = context?.displayName || 'Pokémon Herd'
-  agentReadFailed = false
-  retry.hidden = progressError.hidden
-  herd.replaceChildren()
-  companions.clear()
-  progress.clear()
-  pendingStates = null
-  updateCount()
+  paintRoster()
+  showRosterStatus()
+  updateRetry()
   void readProgress()
   void trainerGame.refresh(true)
-  if (!context) {
-    return
-  }
-  message.textContent = 'Loading agents…'
-  const changes = new Map()
-  pendingStates = changes
-  try {
-    const { agents } = await window.orca.host.call(
-      'agents.list',
-      context.workspaceId ? { workspaceId: context.workspaceId } : {}
-    )
-    if (version !== revision) {
-      return
+  if (workspace) {
+    if (!roster.length) {
+      message.textContent = 'Loading agents…'
     }
-    for (const agent of agents) {
-      addAgent(agent)
-    }
-    for (const event of changes.values()) {
-      applyStatus(event)
-    }
-    updateCount()
-  } catch (error) {
-    if (version === revision) {
-      showError(error)
-    }
-  } finally {
-    if (version === revision) {
-      pendingStates = null
-    }
+    void readAgents(workspace)
   }
 }
 
-function showError(error) {
-  agentReadFailed = true
-  message.hidden = false
-  message.textContent = `Could not read agents. ${error.message}`
-  retry.hidden = false
+showWorld.onclick = () => selectView(false)
+showParty.onclick = () => selectView(true)
+showSettings.onclick = () => toggleSettings(settings.hidden)
+document.querySelector('#world-action-settings').onclick = () => toggleSettings(true)
+settings.addEventListener(
+  'keydown',
+  (event) => {
+    if (!event.defaultPrevented && event.key === 'Escape') {
+      event.preventDefault()
+      toggleSettings(false)
+    }
+  },
+  { signal }
+)
+retry.onclick = () => {
+  if (workspace) {
+    void readAgents(workspace)
+  }
+  void readProgress()
 }
 
-async function readContext() {
-  const version = revision
-  try {
-    const current = await window.orca.host.call('workspace.readContext')
-    if (version === revision) {
-      await refresh(current)
+// workspace.changed replays the current context when the panel subscribes.
+const subscriptions = [
+  orca.plugin.on('trainer.changed', readProgress),
+  orca.on('agent.status.changed', (event) => {
+    if (
+      workspace &&
+      (workspace.terminals.has(event.terminalId) ||
+        (!workspace.context.workspaceId && !event.terminalId) ||
+        (workspace.context.workspaceId && workspace.context.workspaceId === event.workspaceListId))
+    ) {
+      void readAgents(workspace)
     }
-  } catch (error) {
-    if (version === revision) {
-      showError(error)
+  }),
+  orca.on('workspace.changed', ({ context }) => refresh(context))
+]
+window.addEventListener(
+  'pagehide',
+  () => {
+    lifetime.abort()
+    focusRequest?.abort()
+    workspace?.read.abort()
+    workspace?.scope.abort()
+    for (const subscription of subscriptions) {
+      subscription.dispose()
     }
-  }
-}
-
-retry.onclick = readContext
-window.orca.plugin.on('trainer.changed', readProgress)
-window.orca.on('workspace.changed', ({ context }) => refresh(context))
-window.orca.on('agent.status.changed', (event) => {
-  if (!context) {
-    return
-  }
-  const knownWorkspace = context.workspaceId && context.workspaceId === event.workspaceListId
-  if (!knownWorkspace && !terminals.has(event.terminalId)) {
-    return
-  }
-  if (!event.terminalId) {
-    if (!pendingStates) {
-      void refresh(context)
-    }
-    return
-  }
-  if (pendingStates) {
-    if (!(pendingStates.get(event.terminalId)?.receivedAt >= event.receivedAt)) {
-      pendingStates.set(event.terminalId, event)
-    }
-  } else {
-    applyStatus(event)
-    updateCount()
-  }
-})
-void readContext()
+    world.dispose()
+  },
+  { once: true }
+)

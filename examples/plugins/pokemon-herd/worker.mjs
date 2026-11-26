@@ -1,3 +1,4 @@
+import { registerTerminalFocus } from './terminal-focus.mjs'
 import { recordStatus, trainerView, workingMinutes } from './trainer.mjs'
 import { trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
@@ -147,6 +148,7 @@ export function deactivate() {
 }
 
 export default function activate(orca) {
+  registerTerminalFocus(orca)
   activateTrainer(orca)
 }
 

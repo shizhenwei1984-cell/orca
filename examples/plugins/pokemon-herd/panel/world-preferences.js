@@ -1,0 +1,133 @@
+const KEY = 'world.settings'
+
+export function bindWorldPreferences(orca, signal, apply) {
+  const form = document.querySelector('#world-settings')
+  const status = document.querySelector('#settings-status')
+  const preview = document.querySelector('#preview-sound')
+  const save = form.querySelector('[type="submit"]')
+  const controls = [...form.querySelectorAll('select, input')]
+  let audio
+  let enabled = false
+
+  function values() {
+    return Object.fromEntries(
+      controls.map((control) => [
+        control.name,
+        control.type === 'checkbox'
+          ? control.checked
+          : control.name === 'rows' || control.name === 'scale'
+            ? Number(control.value)
+            : control.value
+      ])
+    )
+  }
+
+  function update({ sound, ...settings }) {
+    enabled = sound
+    apply(settings)
+  }
+
+  function play(kind, gesture = false) {
+    if (signal.aborted || !window.AudioContext || (!gesture && audio?.state !== 'running')) {
+      return
+    }
+    audio ??= new AudioContext()
+    if (audio.state === 'suspended' && gesture) {
+      void audio.resume().catch(() => {})
+    }
+    const frequencies = kind === 'spar' ? [392, 330] : [523, 659]
+    for (const [index, frequency] of frequencies.entries()) {
+      const start = audio.currentTime + index * 0.07
+      const note = audio.createOscillator()
+      const level = audio.createGain()
+      note.frequency.value = frequency
+      level.gain.setValueAtTime(0.001, start)
+      level.gain.exponentialRampToValueAtTime(0.045, start + 0.015)
+      level.gain.exponentialRampToValueAtTime(0.001, start + 0.1)
+      note.connect(level).connect(audio.destination)
+      note.start(start)
+      note.stop(start + 0.1)
+    }
+  }
+
+  preview.addEventListener(
+    'click',
+    (event) => {
+      if (event.isTrusted) {
+        play('pet', true)
+      }
+    },
+    { signal }
+  )
+
+  const inputs = [...controls, save]
+  function busy(value) {
+    for (const input of inputs) {
+      input.disabled = value
+    }
+  }
+
+  async function load() {
+    busy(true)
+    try {
+      const stored = await orca.storage.get(KEY)
+      if (signal.aborted) {
+        return
+      }
+      for (const control of controls) {
+        const value = stored?.[control.name]
+        if (control.type === 'checkbox') {
+          if (typeof value === 'boolean') {
+            control.checked = value
+          }
+        } else if ([...control.options].some((option) => option.value === String(value))) {
+          control.value = String(value)
+        }
+      }
+      update(values())
+    } catch {
+      status.textContent = 'Could not load saved settings.'
+    } finally {
+      busy(false)
+    }
+  }
+
+  form.addEventListener(
+    'submit',
+    async (event) => {
+      event.preventDefault()
+      const next = values()
+      busy(true)
+      status.textContent = ''
+      try {
+        await orca.storage.set(KEY, next)
+        if (!signal.aborted) {
+          update(next)
+          status.textContent = 'Settings saved.'
+        }
+      } catch {
+        status.textContent = 'Could not save settings. Try again.'
+      } finally {
+        busy(false)
+      }
+    },
+    { signal }
+  )
+
+  signal.addEventListener(
+    'abort',
+    () => {
+      if (audio) {
+        void audio.close().catch(() => {})
+      }
+    },
+    { once: true }
+  )
+
+  void load()
+  return (kind, event) => {
+    if (enabled) {
+      play(kind, event?.isTrusted)
+    }
+  }
+}

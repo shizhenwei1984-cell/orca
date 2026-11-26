@@ -1,8 +1,10 @@
 # Pokémon Herd for Orca
 
-Open **Pokémon Herd** in the desktop right sidebar. Each terminal agent in the focused workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and sleeps when done.
+Open **Pokémon Herd** in the desktop right sidebar. In **World**, each linked terminal agent in the current workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and rests when done. Click a companion or press Enter on it to return to its terminal. Open **Settings** to change the rows, scenery, Pokémon size and sound.
 
-Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the worker, workspace and agent read access, and plugin storage grant. Then run `orca plugin open local.pokemon-herd`.
+The trainer summary shows Pokédollars, time worked, finished jobs and Rare Candy. Open **Party** to see each companion's work, friendship and evolution progress.
+
+Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the trusted worker, workspace and agent read access, and plugin storage grants. Orca includes terminal focus in its workspace write grant. The plugin uses that grant to focus the companion's terminal when you activate it. Then run `orca plugin open local.pokemon-herd`.
 
 Open **Trainer** to use the Bag and Shop, browse the Box and Pokédex, or check Research and badges. Use **Care** on a Pokémon's card to pet it, give it an item, rename it, or move it to the Box. In the Box, choose **Put in Day Care** to leave a parent. Compatible parents can lay an egg as your agents work. Hatched Pokémon join the Box and Pokédex.
 

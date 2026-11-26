@@ -76,6 +76,7 @@ export function mountWorld(container, callbacks = {}) {
     root.style.setProperty('--pokemon-row-height', `${field.rowHeight}px`)
     root.dataset.background = settings.background
     const width = root.clientWidth
+    field.visible = width > 0
     if (field.width === width || width <= 0) {
       return
     }
@@ -244,7 +245,7 @@ export function mountWorld(container, callbacks = {}) {
   }
 
   function paint(frame, force = false) {
-    if (!field.width) {
+    if (!field.visible) {
       return
     }
     const timestamp = now()
@@ -287,10 +288,10 @@ export function mountWorld(container, callbacks = {}) {
     }
   }
 
-  function pet(actor) {
+  function pet(actor, event) {
     focusActor(actor, now())
     actor.petUntil = now() + 2800
-    options.onPet?.(actor.entity)
+    options.onPet?.(actor.entity, event)
     paint(view.performance.now(), true)
   }
 
@@ -311,9 +312,9 @@ export function mountWorld(container, callbacks = {}) {
     {
       now,
       pet,
-      activate(actor) {
-        pet(actor)
-        options.onFocus?.(actor.entity)
+      activate(actor, event) {
+        pet(actor, event)
+        options.onFocus?.(actor.entity, event)
       },
       hover(actor, clientX) {
         hovered = actor

@@ -49,7 +49,7 @@ const GESTURES = {
 }
 
 export function spriteSet(entity) {
-  const fallback = FALLBACK[entity.species?.toLowerCase()]
+  const fallback = FALLBACK[(entity.spriteSpecies ?? entity.species)?.toLowerCase()]
   const sprites = { ...fallback, ...entity.sprites }
   const has = new Set([...Object.keys(GESTURES), ...Object.keys(sprites.reactions ?? {})])
   const msOf = (name) => sprites.reactions?.[name]?.duration ?? GESTURES[name][0]

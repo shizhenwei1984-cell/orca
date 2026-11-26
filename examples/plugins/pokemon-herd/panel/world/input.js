@@ -44,6 +44,10 @@ export function bindWorldInput(root, options, actions, signal) {
   root.addEventListener(
     'pointerdown',
     (event) => {
+      if (pointer && !root.contains(pointer.button)) {
+        clearTimeout(held)
+        pointer = null
+      }
       if (event.button !== 0 || !event.isPrimary || pointer) {
         return
       }
@@ -65,7 +69,7 @@ export function bindWorldInput(root, options, actions, signal) {
       }
       if (event.pointerType === 'touch' && options.onMenu) {
         held = setTimeout(() => {
-          if (!pointer || pointer.dragged) {
+          if (!pointer || pointer.dragged || !root.contains(pointer.button)) {
             return
           }
           suppressClick = true
@@ -139,7 +143,7 @@ export function bindWorldInput(root, options, actions, signal) {
       if (actor?.button.dataset.kind === 'visitor') {
         options.onWild?.(actor.entity)
       } else if (actor) {
-        actions.activate(actor)
+        actions.activate(actor, event)
       }
     },
     { signal }
@@ -179,12 +183,14 @@ export function bindWorldInput(root, options, actions, signal) {
       } else if (key === 'p' && actor?.button.dataset.kind === 'agent') {
         event.preventDefault()
         if (!event.repeat) {
-          actions.pet(actor)
+          actions.pet(actor, event)
         }
       } else if ((key === 's' || key === 'b') && options.onCommand) {
-        event.preventDefault()
-        if (!event.repeat) {
-          options.onCommand(key === 's' ? 'settings' : 'bag', actor?.entity ?? null)
+        if (
+          !event.repeat &&
+          options.onCommand(key === 's' ? 'settings' : 'bag', actor?.entity ?? null) !== false
+        ) {
+          event.preventDefault()
         }
       }
     },
