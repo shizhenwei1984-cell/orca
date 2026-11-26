@@ -8,6 +8,7 @@ import { trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
 import { readTrainer, writeTrainer } from './trainer-save.mjs'
 import { gameView } from './trainer-view.mjs'
+import { registerSidebar } from './sidebar/worker.mjs'
 import { registerTerminalFocus } from './terminal-focus.mjs'
 import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
 import { initialCatalogPick, registerCatalogPreferences } from './catalog/trainer-catalog.mjs'
@@ -166,6 +167,7 @@ export function activateTrainer(
   registerCatalogSprites(orca)
   const catalogPreferences = registerCatalogPreferences(orca)
   const store = createTrainerStore(orca)
+  registerSidebar(orca, store)
   const list = getTerminalLists(orca)
 
   async function getScope(save, ids, fresh = false) {

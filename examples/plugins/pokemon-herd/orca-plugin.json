@@ -18,6 +18,12 @@
         "title": "Pokémon Herd",
         "icon": "activity",
         "entry": "panel/index.html"
+      },
+      {
+        "id": "pokemon-sidebar",
+        "title": "Pokémon Sidebar",
+        "icon": "layers",
+        "entry": "sidebar/index.html"
       }
     ]
   },
@@ -27,6 +33,12 @@
     },
     {
       "kind": "workspace:write"
+    },
+    {
+      "kind": "workspace:create"
+    },
+    {
+      "kind": "terminal:send"
     },
     {
       "kind": "agent:read"

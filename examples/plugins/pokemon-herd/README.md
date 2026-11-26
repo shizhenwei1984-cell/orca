@@ -4,7 +4,7 @@ Open **Pokémon Herd** in the desktop right sidebar. In **World**, each linked t
 
 The trainer summary shows Pokédollars, time worked, finished jobs and Rare Candy. Open **Party** to see each companion's work, friendship and evolution progress.
 
-Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the trusted worker, workspace and agent read access, and plugin storage grants. Orca includes terminal focus in its workspace write grant. The plugin uses that grant to focus the companion's terminal when you activate it. Then run `orca plugin open local.pokemon-herd`.
+Install the folder with `orca plugin install ./examples/plugins/pokemon-herd`. Review the trusted worker and its workspace, terminal, agent and storage grants. The sidebar uses workspace creation and terminal access to create workspaces and to open or close terminals. Open the map with `orca plugin open local.pokemon-herd --panel pokemon-herd`.
 
 Open **Trainer** to use the Bag and Shop, browse the Box and Pokédex, or check Research and badges. Use **Care** on a Pokémon's card to pet it, give it an item, rename it, or move it to the Box. In the Box, choose **Put in Day Care** to leave a parent. Compatible parents can lay an egg as your agents work. Hatched Pokémon join the Box and Pokédex.
 
@@ -13,6 +13,8 @@ In the trainer's **Party**, use **Change Pokémon** to find a species or form an
 Waiting for input pauses the current job. Done pays by active time and rounds each job independently. A job with at least 30 active minutes earns a Rare Candy. Quick answers build friendship and extended waits can reduce it. Evolution follows the species' jobs, friendship, time of day, or item requirements.
 
 The worker tracks agent status across workspaces, including folders, while the panel is closed. It saves the purse, party, in-flight jobs, and trainer records together. It can resume the saved run after a restart when it receives another live status event. The host has no durable replay for status changes the worker missed.
+
+Open **Pokémon Sidebar** to browse workspaces, focus terminals, and see agent cards with their saved Pokémon. See [Pokémon Sidebar](./sidebar/README.md) for the direct-open command and host requirements.
 
 See [Trainer integration](./trainer-integration.md) for the worker contracts and remaining cross-feature wiring.
 

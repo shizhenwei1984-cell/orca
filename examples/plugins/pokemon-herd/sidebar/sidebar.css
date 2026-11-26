@@ -1,0 +1,397 @@
+/* SPDX-License-Identifier: Apache-2.0. Adapted for Orca from Pokémon Sidebar. See NOTICE. */
+* {
+  box-sizing: border-box;
+}
+
+[hidden],
+#feedback:empty,
+#confirm-error:empty,
+#confirm-message:empty {
+  display: none !important;
+}
+
+body {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  height: 100dvh;
+  margin: 0;
+  background: var(--orca-background);
+  color: var(--orca-foreground);
+  font: 13px var(--orca-font-sans, Geist, sans-serif);
+}
+
+body > header,
+body > footer,
+nav,
+.footer-tools,
+#filters,
+#agent-filters,
+.dialog-actions {
+  display: flex;
+  gap: 4px;
+}
+
+body > header,
+#filters {
+  flex-direction: column;
+}
+
+header,
+body > footer {
+  padding: 8px;
+}
+
+body > header {
+  border-bottom: 1px solid var(--orca-border);
+}
+
+body > footer {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--orca-border);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+  min-width: 0;
+  border-radius: calc(var(--orca-radius) - 2px);
+}
+
+button {
+  padding: 4px 8px;
+  min-height: 28px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+button:hover,
+button[aria-pressed='true'],
+[data-current='true'] > button:first-child {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--orca-ring);
+  outline-offset: -2px;
+}
+
+input:not([type='checkbox']),
+select {
+  min-height: 28px;
+  padding: 4px 6px;
+  background: var(--orca-background);
+  border: 1px solid var(--orca-input);
+}
+
+#agent-filters select {
+  flex: 1;
+}
+
+#list {
+  overflow: auto;
+  padding: 6px 8px;
+  scrollbar-width: thin;
+}
+
+#count,
+.meta,
+#feedback,
+details > summary,
+.section-title {
+  color: var(--orca-muted-foreground);
+  font-size: 12px;
+}
+
+#feedback {
+  margin: 0;
+  padding: 4px 8px;
+  overflow-wrap: anywhere;
+}
+
+details > summary {
+  padding: 4px 2px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.section-title,
+.group-title {
+  margin: 8px 0 4px;
+  font-weight: 600;
+}
+
+.group-title {
+  font-size: 14px;
+}
+
+.workspace-row,
+.terminal-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-block: 2px;
+}
+
+.workspace-row > button:first-child,
+.terminal-row > button:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.terminal-list {
+  margin: 2px 0 6px 10px;
+  padding-left: 6px;
+  border-left: 1px solid var(--orca-border);
+}
+
+.workspace-label,
+.terminal-label,
+.growth,
+.state {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.workspace-label > .meta {
+  margin-left: auto;
+  flex: 0 1 45%;
+  text-align: right;
+}
+
+.ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.agent-card {
+  border: 1px solid var(--tone, var(--orca-border));
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+  overflow: hidden;
+}
+
+[data-state='blocked'] {
+  --tone: var(--orca-destructive);
+}
+[data-state='working'] {
+  --tone: var(--orca-primary);
+}
+[data-state='done'] {
+  --tone: var(--orca-muted-foreground);
+}
+
+.terminal-label {
+  width: 100%;
+  min-height: 22px;
+}
+
+.card-copy {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.agent-card strong {
+  font-size: 14px;
+}
+
+.state {
+  font-size: 11px;
+  justify-content: space-between;
+}
+
+.dot {
+  display: inline-block;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--tone, var(--orca-muted-foreground));
+}
+
+.dot + span,
+.growth progress {
+  flex: 1;
+}
+
+.growth progress {
+  width: 0;
+  min-width: 12px;
+  height: 6px;
+  accent-color: var(--orca-primary);
+}
+
+.heart {
+  color: var(--orca-destructive);
+}
+
+.portrait,
+.monogram {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: calc(var(--orca-radius) - 2px);
+  background: var(--orca-muted);
+  color: var(--orca-muted-foreground);
+}
+
+.portrait canvas {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+[data-current='true'] {
+  box-shadow: inset 2px 0 var(--orca-foreground);
+}
+
+[popover],
+#confirm {
+  max-width: calc(100% - 12px);
+  color: var(--orca-popover-foreground);
+  background: var(--orca-popover);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  padding: 8px;
+}
+
+#preferences {
+  margin: auto 6px 44px auto;
+}
+
+#preferences label,
+#actions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+#preferences input {
+  vertical-align: middle;
+}
+
+#actions {
+  position: fixed;
+  margin: 0;
+  padding: 4px;
+  max-height: calc(100% - 12px);
+  overflow: auto;
+}
+
+#confirm {
+  width: min(320px, calc(100% - 12px));
+  padding: 14px;
+}
+
+#confirm h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+#confirm input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.dialog-actions {
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+#submit {
+  background: var(--orca-primary);
+  color: var(--orca-primary-foreground);
+}
+
+#submit.destructive {
+  background: var(--orca-destructive);
+  color: var(--orca-destructive-foreground);
+}
+
+#confirm-error {
+  color: var(--orca-destructive);
+}
+
+body[data-rail='true'] {
+  grid-template-rows: minmax(0, 1fr) auto auto;
+}
+
+[data-rail='true'] > header,
+[data-rail='true'] .footer-tools {
+  display: none;
+}
+
+[data-rail='true'] #list,
+[data-rail='true'] > footer {
+  padding-inline: 4px;
+}
+
+[data-rail='true'] .rail-list {
+  width: max-content;
+  max-width: 100%;
+}
+
+[data-rail='true'] .terminal-list {
+  margin-left: 5px;
+  padding-left: 3px;
+}
+
+.rail-workspace,
+.rail-terminal {
+  display: grid;
+  position: relative;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-block: 2px;
+  padding: 0;
+  border: 1px solid var(--orca-border);
+}
+
+.rail-terminal {
+  width: 28px;
+  height: 28px;
+}
+
+.rail-terminal .portrait,
+.rail-terminal .monogram {
+  width: 24px;
+  height: 24px;
+}
+
+.rail-terminal .dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  outline: 1px solid var(--orca-background);
+}
+
+@media (width < 160px) {
+  #rail {
+    display: none;
+  }
+
+  [data-rail='true'] #feedback {
+    padding-inline: 2px;
+  }
+}
