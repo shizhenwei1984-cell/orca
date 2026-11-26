@@ -12,6 +12,9 @@ const STATES = {
   idle: 'Idle',
   sleep: 'Sleeping'
 }
+const EVOLVE_MS = 3000
+const EVOLVE_BURST = 2000
+const EVOLVE_SWAPS = [650, 950, 1175, 1344, 1470, 1565, 1636, 1696, 1756, 1816, 1876, 1936]
 
 export function createActor(document, entity, now, x, row, visitor = false) {
   const button = document.createElement('button')
@@ -109,8 +112,11 @@ export function paintActors(
       const shots = actor.react?.shot
       const activeShot = shots && now >= shots.at && now < shots.until && !reduced
       const { careNote, hungry } = entity
-      const care = careNote && now >= careNote.at && now - careNote.at < 3200 ? careNote.kind : ''
+      const careDuration = careNote?.kind === 'pickup' ? 8000 : 3200
+      const care =
+        careNote && now >= careNote.at && now - careNote.at < careDuration ? careNote.kind : ''
       const careIcon = care === 'pet' ? '♥' : care ? (ITEMS[careNote.item]?.icon ?? '🍓') : ''
+      const pickup = care === 'pickup' ? ITEMS[careNote.item] : null
       const attentionIcon = attention(actor.mood)
         ? hungry
           ? '🥺'
@@ -118,7 +124,16 @@ export function paintActors(
             ? '!'
             : '…'
         : ''
-      const evolved = entity.evolvedAt && now >= entity.evolvedAt && now - entity.evolvedAt < 3000
+      const elapsed = now - (entity.evolvedAt ?? -Infinity)
+      const evolved = elapsed >= 0 && elapsed < EVOLVE_MS
+      const old = evolved && EVOLVE_SWAPS.filter((at) => elapsed >= at).length % 2 === 0
+      const evolution =
+        !reduced && evolved && entity.evolvedFrom && elapsed < EVOLVE_BURST
+          ? {
+              pick: old ? entity.evolvedFrom : entity.appearance,
+              light: Math.min(1, elapsed / 500)
+            }
+          : null
       const flash = actor.flashUntil > now || evolved ? '✦' : ''
       const resting = entity.state === 'done' ? '✓' : actor.mood === 'sleep' ? 'zZ' : ''
       const icon = careIcon || attentionIcon || flash || reactIcon(actor, now) || resting
@@ -137,14 +152,30 @@ export function paintActors(
       button.dataset.focused = entity.focused ? 'true' : 'false'
       button.dataset.petted = String(care === 'pet')
       button.dataset.care = care
+      button.dataset.evolution = evolution
+        ? old
+          ? 'before'
+          : 'after'
+        : !reduced && evolved && elapsed >= EVOLVE_BURST && elapsed < EVOLVE_BURST + 420
+          ? 'burst'
+          : evolved
+            ? 'evolved'
+            : ''
       button.dataset.row = row
       button.classList.toggle('pokemon-world__actor--dragging', !!actor.dragging)
-      setLabel(actor, hungry ? `${status} · Hungry` : status, settings.tags || visitor)
+      const description = [
+        status,
+        hungry && 'Hungry',
+        pickup && `Found ${pickup.name}`,
+        evolved && 'Evolved'
+      ]
+      setLabel(actor, description.filter(Boolean).join(' · '), settings.tags || visitor)
       const scale = settings.scale * (entity.parentId ? 1.5 : 2)
       const { w, h } = paintSprite(sprite, actor, {
         now,
         scale,
         reduced,
+        evolution,
         hovered: hovered === actor,
         season: season && (season.t < 0.5 ? season.a : season.b)
       })
@@ -164,7 +195,13 @@ export function paintActors(
       tag.style.top = `${y + 11 + 17 * spot.line}px`
       tag.style.width = `${Math.round(spot.w)}px`
 
-      const badgeText = visitor ? (entity.icon ?? '?') : icon || (rival ? '⚔' : '')
+      const badgeText = visitor
+        ? (entity.icon ?? '?')
+        : pickup
+          ? `${pickup.icon} ${pickup.name}`
+          : evolved && !evolution
+            ? 'Evolved'
+            : icon || (rival ? '⚔' : '')
       if (badge.textContent !== badgeText) {
         badge.textContent = badgeText
       }

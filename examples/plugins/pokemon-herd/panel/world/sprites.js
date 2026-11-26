@@ -67,7 +67,7 @@ function frameAt(sheet, elapsed) {
   return Math.floor((t * sheet.frames) / sheet.duration)
 }
 
-export function paintSprite(node, actor, { now, scale, reduced, hovered, season = 0 }) {
+export function paintSprite(node, actor, { now, scale, reduced, hovered, season = 0, evolution }) {
   const { sprites } = actor.assets
   const current = pose(actor, actor.mood, now, hovered, actor.hoverSide)
   const facing = current.face ?? { idleL: 'l', idleR: 'r', walkL: 'l', walkR: 'r' }[current.sprite]
@@ -85,16 +85,19 @@ export function paintSprite(node, actor, { now, scale, reduced, hovered, season 
       (current.sprite.startsWith('walk') ? sprites.walk : null) ??
       (current.sprite === 'sleep' ? sprites.sleep : null) ??
       (standingTurn || sprites.idle || sprites.idleD))
-  const pick = actor.entity.appearance
+  const pick = evolution?.pick ?? actor.entity.appearance
   const catalogPose = current.sprite.startsWith('walk')
     ? 'walk'
     : current.sprite === 'sleep'
       ? 'sleep'
       : 'idle'
-  const sheet =
+  const currentSheet =
+    evolution && worldCatalogSheet(actor, actor.entity.appearance, catalogPose, season)
+  const incoming =
     pick && !(anim && sprites.reactions?.[anim])
       ? worldCatalogSheet(actor, pick, catalogPose, season)
       : original
+  const sheet = incoming || currentSheet || original
   const actualAnimation = anim && sprites.reactions?.[anim]
   const step = anim && actor.react?.seq?.find((item) => now >= item.at && now < item.until)
   const elapsed = Math.max(0, anim ? now - (step?.at ?? actor.react?.at ?? now) : now - actor.born)
@@ -106,7 +109,7 @@ export function paintSprite(node, actor, { now, scale, reduced, hovered, season 
   const baseHeight = sheet?.height ?? 18
   const w = Math.round(baseWidth * scale)
   const h = Math.round(baseHeight * scale)
-  const freezeFrame = reduced || (!pick && standingTurn) || (anim && !actualAnimation)
+  const freezeFrame = reduced || evolution || (!pick && standingTurn) || (anim && !actualAnimation)
   const frame = sheet && !freezeFrame ? frameAt(sheet, elapsed) : 0
   const sourceDirection = sheet?.facing ?? (current.sprite.endsWith('R') ? 'r' : 'l')
   const row = sheet?.rows >= 8 ? ({ l: 2, r: 6 }[facing] ?? 0) : (sheet?.row ?? 0)
@@ -121,6 +124,10 @@ export function paintSprite(node, actor, { now, scale, reduced, hovered, season 
     ? `${w * (sheet.cols ?? sheet.frames)}px ${h * (sheet.rows ?? 1)}px`
     : ''
   node.style.backgroundPosition = `${-frame * w}px ${-row * h}px`
+  node.style.filter =
+    evolution && sheet
+      ? `brightness(${1 - evolution.light}) invert(${evolution.light}) drop-shadow(0 0 2px var(--orca-ring, Highlight))`
+      : ''
   if (node.dataset.credits !== (sheet?.credits ?? '')) {
     node.dataset.credits = sheet?.credits ?? ''
   }

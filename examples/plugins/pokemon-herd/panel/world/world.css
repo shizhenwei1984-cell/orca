@@ -151,3 +151,76 @@
   right: calc(100% + 4px);
   color: inherit;
 }
+
+.pokemon-world__notices {
+  position: absolute;
+  z-index: 2;
+  inset: 4px 4px auto;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  pointer-events: none;
+}
+.pokemon-world__notices div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pokemon-world__notices span {
+  padding: 2px 4px;
+  border-radius: var(--orca-radius);
+  background: var(--orca-popover, Canvas);
+  color: var(--orca-popover-foreground, CanvasText);
+}
+.pokemon-world__actor:is([data-care='pickup'], [data-evolution='burst'], [data-evolution='evolved'])
+  .pokemon-world__badge {
+  width: max-content;
+  max-width: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pokemon-world__actor:is([data-evolution='before'], [data-evolution='after'])
+    .pokemon-world__body::before {
+    content: '';
+    position: absolute;
+    inset: -12px 15% 0;
+    border-radius: var(--orca-radius);
+    background: linear-gradient(
+      transparent,
+      color-mix(in srgb, var(--orca-ring, Highlight) 25%, transparent)
+    );
+  }
+  .pokemon-world__actor[data-care='pickup'] .pokemon-world__badge {
+    animation: pokemon-pickup 420ms ease-out both;
+  }
+  .pokemon-world__actor[data-evolution='burst'] .pokemon-world__body::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--orca-ring, Highlight);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: pokemon-evolution-burst 420ms ease-out both;
+  }
+}
+@keyframes pokemon-pickup {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes pokemon-evolution-burst {
+  from {
+    opacity: 1;
+    scale: 0.75;
+  }
+  to {
+    opacity: 0;
+    scale: 1.5;
+  }
+}

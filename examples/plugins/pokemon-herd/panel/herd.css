@@ -123,6 +123,41 @@ small,
   display: grid;
   gap: 4px;
 }
+.companion-menu {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+}
+.companion-menu:has([role='status']:empty) {
+  display: none;
+}
+.companion-menu header,
+.companion-chips {
+  display: flex;
+  gap: 4px;
+}
+.companion-menu header {
+  align-items: center;
+}
+.companion-menu canvas {
+  flex: none;
+  image-rendering: pixelated;
+}
+.companion-menu small {
+  display: block;
+  color: var(--orca-muted-foreground);
+}
+.companion-menu h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+.companion-chips {
+  flex-wrap: wrap;
+}
+.companion-chips .companion-mate {
+  display: grid;
+  justify-items: center;
+}
 #world-actions button {
   text-align: start;
 }

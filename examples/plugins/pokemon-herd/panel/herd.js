@@ -3,6 +3,7 @@ import { mountEncounterGame } from './encounters/encounter-game.js'
 import { encounterSprites } from './encounters/encounter-sprites.js'
 import { species, starterDex } from './pokemon.mjs'
 import { disposeCompanionArt, paintCompanionArt } from './catalog/companion-art.mjs'
+import { renderCompanionMenu } from './companion-menu.js'
 import { mountTrainer } from './trainer.js'
 import { mountWorldCare, mountWorldCries } from './world-care.js'
 import { worldInteractions } from './world-interactions.js'
@@ -47,7 +48,7 @@ let progress = new Map()
 let readingProgress = false
 let progressDirty = false
 let focusRequest
-let berries = []
+let menuRequest
 const care = mountWorldCare(orca, careStatus, (action) => {
   if (action.type === 'pet') {
     preferences.play('pet')
@@ -107,7 +108,7 @@ const preferences = bindWorldPreferences(orca, signal, (settings) => {
   encounters.update({ settings })
 })
 
-function careFor(agent, action) {
+function careFor(agent, action, message) {
   const ref = progress.get(agent.id)?.ref
   if (
     !workspace?.terminals.has(agent.id) ||
@@ -117,7 +118,7 @@ function careFor(agent, action) {
   ) {
     return
   }
-  return care(action, agent, workspace.scope.signal, [...workspace.terminals].slice(0, 50))
+  return care(action, agent, workspace.scope.signal, [...workspace.terminals].slice(0, 50), message)
 }
 
 function runCommand(command, agent) {
@@ -165,6 +166,7 @@ function toggleSettings(open) {
 
 function openActions({ agent, x, y, anchor }) {
   actions.hidePopover()
+  menuRequest?.abort()
   const scope = workspace?.scope.signal
   const items = agent
     ? [['Focus terminal', (event) => void focusTerminal(agent, event)]]
@@ -181,10 +183,6 @@ function openActions({ agent, x, y, anchor }) {
           void careFor(agent, { type: 'pet' })
         }
       ],
-      ...berries.map((item) => [
-        item === 'berry' ? 'Feed Oran Berry' : 'Feed Sitrus Berry',
-        () => void careFor(agent, { type: 'use', item })
-      ]),
       ['Pokémon details', () => void trainerGame.openParty(agent.id)],
       ['Bring out from Box', () => void trainerGame.openBoxFor(agent.id)],
       ['Change Pokémon', () => runCommand('open-picker', agent)]
@@ -234,11 +232,72 @@ function openActions({ agent, x, y, anchor }) {
       })
     )
   }
+  const position = () => {
+    actions.style.left = `${Math.max(4, Math.min(x, innerWidth - actions.offsetWidth - 4))}px`
+    actions.style.top = `${Math.max(4, Math.min(y, innerHeight - actions.offsetHeight - 4))}px`
+  }
+  if (agent?.ref && scope && workspace) {
+    menuRequest = new AbortController()
+    const signal = AbortSignal.any([scope, menuRequest.signal])
+    const content = document.createElement('div')
+    content.className = 'companion-menu'
+    const loading = document.createElement('small')
+    loading.setAttribute('role', 'status')
+    content.append(loading)
+    actions.append(content)
+    const spinner = setTimeout(() => {
+      loading.textContent = 'Loading companion…'
+    }, 200)
+    void orca.plugin
+      .request(
+        'trainer.companion-menu',
+        {
+          terminalIds: [...workspace.terminals].slice(0, 50),
+          target: agent.ref
+        },
+        { signal }
+      )
+      .then((menu) => {
+        if (signal.aborted || !actions.matches(':popover-open')) {
+          return
+        }
+        if (!menu) {
+          loading.textContent = 'This companion changed.'
+          return
+        }
+        renderCompanionMenu(content, menu, {
+          signal,
+          labels: new Map(
+            roster.map(({ terminalId, title, agent }) => [terminalId, title || agent])
+          ),
+          onAction(action, message) {
+            actions.hidePopover()
+            void careFor(agent, action, message)
+          },
+          onMega() {
+            actions.hidePopover()
+            runCommand('open-picker', agent)
+          }
+        })
+        position()
+      })
+      .catch(() => {
+        if (!signal.aborted) {
+          loading.textContent = 'Could not load companion actions.'
+        }
+      })
+      .finally(() => clearTimeout(spinner))
+  }
   actions.showPopover({ source: anchor.closest('button') ?? anchor })
-  actions.style.left = `${Math.max(0, Math.min(x, innerWidth - actions.offsetWidth))}px`
-  actions.style.top = `${Math.max(0, Math.min(y, innerHeight - actions.offsetHeight))}px`
+  position()
   actions.firstElementChild.focus()
 }
+
+actions.addEventListener('beforetoggle', (event) => {
+  if (event.newState === 'closed') {
+    menuRequest?.abort()
+  }
+})
 
 async function focusTerminal(agent, event) {
   if (!event.isTrusted || !workspace?.terminals.has(agent.id)) {
@@ -337,6 +396,7 @@ function paintRoster() {
         hungry: member?.hungry,
         careNote: member?.careNote,
         evolvedAt: member?.evolvedAt,
+        evolvedFrom: member?.evolvedFrom,
         state: agent.state,
         stateStartedAt: agent.stateStartedAt
       })
@@ -408,8 +468,8 @@ async function readProgress() {
       trainer.hidden = false
       progressError.hidden = true
       updateRetry()
-      berries = view.berries
       progress = new Map(view.companions.map((member) => [member.terminalId, member]))
+      world.update({ boosts: view.boosts })
       paintRoster()
     } catch (error) {
       if (!signal.aborted && current === workspace) {

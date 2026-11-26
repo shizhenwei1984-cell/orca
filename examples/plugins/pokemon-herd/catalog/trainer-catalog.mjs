@@ -11,8 +11,8 @@ import {
 const PREFERENCES = 'catalog.preferences'
 const SOURCES = ['starters', 'any', 'favorites']
 
-export function catalogUnlocks(save) {
-  const { trainer, legendsOpen } = loadSettings(save.settings)
+export function catalogUnlocks(save, settings = loadSettings(save.settings)) {
+  const { trainer, legendsOpen } = settings
   return { trainer, legendsOpen, caught: save.dex.caught, shinyUnlocked: save.dex.shiny }
 }
 
@@ -31,13 +31,13 @@ export function appearanceOf({ dex, form, gender, shiny, mega, megaKind }) {
   }
 }
 
-export function validateChoice(save, pokemon, action) {
+export function validateChoice(save, pokemon, action, settings) {
   const { dex, form, gender, mega, megaKind, shiny } = action
   const entry = entryOf({ dex, form })
-  if (!entry || !canChoose(entry, asUnlocks(catalogUnlocks(save)))) {
+  const same = dex === pokemon.dex && form === (pokemon.form ?? undefined) && !action.fresh
+  if (!entry || (!same && !canChoose(entry, asUnlocks(catalogUnlocks(save, settings))))) {
     throw new Error('That Pokémon is unavailable.')
   }
-  const same = dex === pokemon.dex && form === (pokemon.form ?? undefined) && !action.fresh
   const megas = megaForms(entry)
   if (
     (gender !== undefined && !genderChoices(dex).includes(gender)) ||
@@ -54,20 +54,20 @@ export function validateChoice(save, pokemon, action) {
   return { same, gender, mega, megaKind, shiny }
 }
 
-export function initialCatalogPick(save, { source, favorites }, rnd) {
-  if (source === 'starters') {
+export function initialCatalogPick(save, { source, favorites }, rnd, settings) {
+  const unlocks = asUnlocks(catalogUnlocks(save, settings))
+  if (source === 'starters' && !unlocks.trainer) {
     return undefined
   }
-  const unlocks = asUnlocks(catalogUnlocks(save))
   const choices = searchEntries('', {
-    keys: source === 'favorites' ? new Set(favorites) : undefined,
+    keys: source === 'favorites' && !unlocks.trainer ? new Set(favorites) : undefined,
     available: (entry) => canChoose(entry, unlocks)
   })
   const entry = choices[Math.floor(rnd() * choices.length)]
   return entry && appearanceOf({ dex: entry.dex, form: entry.form })
 }
 
-export function registerCatalogPreferences(orca) {
+export function registerCatalogPreferences(orca, selectionSettings) {
   let current
   let tail = Promise.resolve()
 
@@ -116,7 +116,9 @@ export function registerCatalogPreferences(orca) {
       return next
     })
     tail = result.catch(() => {})
-    return result
+    return input == null && selectionSettings
+      ? result.then(async (stored) => ({ ...stored, ...(await selectionSettings()) }))
+      : result
   })
   return () => tail.then(read)
 }

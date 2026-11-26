@@ -1,5 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
+import { entryOf, megaForms } from '../catalog/dex.mjs'
 import { pokemonId, trainerAction } from '../trainer-actions.mjs'
+import { showPokemon } from '../trainer-view.mjs'
 import {
   changeItems,
   creditResearch,
@@ -14,10 +16,12 @@ import {
 } from '../trainer-game.mjs'
 import { createEncounterState, hpOf } from './encounter-state.js'
 import { renderEncounterSnapshot } from './encounter-view.js'
-import { transitionEncounter } from './encounters.js'
+import { movesFor, transitionEncounter } from './encounters.js'
+import { abilityName, megaAbility } from './rules/abilities.js'
 import { isWalkable } from './rules/dex.js'
-import { addMoney } from './rules/items.js'
-import { BAIT, AUTO_BAIT, dayOf } from './rules/trainer.js'
+import { addMoney, holdOrder, ITEMS } from './rules/items.js'
+import { HELD_IDS } from './rules/picks.js'
+import { BAIT, AUTO_BAIT, dayOf, fighterKey } from './rules/trainer.js'
 import { TOWER_HEAL_IDS } from './rules/trainers.js'
 import { weatherNow } from './rules/weather.js'
 import { readHerdSettings } from '../world-settings.mjs'
@@ -217,9 +221,123 @@ export function encounterTrainerAction(save, action, context) {
       swap: (next, slot) =>
         scope.slots.includes(slot)
           ? applyEncounter(next, { type: 'party-switch', slot }, scope)
-          : next
+          : next,
+      exchange: (next, first, second) => exchangeCompanions(next, scope.workspaceId, first, second)
     }
   })
+}
+
+export function companionMenu(save, context, slot, source, targets) {
+  const { workspaceId, at } = context
+  const state = stateFor(save, workspaceId)
+  const member = save.party[slot]
+  const { pokemon } = member
+  const health = (slot) => (state ? hpOf(state, slot, at) : 1)
+  const card = showPokemon(pokemon, slot, save, at, member, health)
+  const entry = entryOf(card.appearance)
+  const megas = entry ? megaForms(entry) : []
+  const form = megas.find(({ kind }) => kind === pokemon.megaKind) ?? megas[0]
+  const active =
+    pokemon.mega === 'on' ||
+    ((pokemon.mega ?? 'auto') === 'auto' && member.run?.state === 'working')
+  const mega = active ? form : null
+  const key = mega ? fighterKey(pokemon.dex, { mega: mega.kind }) : null
+  const pick = { ...trainerPick(pokemon), mega: mega ? 'on' : 'off' }
+  const moves = movesFor({}, { [slot]: pick }, slot).map(({ name }) => name)
+  const stock = (id) => ({
+    id,
+    name: ITEMS[id].name,
+    icon: ITEMS[id].icon,
+    count: save.bag.items[id] ?? 0
+  })
+  const held = card.held ? stock(card.held) : null
+  const rules = rulesFor(save, context)
+  return {
+    card: {
+      ...card,
+      name: mega ? `Mega ${card.name}${mega.kind ? ` ${mega.kind}` : ''}` : card.name,
+      appearance: { ...card.appearance, mega: pick.mega },
+      types: mega?.types ?? entry?.types ?? [],
+      ability: (key && abilityName(megaAbility(key))) || card.ability,
+      moves,
+      hp: health(slot),
+      hasMega: !!form
+    },
+    held,
+    uses: card.items
+      .filter(
+        (id) =>
+          !HELD_IDS.includes(id) &&
+          (!TOWER_HEAL_IDS.includes(id) ||
+            !transitionEncounter(state, { type: 'heal', slot, item: id }, rules).error)
+      )
+      .map(stock),
+    holds: holdOrder(
+      pick,
+      card.items.filter((id) => HELD_IDS.includes(id))
+    ).map(stock),
+    source,
+    mates: source
+      ? targets
+          .filter(
+            (target) =>
+              target.slot !== slot &&
+              target.id !== source.id &&
+              !exchangeBlocked(state, [slot, target.slot])
+          )
+          .map((target) => {
+            const mate = save.party[target.slot]
+            const { appearance, name, title } = showPokemon(
+              mate.pokemon,
+              target.slot,
+              save,
+              at,
+              mate
+            )
+            return { target, appearance, name, title }
+          })
+      : []
+  }
+}
+
+function exchangeBlocked(state, slots) {
+  return (
+    !!state &&
+    slots.some(
+      (slot) =>
+        state.clash?.kind === 'spar' ||
+        state.clash?.slot === slot ||
+        state.visitor?.battle?.slot === slot ||
+        state.visitor?.trainer?.fighter === slot ||
+        Object.hasOwn(state.counters, slot)
+    )
+  )
+}
+
+function exchangeCompanions(save, workspaceId, first, second) {
+  const state = stateFor(save, workspaceId)
+  if (!state) {
+    return save
+  }
+  if (exchangeBlocked(state, [first, second])) {
+    throw new Error('Wait for these Pokémon to finish battling.')
+  }
+  const moved = (slot) => (slot === first ? second : slot === second ? first : slot)
+  const moveEntries = (map) =>
+    Object.fromEntries(Object.entries(map).map(([slot, value]) => [moved(slot), value]))
+  const { tower, spar, visitor } = state
+  const run = tower.run
+  const next = {
+    ...state,
+    revision: (state.revision ?? 0) + 1,
+    health: moveEntries(state.health),
+    spar: { ...spar, last: moveEntries(spar.last) },
+    ...(visitor?.statuses && { visitor: { ...visitor, statuses: moveEntries(visitor.statuses) } }),
+    ...(run && {
+      tower: { ...tower, run: { ...run, out: run.out.map(moved), fighter: moved(run.fighter) } }
+    })
+  }
+  return { ...save, encounters: { ...save.encounters, [workspaceId]: next } }
 }
 
 function requestScope(input) {
@@ -341,7 +459,7 @@ export function registerEncounterHandlers(
   async function contextFor(save, input, catalog, at, fresh) {
     return {
       ...input,
-      settings: await preferences(),
+      settings: await preferences(save.settings),
       ...roomScope(
         save,
         await getScope(save, input.terminalIds, catalog, {

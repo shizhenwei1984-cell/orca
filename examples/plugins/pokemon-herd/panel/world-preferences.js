@@ -79,9 +79,10 @@ export function bindWorldPreferences(orca, signal, apply) {
   async function load() {
     busy(true)
     try {
-      const [stored, battleSounds] = await Promise.all([
+      const [stored, battleSounds, catalog] = await Promise.all([
         orca.storage.get(WORLD_SETTINGS_KEY),
-        orca.storage.get('battle.sounds')
+        orca.storage.get('battle.sounds'),
+        orca.plugin.request('catalog.preferences', null, { signal })
       ])
       if (signal.aborted) {
         return
@@ -92,7 +93,7 @@ export function bindWorldPreferences(orca, signal, apply) {
             ? (stored?.battleSounds ?? battleSounds)
             : control.name === 'visitors' && stored?.visitors === false
               ? 'off'
-              : stored?.[control.name]
+              : (stored?.[control.name] ?? catalog?.[control.name])
         if (control.type === 'checkbox') {
           if (typeof value === 'boolean') {
             control.checked = value
