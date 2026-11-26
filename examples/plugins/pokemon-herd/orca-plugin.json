@@ -12,13 +12,32 @@
   "main": "worker.mjs",
   "contributes": {
     "events": [{ "on": "agent.status.changed" }],
+    "commands": [
+      {
+        "id": "pick",
+        "title": "Choose a Pokémon companion",
+        "when": "workspace",
+        "openPanel": { "panel": "pokemon-herd", "action": "pick", "activeTerminal": true }
+      },
+      {
+        "id": "bag",
+        "title": "Open Pokémon Bag",
+        "when": "workspace",
+        "openPanel": { "panel": "pokemon-herd", "action": "bag" }
+      }
+    ],
+    "keybindings": [
+      { "key": "Alt+Shift+P", "command": "pick" },
+      { "key": "Alt+Shift+B", "command": "bag" }
+    ],
     "panels": [
       {
         "id": "pokemon-herd",
         "title": "Pokémon Herd",
         "icon": "activity",
         "entry": "panel/index.html",
-        "defaultPlacement": "bottom"
+        "defaultPlacement": "bottom",
+        "actions": ["pick", "bag", "care", "box"]
       },
       {
         "id": "pokemon-sidebar",

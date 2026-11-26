@@ -22,6 +22,10 @@ Open **Pokémon Sidebar** to browse workspaces, focus terminals, and see agent c
 
 See [Trainer integration](./trainer-integration.md) for the worker contracts and remaining cross-feature wiring.
 
+In Orca’s command palette, use **Choose a Pokémon companion** or **Open Pokémon Bag**.
+The default shortcuts are `Alt+Shift+P` and `Alt+Shift+B`. Change them in Orca’s keyboard shortcut settings.
+The picker uses the active terminal’s companion when Herd can verify it. Otherwise it asks you to choose a companion from the workspace.
+
 ## Credits
 
 Adapted from [Pokerdr](https://github.com/lntvan166/herdr-pokemon/tree/11f949d). The tree and flowers come from its scenery. Its copyright notice is included in LICENSE-upstream.

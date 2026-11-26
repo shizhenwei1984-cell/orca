@@ -1,3 +1,4 @@
+import { runPluginPanelCommandFromGuestChord } from '@/lib/plugins/commands/plugin-command-execution'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { FRAME_EVENTS } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
@@ -18,11 +19,16 @@ import {
   type PluginFrameElement
 } from './plugin-frame-element'
 import { createPanelWatchdog } from '../../right-sidebar/plugin-panels/health/plugin-panel-watchdog'
+import {
+  openSiblingPluginPanel,
+  registerPluginPanelActivationReceiver
+} from '../view/plugin-panel-activation'
 import { usePluginFrameThemeSync } from './use-plugin-panel-theme-revision'
 
 /** Wires one plugin frame (panel or editor, iframe or guest): message host, watchdog and live theme. */
 export function usePluginFrameHost(options: {
   surface: 'panel' | 'editor'
+  panelTabKey?: string
   frameRef: RefObject<PluginFrameElement | null>
   /** Changes whenever a new document mounts; null while none is ready. */
   frameKey: string | null
@@ -40,6 +46,7 @@ export function usePluginFrameHost(options: {
 }): { onFrameLoad: () => void } {
   const {
     surface,
+    panelTabKey,
     frameRef,
     frameKey,
     sessionToken,
@@ -79,12 +86,34 @@ export function usePluginFrameHost(options: {
       return
     }
     let active = true
+    let unregisterActivation: (() => void) | undefined
+    const deactivate = (): void => {
+      active = false
+      unregisterActivation?.()
+    }
     const hostOptions = {
       surface,
       onPanelPreferredHeight,
       getFrameWindow,
       getSessionToken: () => sessionTokenRef.current,
       isActive: () => active,
+      onOpenPanel: panelTabKey
+        ? (params: unknown) => openSiblingPluginPanel(panelTabKey, params)
+        : undefined,
+      onPanelActivationReady: (workspaceId: unknown) => {
+        if (panelTabKey) {
+          unregisterActivation?.()
+          unregisterActivation = registerPluginPanelActivationReceiver(
+            panelTabKey,
+            workspaceId,
+            (activation) =>
+              getFrameWindow()?.postMessage(
+                pluginEvent(FRAME_EVENTS.panelActivated, activation),
+                '*'
+              )
+          )
+        }
+      },
       onPong: (pingId: number) => watchdog.handlePong(pingId),
       editor,
       declarative,
@@ -95,7 +124,7 @@ export function usePluginFrameHost(options: {
       const handler = createPluginFrameMessageHandler(hostOptions)
       window.addEventListener('message', handler)
       return () => {
-        active = false
+        deactivate()
         window.removeEventListener('message', handler)
       }
     }
@@ -113,7 +142,9 @@ export function usePluginFrameHost(options: {
       }
       // Trusted modifier chords: the preload saw these as real key presses in this guest.
       const chord = readPluginGuestMessage(event, PLUGIN_FRAME_KEY_CHANNEL)
-      if (chord) {
+      if (chord && panelTabKey && document.activeElement === element) {
+        runPluginPanelCommandFromGuestChord(chord.data)
+      } else if (chord) {
         handle(pluginEvent(FRAME_EVENTS.editorKeydown, chord.data), {
           userActivation: true,
           transport: 'guest',
@@ -128,7 +159,7 @@ export function usePluginFrameHost(options: {
     element.addEventListener('destroyed', onGone)
     element.addEventListener('render-process-gone', onGone)
     return () => {
-      active = false
+      deactivate()
       element.removeEventListener('ipc-message', onMessage)
       element.removeEventListener('dom-ready', onReady)
       element.removeEventListener('destroyed', onGone)
@@ -143,6 +174,7 @@ export function usePluginFrameHost(options: {
     getFrameWindow,
     onPanelPreferredHeight,
     surface,
+    panelTabKey,
     trackHostCall,
     watchdog
   ])

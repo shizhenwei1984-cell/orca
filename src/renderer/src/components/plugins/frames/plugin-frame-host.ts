@@ -1,6 +1,7 @@
 import {
   FRAME_EVENTS,
   PANEL_CONTROL_MESSAGE_MAX_BYTES,
+  OPEN_PLUGIN_PANEL_METHOD,
   readPanelPongId
 } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
@@ -72,6 +73,8 @@ export type PluginFrameHostOptions = {
   /** False once the frame document/session has been replaced. */
   isActive?: () => boolean
   onPong?: (pingId: number) => void
+  onPanelActivationReady?: (workspaceId: unknown) => void
+  onOpenPanel?: (params: unknown) => PluginHostCallOutcome
   editor?: PluginFrameEditorChannel
   /** Injectable for tests; defaults to the shared per-plugin budget. */
   budget?: PanelMessageBudget
@@ -234,6 +237,8 @@ export function createPluginFrameEnvelopeHandler(
           ) {
             options.onPanelPreferredHeight?.(height)
           }
+        } else if (message.event === FRAME_EVENTS.panelActivationReady) {
+          options.onPanelActivationReady?.(message.payload)
         } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.render) {
           options.declarative?.onRender(message.payload)
         } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.error) {
@@ -288,6 +293,18 @@ export function createPluginFrameEnvelopeHandler(
     }
     if (!sessionToken) {
       respond(pluginFailure(request.id, pluginError('unavailable', 'plugin session is not ready')))
+      return
+    }
+    if (request.method === OPEN_PLUGIN_PANEL_METHOD) {
+      const result = options.onOpenPanel?.(request.params) ?? {
+        ok: false as const,
+        code: 'not_permitted' as const,
+        error: translate(
+          'auto.components.rightSidebar.pluginPanelBridgeHost.cannotOpenPanels',
+          'This frame cannot open plugin panels.'
+        )
+      }
+      respond(pluginOutcomeResponse(request.id, result))
       return
     }
     const settled = options.trackHostCall?.()

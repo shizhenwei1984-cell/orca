@@ -30,7 +30,8 @@ window.addEventListener(
   (event) => {
     gestures.note(event)
     // Why its own channel: the page can post any envelope, so a save chord counts only from here.
-    if (event.isTrusted && !event.repeat && (event.metaKey || event.ctrlKey)) {
+    const altChord = event.altKey && !event.isComposing && !event.getModifierState('AltGraph')
+    if (event.isTrusted && !event.repeat && (event.metaKey || event.ctrlKey || altChord)) {
       ipcRenderer.sendToHost(PRELOAD_PLUGIN_FRAME_KEY_CHANNEL, {
         key: String(event.key).slice(0, 64),
         code: String(event.code).slice(0, 64),

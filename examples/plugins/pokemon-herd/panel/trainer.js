@@ -23,6 +23,8 @@ let pending
 let busy = false
 let picking = false
 let focusedTerminal = null
+let chooseCompanion = false
+let focusedCompanion = null
 let group = 'Balls'
 let selectedRegion = ''
 let dexSearch = ''
@@ -364,6 +366,10 @@ function releaseButton(pokemon) {
 }
 
 function party() {
+  if (focusedCompanion) {
+    renderFocusedCompanion()
+    return
+  }
   if (!game.party.length) {
     body.append(node('p', 'Start a terminal agent in this workspace to meet its Pokémon.'))
     return
@@ -371,7 +377,19 @@ function party() {
   const companions = [...game.party].sort(
     (a, b) => Number(b.terminalId === focusedTerminal) - Number(a.terminalId === focusedTerminal)
   )
-  body.append(...companions.map(pokemonCard))
+  if (!chooseCompanion) {
+    body.append(...companions.map(pokemonCard))
+    return
+  }
+  body.append(node('p', 'Choose a companion.'))
+  for (const pokemon of companions) {
+    const choice = button(
+      [pokemon.title, pokemon.name].filter(Boolean).join(' · '),
+      () => void changeCompanion(pokemon, choice)
+    )
+    choice.dataset.terminalId = pokemon.terminalId
+    body.append(choice)
+  }
 }
 
 function shop() {
@@ -460,7 +478,24 @@ function searchField(label, value, onSearch) {
   return field(label, input)
 }
 
+function renderFocusedCompanion() {
+  const pokemon = game.party.find(
+    ({ terminalId, ref }) =>
+      terminalId === focusedTerminal &&
+      ref.slot === focusedCompanion.slot &&
+      ref.id === focusedCompanion.id
+  )
+  body.append(
+    pokemon ? pokemonCard(pokemon) : node('p', 'This companion is no longer in the party.')
+  )
+}
+
 function box() {
+  if (focusedCompanion) {
+    renderFocusedCompanion()
+    body.append(button('Show all boxed Pokémon', () => open('Box')))
+    return
+  }
   const { entries, page, lastPage, count, total, canUndo } = game.box
   function updateSearch(changes) {
     Object.assign(query, { page: 0, ...changes })
@@ -704,14 +739,16 @@ function render() {
   }
 }
 
-function open(section, terminalId = null) {
+function open(section, { terminalId = null, companion = null, choose = false } = {}) {
   active = section
   focusedTerminal = terminalId
+  focusedCompanion = companion
+  chooseCompanion = choose
   if (!dialog.open) {
     dialog.showModal()
   }
   body.scrollTop = 0
-  if (game) {
+  if (game && !companion && !choose) {
     render()
   } else {
     body.replaceChildren(node('p', 'Loading trainer…'))
@@ -730,22 +767,30 @@ export function mountTrainer(getTerminalIds) {
   window.orca.plugin.on('trainer.changed', () => void refresh())
   return {
     open,
-    openParty: (terminalId) => open('Party', terminalId),
-    openBoxFor: (terminalId) => open('Box', terminalId),
-    async openPicker({ id, ref }) {
+    openParty: (terminalId) => open('Party', { terminalId }),
+    openBoxFor: (terminalId) => open('Box', { terminalId }),
+    openCompanion: (section, terminalId, companion) => open(section, { terminalId, companion }),
+    async openPicker({ id = null, ref } = {}) {
       const current = scope
-      await open('Party', id)
+      await open('Party', { terminalId: id, choose: !ref })
       if (scope !== current || !dialog.open || active !== 'Party' || focusedTerminal !== id) {
         return
       }
       const pokemon = game?.party.find(
         (member) =>
-          member.terminalId === id && member.ref.slot === ref.slot && member.ref.id === ref.id
+          member.terminalId === id &&
+          (!ref || (member.ref.slot === ref.slot && member.ref.id === ref.id))
       )
+      const choices = [...body.querySelectorAll('button[data-terminal-id]')]
       if (pokemon) {
-        await changeCompanion(pokemon)
-      } else {
+        await changeCompanion(
+          pokemon,
+          choices.find((choice) => choice.dataset.terminalId === id)
+        )
+      } else if (ref) {
         status.textContent = 'That Pokémon is no longer available.'
+      } else {
+        choices[0]?.focus()
       }
     },
     reset() {

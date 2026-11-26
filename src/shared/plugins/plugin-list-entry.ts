@@ -1,5 +1,6 @@
 import type { PluginBlockNotice } from './catalog/plugin-kill-list'
 import type { PluginCatalogType } from './catalog/plugin-catalog-types'
+import type { PluginCommandPanelTarget } from './contributions/plugin-command-contribution'
 import type { PluginExecutionProfile } from './contributions/plugin-execution-profile'
 import type { PluginHostImages } from './images/plugin-image-url'
 import type { PluginStatusBarItemContribution } from './contributions/plugin-status-bar-item-contribution'
@@ -18,6 +19,7 @@ export type PluginHostPanel = {
   icon?: string
   tabKey: PluginPanelTabKey
   defaultPlacement?: PluginPanelPlacement
+  actions?: readonly string[]
 }
 
 /** pending awaits consent; idle defers worker startup; errored exhausted retries or failed startup. */
@@ -106,7 +108,10 @@ export type PluginHostListEntry = {
     title: string
     // Why `worktree`: hosts from before the rename to `workspace` still send it.
     context: 'global' | 'workspace' | 'worktree'
-    handler: { type: 'built-in'; action: string } | { type: 'worker' }
+    handler:
+      | { type: 'built-in'; action: string }
+      | { type: 'worker' }
+      | ({ type: 'panel' } & PluginCommandPanelTarget)
     keybindings: { key: string; when: 'global' | 'workspace' | 'worktree' }[]
     /** The built-in action it runs in place of; absent on older hosts. */
     replaces?: string

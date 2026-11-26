@@ -2818,6 +2818,10 @@
       "pluginCommandKeybindings": {
         "group": "Plugins"
       },
+      "pluginPanelActivation": {
+        "invalidTarget": "Invalid plugin panel target.",
+        "unavailable": "The panel action is unavailable in this workspace."
+      },
       "feedback": {
         "image": {
           "attachments": {
@@ -19954,6 +19958,7 @@
         },
         "pluginPanelBridgeHost": {
           "actionsUnavailable": "Plugin actions are not available in this client.",
+          "cannotOpenPanels": "This frame cannot open plugin panels.",
           "messageTooLarge": "Message exceeds the size limit.",
           "tooManyRequests": "Too many requests."
         },
