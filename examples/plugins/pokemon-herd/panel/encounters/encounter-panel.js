@@ -228,6 +228,9 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound, onCapture
     node.disabled = pending || disabled
     node.className = primary ? 'encounter-primary' : ''
     node.setAttribute('data-encounter-control', JSON.stringify(command))
+    if (command.type === 'gift' || command.type === 'throw') {
+      node.dataset.visitorAction = command.type
+    }
     node.addEventListener('click', () => void submit(command))
     return node
   }
@@ -408,6 +411,14 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound, onCapture
       body.append(portrait(visitor.pick), health(visitor.pick, 'Visitor HP'))
       if (visitor.trainer) {
         const { remaining, floor, lives, greet } = visitor.trainer
+        body.append(
+          text(
+            'p',
+            ready.length
+              ? 'Trainer Pokémon cannot be caught.'
+              : 'Trainer Pokémon cannot be caught. You need a battle-ready companion to challenge this trainer.'
+          )
+        )
         const details = [
           floor && `Floor ${floor}`,
           `${remaining} Pokémon left`,
@@ -531,7 +542,12 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound, onCapture
       body.append(text('p', error, 'encounter-error'))
     }
     if (result) {
-      body.append(battleLog(result))
+      const log = battleLog(result)
+      if (result.kind === 'gift' || result.ball) {
+        header.after(log)
+      } else {
+        body.append(log)
+      }
     }
     const resultKey = result ? `${result.at}:${result.kind}` : null
     if (resultKey !== lastResult || error) {
@@ -590,19 +606,10 @@ export function mountEncounterPanel(root, { onAction, sprite, onSound, onCapture
       draw()
     },
     activateVisitor() {
-      const visitor = model?.visitor
-      if (visitor?.canGift) {
-        return submit({ type: 'gift', id: visitor.id })
-      }
-      if (visitor?.catch && (ballChoice || visitor.catch.ball)) {
-        const ball = content.querySelector('[data-encounter-control="ball"]')
-        const berry = content.querySelector('[data-encounter-control="berry"]')
-        return submit({
-          type: 'throw',
-          id: visitor.id,
-          ball: ball?.value || null,
-          bait: berry?.disabled ? null : berry?.value || null
-        })
+      const action = content.querySelector('[data-visitor-action]:enabled')
+      if (action) {
+        action.click()
+        return
       }
       this.focus()
     },

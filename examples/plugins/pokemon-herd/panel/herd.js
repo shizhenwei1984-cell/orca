@@ -111,6 +111,7 @@ const encounters = mountEncounterGame(encounterContainer, {
   request: (name, input, scope) =>
     orca.plugin.request(name, input, { signal: scope ? AbortSignal.any([signal, scope]) : signal }),
   interactions: worldInteractions,
+  onReveal: () => setEncounters(true),
   world: worldContainer,
   onBattle: (battle) => world.update({ battle }),
   ...encounterSprites(loadCatalogSprite),
