@@ -58,11 +58,12 @@ export function mountEncounterGame(
   }
 
   function input() {
+    const rain = worldNode()?.dataset.weather
     return {
-      workspaceId: scope.workspaceId,
+      ...(scope.workspaceId && { workspaceId: scope.workspaceId }),
       terminalIds: scope.terminalIds,
       settings,
-      rain: worldNode()?.dataset.weather
+      ...(rain && { rain })
     }
   }
 
@@ -233,8 +234,11 @@ export function mountEncounterGame(
       panel.render(model)
       stage.render(model, model.now)
       checkProximity()
-    } catch {
-      readFailure = true
+    } catch (error) {
+      if (scope === active && !lifetime.signal.aborted) {
+        readFailure = true
+        panel.showReadError(error.message)
+      }
     } finally {
       if (reading === active) {
         reading = null
@@ -257,7 +261,11 @@ export function mountEncounterGame(
       client,
       sequence: ++sequence,
       revision: snapshot.revision,
-      action: { ...action, pokemonId, opponentId }
+      action: {
+        ...action,
+        ...(pokemonId && { pokemonId }),
+        ...(opponentId && { opponentId })
+      }
     }
     sending = active
     view.clearTimeout(refreshTimer)
