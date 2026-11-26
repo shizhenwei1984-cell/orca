@@ -1,0 +1,497 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 12px;
+  font: 13px var(--orca-font-sans, sans-serif);
+  color: var(--orca-foreground);
+  background: var(--orca-background);
+}
+.herd-strip {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px 2px;
+}
+.herd-strip .toolbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  order: -2;
+  margin: 0 0 4px;
+  background: var(--orca-background);
+}
+.herd-strip .toolbar > button {
+  padding-inline: 8px;
+}
+.herd-strip #world {
+  order: -1;
+}
+.herd-strip[data-view='world'] #care-status {
+  position: fixed;
+  inset: var(--herd-settings-top, 38px) 8px auto;
+  z-index: 2;
+  margin: 0;
+  padding: 4px;
+  overflow-wrap: anywhere;
+  background: var(--orca-popover);
+  color: var(--orca-popover-foreground);
+  border-radius: var(--orca-radius);
+  pointer-events: none;
+}
+.herd-strip[data-view='world'] :is(#herd-heading, #trainer),
+#encounters[hidden],
+#care-status:empty {
+  display: none;
+}
+.herd-strip #herd-settings {
+  position: fixed;
+  inset: var(--herd-settings-top, 38px) 8px 4px;
+  z-index: 3;
+  margin: 0;
+}
+header,
+.caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+h1 {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+#count,
+small,
+#message,
+#work,
+#candy,
+.progress {
+  color: var(--orca-muted-foreground);
+}
+#trainer:not([hidden]),
+.progress:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
+  font-size: 12px;
+}
+#trainer {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+}
+.progress {
+  padding: 0 12px 8px;
+}
+#progress-error {
+  color: var(--orca-destructive);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block: 12px;
+}
+.toolbar button[aria-pressed='true'],
+.toolbar button[aria-expanded='true'] {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+#herd-settings {
+  margin-block: 12px;
+  padding: 12px;
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+#herd-settings:not([hidden]) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+}
+.settings-pages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.settings-pages button[aria-pressed='true'],
+#workspace-companions button[aria-pressed='true'] {
+  border-color: currentColor;
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+.settings-content {
+  overflow: auto;
+}
+#herd-guide h2,
+#herd-guide h3 {
+  margin: 0;
+  font-size: 14px;
+}
+#herd-guide section {
+  margin-block-start: 12px;
+}
+#herd-guide p {
+  margin-block: 4px 0;
+  max-width: 68ch;
+}
+#world-settings fieldset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 116px), 1fr));
+  gap: 8px 12px;
+  border: 0;
+  margin: 0 0 12px;
+  padding: 0;
+}
+#world-settings legend {
+  padding: 0;
+  margin-block-end: 8px;
+  font-weight: 600;
+}
+#world-settings fieldset:last-of-type {
+  grid-template-columns: 1fr;
+}
+#preview-sound {
+  justify-self: start;
+}
+#world-settings label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+#world-settings select {
+  width: 100%;
+}
+#world-settings small {
+  white-space: normal;
+}
+#settings-status {
+  margin: 8px 0 0;
+}
+#settings-status:empty {
+  display: none;
+}
+#world-actions {
+  inset: auto;
+  margin: 0;
+  max-width: calc(100% - 8px);
+  max-height: calc(100% - 8px);
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-popover);
+  color: var(--orca-popover-foreground);
+}
+#world-actions:popover-open {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+#world-actions:has(.companion-menu) {
+  width: min(330px, calc(100% - 8px));
+}
+.world-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.world-action-group > span {
+  flex-basis: 100%;
+}
+#world-actions button[aria-pressed='true'] {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+.companion-menu {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.companion-menu:has([role='status']:empty) {
+  display: none;
+}
+.companion-menu header,
+.companion-chips {
+  display: flex;
+  gap: 4px;
+}
+.companion-menu header {
+  align-items: center;
+}
+.companion-menu header > div {
+  min-width: 0;
+}
+.companion-menu canvas {
+  flex: none;
+  image-rendering: pixelated;
+}
+.companion-menu small {
+  display: block;
+  color: var(--orca-muted-foreground);
+}
+.companion-menu :is(strong, small),
+#world-actions button {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#world-actions button {
+  text-align: start;
+}
+.companion-menu h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+.companion-chips {
+  flex-wrap: wrap;
+}
+.companion-chips .companion-mate {
+  display: grid;
+  justify-items: center;
+}
+#count,
+.state {
+  white-space: nowrap;
+  font-size: 12px;
+}
+#herd:not([hidden]) {
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+#herd > li {
+  overflow: hidden;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+}
+.field {
+  height: 84px;
+  position: relative;
+  overflow: hidden;
+  image-rendering: pixelated;
+  background:
+    url('./sprites/tree-summer.png') right 4px bottom / auto 68px no-repeat,
+    url('./sprites/flowers-yellow.png') left 8px bottom / auto 16px no-repeat,
+    var(--orca-muted);
+}
+.trail {
+  position: absolute;
+  bottom: 0;
+  left: 12%;
+  width: 58%;
+}
+.sprite {
+  display: block;
+  width: 80px;
+  height: 80px;
+}
+li[data-state='working'] .trail {
+  animation: patrol 5s ease-in-out infinite alternate;
+}
+.caption {
+  padding: 8px 12px;
+  border-top: 1px solid var(--orca-border);
+}
+.identity {
+  min-width: 0;
+}
+strong,
+small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+small {
+  font-size: 12px;
+  margin-top: 2px;
+}
+.task {
+  padding: 0 12px;
+}
+.task[hidden] {
+  display: none;
+}
+li[data-state='blocked'] .state {
+  color: var(--orca-destructive);
+}
+button:not(.pokemon-world__actor),
+select {
+  font: inherit;
+  min-height: 28px;
+  padding: 4px 10px;
+  color: var(--orca-secondary-foreground);
+  background: var(--orca-secondary);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+button:not(.pokemon-world__actor):hover:not(:disabled) {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--orca-ring);
+  outline-offset: 1px;
+}
+@keyframes patrol {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(65%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  li[data-state='working'] .trail {
+    animation: none;
+  }
+}
+.trainer-dialog button,
+.trainer-dialog input:not([type='checkbox']),
+.trainer-dialog select {
+  min-height: 28px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  padding: 4px 8px;
+  font: inherit;
+  color: inherit;
+  background: var(--orca-background);
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+.trainer-dialog button:hover:not(:disabled),
+.trainer-dialog button[aria-pressed='true'] {
+  background: var(--orca-muted);
+}
+
+button:disabled {
+  opacity: 0.55;
+}
+
+.trainer-dialog {
+  width: calc(100% - 16px);
+  max-width: 560px;
+  max-height: calc(100% - 16px);
+  padding: 12px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+  overflow: hidden;
+}
+
+.trainer-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trainer-dialog::backdrop {
+  background: color-mix(in srgb, var(--orca-foreground) 12%, transparent);
+}
+
+.trainer-dialog h2,
+.trainer-dialog h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.trainer-dialog p {
+  margin: 0;
+  color: var(--orca-muted-foreground);
+}
+
+.trainer-dialog input,
+.trainer-dialog select {
+  max-width: 100%;
+  min-width: 0;
+}
+
+#trainer-game input[type='number'] {
+  width: 64px;
+}
+
+#trainer-tabs,
+.trainer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 4px;
+}
+
+#trainer-tabs button[aria-pressed='true'] {
+  border-color: currentColor;
+}
+
+#trainer-view {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow: auto;
+}
+
+.trainer-entry,
+#trainer-view details {
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+
+.trainer-entry {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#trainer-view details > .trainer-entry {
+  border: 0;
+  border-top: 1px solid var(--orca-border);
+  border-radius: 0;
+}
+
+#trainer-view summary {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.trainer-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+#trainer-game progress {
+  width: 100%;
+}
+
+#trainer-game footer span:empty {
+  display: none;
+}
+
+#trainer-game footer:not(:has(button:not([hidden]), span:not(:empty))) {
+  display: none;
+}
+
+.trainer-destructive {
+  color: var(--orca-destructive);
+}

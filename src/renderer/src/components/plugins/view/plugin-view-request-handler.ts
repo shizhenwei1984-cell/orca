@@ -1,4 +1,5 @@
 import { pluginPanelTabKey } from '../../../../../shared/plugins/frames/plugin-tab-key'
+import type { PluginHostPanel } from '../../../../../shared/plugins/plugin-list-entry'
 import {
   PLUGIN_VIEW_NO_WORKSPACE_CODE,
   PLUGIN_VIEW_NOT_SHOWN_CODE,
@@ -30,6 +31,7 @@ import {
 } from './plugin-view-panel-settle'
 import { restoreActedPanel, settleAndActOnPanel } from './plugin-view-capture-acts'
 import { pluginPanelNotShownReason } from './plugin-view-shown'
+import { activePluginPanel, openPluginPanel, pluginPanelPlacement } from './plugin-panel-placement'
 import { endPluginShotReplay, replayPluginPanel } from './plugin-view-replay'
 import { showWorkspaceForFile } from './plugin-view-editor-workspace'
 import { captureOpenEditor } from './plugin-view-editor-capture'
@@ -88,43 +90,40 @@ async function openPanel(
   // Why fetch first: a folder `dev load` just added is not in this window's list yet.
   await usePluginPanelsStore.getState().fetchPlugins()
   const tabKey = pluginPanelTabKey(pluginKey, panelId)
-  const known = usePluginPanelsStore
-    .getState()
-    .plugins.some(
-      (plugin) =>
-        plugin.pluginKey === pluginKey && plugin.panels.some((panel) => panel.tabKey === tabKey)
-    )
-  if (!known) {
+  const panel = activePluginPanel(tabKey)
+  if (!panel) {
     return fail(requestId, 'panel_unavailable', `This window does not list ${tabKey} yet.`)
   }
   if (capture?.ifShown) {
     // Never open or switch: the person may have moved on to another tab.
-    const away = pluginPanelNotShownReason(useAppStore.getState(), tabKey)
+    const away = pluginPanelNotShownReason(useAppStore.getState(), panel)
     return away
       ? fail(requestId, PLUGIN_VIEW_NOT_SHOWN_CODE, away)
-      : capturePanel(requestId, tabKey, capture)
+      : capturePanel(requestId, panel, capture)
   }
   const blocked = showWorkspace(requestId, capture === undefined)
   if (blocked) {
     return blocked
   }
-  const state = useAppStore.getState()
-  state.setRightSidebarTab(tabKey)
-  state.setRightSidebarOpen(true)
+  if (!openPluginPanel(tabKey)) {
+    return fail(requestId, 'panel_unavailable', `Could not open ${tabKey}.`)
+  }
   if (!capture) {
     return { requestId, ok: true }
   }
-  return capturePanel(requestId, tabKey, capture)
+  return capturePanel(requestId, panel, capture)
 }
 
 async function capturePanel(
   requestId: string,
-  tabKey: string,
+  panel: PluginHostPanel,
   capture: PluginViewCapture
 ): Promise<PluginViewReply> {
   const wantDark = capture.colorScheme === undefined ? null : capture.colorScheme === 'dark'
+  const { tabKey } = panel
   usePluginViewCaptureStore.getState().begin({
     panelWidth: capture.width ?? null,
+    panelPlacement: pluginPanelPlacement(useAppStore.getState(), panel),
     dark: wantDark,
     ...(capture.captureId === undefined ? {} : { owner: capture.captureId })
   })

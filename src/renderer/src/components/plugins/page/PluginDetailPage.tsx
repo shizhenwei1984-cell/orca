@@ -38,6 +38,7 @@ import {
 } from '../presentation/plugin-install-count'
 import { PluginAuthorByline, PluginMoreFromAuthor } from './PluginAuthor'
 import { PluginPageIcon } from './PluginPageIcon'
+import { PluginWorkspaceAccess } from './PluginWorkspaceAccess'
 
 type PluginDetailPageProps = {
   entry: PluginListEntry
@@ -342,6 +343,13 @@ export function PluginDetailPage({
           {/* Why installed only: before install, and while it waits for review, the consent above says this. */}
           {plugin && controls?.kind !== 'review' ? (
             <PluginAccessSection capabilities={plugin.capabilities} trust={model.trust} />
+          ) : null}
+          {plugin ? (
+            <PluginWorkspaceAccess
+              pluginKey={plugin.pluginKey}
+              name={name}
+              canGrantCompanions={plugin.panels.length > 0}
+            />
           ) : null}
           {plugin ? (
             <PluginSettingsSection

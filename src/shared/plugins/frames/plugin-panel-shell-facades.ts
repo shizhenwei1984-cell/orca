@@ -1,5 +1,6 @@
 import { PLUGIN_EVENT_NAMES } from '../contributions/plugin-event-contribution'
 import { PLUGIN_PANEL_REQUEST_MAX_TIMEOUT_MS } from '../workers/plugin-panel-bridge-protocol'
+import { MOVE_PLUGIN_PANEL_METHOD } from './plugin-frame-bridge'
 
 /**
  * Part of the frame shell's IIFE (plugin-panel-shell.ts), after `orca` exists: `orca.plugin`
@@ -56,7 +57,13 @@ export const PLUGIN_FRAME_FACADES_SCRIPT = `
       }
       return call('plugin.request', params, { signal: o.signal }).then(pick('output'))
     },
-    on: function (event, fn) { return listen(pluginListeners, String(event), fn) }
+    on: function (event, fn) { return listen(pluginListeners, String(event), fn) },
+    openPanel: C.openPanel ? function (params) { return userCall(C.openPanel, params) } : undefined,
+    onActivate: function (fn, workspaceId) {
+      var subscription = on(E.panelActivated, fn)
+      post({ kind: 'evt', event: E.panelActivationReady, payload: workspaceId })
+      return subscription
+    }
   })
   orca.storage = Object.freeze({
     get: function (key) {
@@ -82,4 +89,35 @@ export const PLUGIN_FRAME_FACADES_SCRIPT = `
     set: function (key, value) { return call('secrets.set', { key: String(key), value: String(value) }).then(done) },
     delete: function (key) { return call('secrets.delete', { key: String(key) }).then(done) }
   })
+  if (C.user) {
+    orca.shell = Object.freeze({
+      openExternal: function (url) { return userCall(C.user.openExternal, { url: String(url) }) }
+    })
+    orca.files = Object.freeze({
+      saveAs: function (options) {
+        var o = options || {}
+        var data = ArrayBuffer.isView(o.data)
+          ? o.data.buffer.slice(o.data.byteOffset, o.data.byteOffset + o.data.byteLength)
+          : o.data
+        var params = { data: data }
+        if (o.suggestedName !== undefined) params.suggestedName = o.suggestedName
+        if (o.mimeType !== undefined) params.mimeType = o.mimeType
+        return userCall(C.user.saveAs, params).then(function (result) {
+          return { status: result && result.status === 'saved' ? 'saved' : 'cancelled' }
+        })
+      }
+    })
+  }
+  if (C.surface === 'panel' && C.user) {
+    orca.panel = Object.freeze({
+      moveTo: function (placement, workspaceId) {
+        return userCall(${JSON.stringify(MOVE_PLUGIN_PANEL_METHOD)}, { placement: placement, workspaceId: workspaceId })
+      },
+      setPreferredHeight: function (height) {
+        if (Number.isSafeInteger(height) && height > 0) {
+          post({ kind: 'evt', event: E.panelPreferredHeight, payload: height })
+        }
+      }
+    })
+  }
 `

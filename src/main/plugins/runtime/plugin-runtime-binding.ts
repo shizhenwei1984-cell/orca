@@ -81,6 +81,7 @@ export function pluginRuntimeDelegate(
     ...(callRuntime ? { callRuntime } : {}),
     resolveActiveWorktreeContext: () => runtime.resolveActiveWorktreeContext(),
     listTerminals: (...args) => runtime.listTerminals(...args),
+    readTerminalFolderKey: (ptyId) => runtime.readTerminalFolderKey?.(ptyId),
     sendTerminal: (...args) => runtime.sendTerminal(...args),
     dispatchPluginNotification: (input) => runtime.dispatchPluginNotification(input),
     listAgentStatuses: agentStatuses,

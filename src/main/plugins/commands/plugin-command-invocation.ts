@@ -11,8 +11,8 @@ export function assertPluginWorkerCommand(
     throw new Error(`plugin ${plugin.pluginKey} does not contribute command ${commandId}`)
   }
   // Renderer-owned action aliases cannot activate workers, even through direct IPC.
-  if (command.action !== undefined) {
-    throw new Error(`plugin ${plugin.pluginKey} command ${commandId} is a built-in action alias`)
+  if (command.action !== undefined || command.openPanel !== undefined) {
+    throw new Error(`plugin ${plugin.pluginKey} command ${commandId} is a renderer action`)
   }
   return command
 }

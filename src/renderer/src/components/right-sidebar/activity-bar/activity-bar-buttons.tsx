@@ -5,6 +5,7 @@ import type {
   ActiveRightSidebarTab
 } from '../../../../../shared/ui-chrome/ui-chrome-types'
 import type { CheckStatus as CoarseCheckStatus } from '../../../../../shared/github/pull-requests/pull-request-types'
+import type { PluginPanelPlacement } from '../../../../../shared/plugins/contributions/plugin-panel-placement'
 type CheckStatus = CoarseCheckStatus | 'cancelled'
 import { cn } from '@/lib/class-names'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -25,6 +26,7 @@ import { activityItemAriaLabel, activityItemTooltip } from './activity-bar-item-
 export type ActivityBarItem = {
   id: ActiveRightSidebarTab
   pluginKey?: string
+  defaultPlacement?: PluginPanelPlacement
   icon: React.ComponentType<{ size?: number; className?: string }>
   title: string
   accessibleTitle?: string

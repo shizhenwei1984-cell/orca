@@ -1,0 +1,70 @@
+{
+  "manifestVersion": 2,
+  "id": "pokemon-herd",
+  "name": "Pokémon Herd",
+  "version": "0.2.0",
+  "description": "Raise a herd of Pokémon as your terminal agents work.",
+  "engines": {
+    "orca": ">=1.4.274"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "worker.mjs",
+  "contributes": {
+    "events": [{ "on": "agent.status.changed" }],
+    "commands": [
+      {
+        "id": "pick",
+        "title": "Choose a Pokémon companion",
+        "when": "workspace",
+        "openPanel": { "panel": "pokemon-herd", "action": "pick", "activeTerminal": true }
+      },
+      {
+        "id": "bag",
+        "title": "Open Pokémon Bag",
+        "when": "workspace",
+        "openPanel": { "panel": "pokemon-herd", "action": "bag" }
+      }
+    ],
+    "keybindings": [
+      { "key": "Alt+Shift+P", "command": "pick" },
+      { "key": "Alt+Shift+B", "command": "bag" }
+    ],
+    "panels": [
+      {
+        "id": "pokemon-herd",
+        "title": "Pokémon Herd",
+        "icon": "activity",
+        "entry": "panel/index.html",
+        "defaultPlacement": "bottom",
+        "actions": ["pick", "bag", "care", "box"]
+      },
+      {
+        "id": "pokemon-sidebar",
+        "title": "Pokémon Sidebar",
+        "icon": "layers",
+        "entry": "sidebar/index.html"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "workspace:write"
+    },
+    {
+      "kind": "workspace:create"
+    },
+    {
+      "kind": "terminal:send"
+    },
+    {
+      "kind": "agent:read"
+    },
+    {
+      "kind": "storage:own"
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { useTranslate } from '@/i18n/use-translate'
 import { useAppStore } from '@/store'
 import { Button } from '../../ui/button'
 import { pluginPanelUnavailableReason } from './plugin-contribution-action-availability'
+import { openPluginPanel } from '../view/plugin-panel-placement'
 
 /** Leaves Settings for the workspace it came from and reveals the panel there. */
 export function openPluginPanelFromSettings(panel: Pick<PluginHostPanel, 'tabKey'>): void {
@@ -12,8 +13,7 @@ export function openPluginPanelFromSettings(panel: Pick<PluginHostPanel, 'tabKey
     return
   }
   state.closeSettingsPage()
-  state.setRightSidebarTab(panel.tabKey)
-  state.setRightSidebarOpen(true)
+  openPluginPanel(panel.tabKey)
 }
 
 export function PluginContributionActionPanel({

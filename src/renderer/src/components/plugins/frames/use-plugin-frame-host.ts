@@ -1,4 +1,21 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { translate } from '@/i18n/i18n'
+import { runPluginPanelCommandFromGuestChord } from '@/lib/plugins/commands/plugin-command-execution'
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject
+} from 'react'
+import { ConfirmationDialogContext } from '@/components/dismiss/confirmation/confirmation-dialog-context'
+import {
+  WORKSPACE_VIEW_CHANGED,
+  isInternalWorkspaceViewMethod,
+  isWorkspaceViewMethod
+} from '../../../../../shared/plugins/frames/plugin-workspace-view'
+import { createPluginWorkspaceViewHost } from './plugin-workspace-view-host'
 import { FRAME_EVENTS } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
   PLUGIN_FRAME_IPC_CHANNEL,
@@ -7,6 +24,7 @@ import {
 import { pluginEvent } from '../../../../../shared/plugins/frames/plugin-protocol'
 import { pluginPanelPushSchema } from '../../../../../shared/plugins/workers/plugin-panel-bridge-protocol'
 import {
+  callPanelActionViaPreload,
   createPluginFrameEnvelopeHandler,
   createPluginFrameMessageHandler,
   type PluginFrameDeclarativeChannel,
@@ -18,15 +36,23 @@ import {
   type PluginFrameElement
 } from './plugin-frame-element'
 import { createPanelWatchdog } from '../../right-sidebar/plugin-panels/health/plugin-panel-watchdog'
+import {
+  openSiblingPluginPanel,
+  registerPluginPanelActivationReceiver
+} from '../view/plugin-panel-activation'
+import { moveOwnPluginPanel } from '../view/plugin-panel-guest-placement'
 import { usePluginFrameThemeSync } from './use-plugin-panel-theme-revision'
+import { forwardPluginFramePush } from './plugin-frame-workspace-focus'
 
 /** Wires one plugin frame (panel or editor, iframe or guest): message host, watchdog and live theme. */
 export function usePluginFrameHost(options: {
   surface: 'panel' | 'editor'
+  panelTabKey?: string
   frameRef: RefObject<PluginFrameElement | null>
   /** Changes whenever a new document mounts; null while none is ready. */
   frameKey: string | null
   sessionToken: string | null
+  onPanelPreferredHeight?: (height: number) => void
   editor?: PluginFrameEditorChannel
   declarative?: PluginFrameDeclarativeChannel
   /** Must be stable: a one-shot grant from presses on Orca's own controls. */
@@ -39,14 +65,17 @@ export function usePluginFrameHost(options: {
 }): { onFrameLoad: () => void } {
   const {
     surface,
+    panelTabKey,
     frameRef,
     frameKey,
     sessionToken,
+    onPanelPreferredHeight,
     editor,
     declarative,
     consumeHostActivation,
     trackHostCall
   } = options
+  const confirm = useContext(ConfirmationDialogContext)
   const [loadedFrameKey, setLoadedFrameKey] = useState<string | null>(null)
   const onUnresponsiveRef = useRef(options.onUnresponsive)
   const onGuestGoneRef = useRef(options.onGuestGone)
@@ -77,11 +106,70 @@ export function usePluginFrameHost(options: {
       return
     }
     let active = true
+    const workspaceView =
+      surface === 'panel' && panelTabKey && !(element instanceof HTMLIFrameElement)
+        ? createPluginWorkspaceViewHost({
+            tabKey: panelTabKey,
+            sessionToken: () => sessionTokenRef.current,
+            confirm,
+            onChange: (reset, fatigueExpired) =>
+              getFrameWindow()?.postMessage(
+                pluginEvent(WORKSPACE_VIEW_CHANGED, {
+                  reset,
+                  ...(fatigueExpired ? { fatigueExpired } : {})
+                }),
+                '*'
+              )
+          })
+        : null
+    let unregisterActivation: (() => void) | undefined
+    const deactivate = (): void => {
+      active = false
+      workspaceView?.dispose()
+      unregisterActivation?.()
+    }
     const hostOptions = {
       surface,
+      onPanelPreferredHeight,
       getFrameWindow,
       getSessionToken: () => sessionTokenRef.current,
       isActive: () => active,
+      callHostMethod: async (call: Parameters<typeof callPanelActionViaPreload>[0]) => {
+        if (isInternalWorkspaceViewMethod(call.action)) {
+          return {
+            ok: false as const,
+            code: 'not_permitted' as const,
+            error: translate(
+              'auto.components.rightSidebar.pluginPanelBridgeHost.actionsUnavailable',
+              'Plugin actions are not available in this client.'
+            )
+          }
+        }
+        return isWorkspaceViewMethod(call.action) && workspaceView
+          ? workspaceView.call(call)
+          : callPanelActionViaPreload(call)
+      },
+      onOpenPanel: panelTabKey
+        ? (params: unknown) =>
+            openSiblingPluginPanel(panelTabKey, params, workspaceView?.permitsHandle)
+        : undefined,
+      onMovePanel: panelTabKey
+        ? (params: unknown) => moveOwnPluginPanel(panelTabKey, params)
+        : undefined,
+      onPanelActivationReady: (workspaceId: unknown) => {
+        if (panelTabKey) {
+          unregisterActivation?.()
+          unregisterActivation = registerPluginPanelActivationReceiver(
+            panelTabKey,
+            workspaceId,
+            (activation) =>
+              getFrameWindow()?.postMessage(
+                pluginEvent(FRAME_EVENTS.panelActivated, activation),
+                '*'
+              )
+          )
+        }
+      },
       onPong: (pingId: number) => watchdog.handlePong(pingId),
       editor,
       declarative,
@@ -92,7 +180,7 @@ export function usePluginFrameHost(options: {
       const handler = createPluginFrameMessageHandler(hostOptions)
       window.addEventListener('message', handler)
       return () => {
-        active = false
+        deactivate()
         window.removeEventListener('message', handler)
       }
     }
@@ -110,7 +198,9 @@ export function usePluginFrameHost(options: {
       }
       // Trusted modifier chords: the preload saw these as real key presses in this guest.
       const chord = readPluginGuestMessage(event, PLUGIN_FRAME_KEY_CHANNEL)
-      if (chord) {
+      if (chord && panelTabKey && document.activeElement === element) {
+        runPluginPanelCommandFromGuestChord(chord.data)
+      } else if (chord) {
         handle(pluginEvent(FRAME_EVENTS.editorKeydown, chord.data), {
           userActivation: true,
           transport: 'guest',
@@ -125,20 +215,23 @@ export function usePluginFrameHost(options: {
     element.addEventListener('destroyed', onGone)
     element.addEventListener('render-process-gone', onGone)
     return () => {
-      active = false
+      deactivate()
       element.removeEventListener('ipc-message', onMessage)
       element.removeEventListener('dom-ready', onReady)
       element.removeEventListener('destroyed', onGone)
       element.removeEventListener('render-process-gone', onGone)
     }
   }, [
+    confirm,
     consumeHostActivation,
     declarative,
     editor,
     frameKey,
     frameRef,
     getFrameWindow,
+    onPanelPreferredHeight,
     surface,
+    panelTabKey,
     trackHostCall,
     watchdog
   ])
@@ -149,12 +242,19 @@ export function usePluginFrameHost(options: {
     if (!frameKey || !sessionToken || !subscribe) {
       return
     }
-    return subscribe(sessionToken, (raw) => {
+    const forward = forwardPluginFramePush((push) =>
+      getFrameWindow()?.postMessage(pluginEvent(FRAME_EVENTS.push, push), '*')
+    )
+    const unsubscribe = subscribe(sessionToken, (raw) => {
       const push = pluginPanelPushSchema.safeParse(raw)
       if (push.success) {
-        getFrameWindow()?.postMessage(pluginEvent(FRAME_EVENTS.push, push.data), '*')
+        forward.receive(push.data)
       }
     })
+    return () => {
+      forward.dispose()
+      unsubscribe()
+    }
   }, [frameKey, getFrameWindow, sessionToken])
 
   useEffect(() => {

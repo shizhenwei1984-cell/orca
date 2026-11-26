@@ -2855,6 +2855,11 @@
       "pluginCommandKeybindings": {
         "group": "Plugins"
       },
+      "pluginPanelActivation": {
+        "invalidTarget": "Invalid plugin panel target.",
+        "unavailable": "The panel action is unavailable in this workspace.",
+        "cannotMove": "The panel cannot be moved in this workspace."
+      },
       "feedback": {
         "image": {
           "attachments": {
@@ -20045,6 +20050,7 @@
         },
         "pluginPanelBridgeHost": {
           "actionsUnavailable": "Plugin actions are not available in this client.",
+          "cannotOpenPanels": "This frame cannot open plugin panels.",
           "messageTooLarge": "Message exceeds the size limit.",
           "tooManyRequests": "Too many requests."
         },
@@ -20737,6 +20743,13 @@
           "featuredDetail": "most installed, one per category",
           "newlyAdded": "Newly added",
           "newlyAddedDetail": "across your catalogs"
+        },
+        "PluginPanelPlacement": {
+          "bottom": "Bottom",
+          "left": "Left sidebar",
+          "right": "Right sidebar",
+          "move": "Move panel",
+          "close": "Close panel"
         }
       },
       "agent-workspace-trust-decision": {
@@ -30768,6 +30781,29 @@
       "t0f9f5503": "GitHub's own VS Code themes: Light Default, Dark Default, Dark Dimmed and the high-contrast variants.",
       "t0b4f7e19": "Unofficial ports of VS Code's default color themes: Dark Modern, Light Modern, Dark+ and Light+.",
       "tc86eed7d": "A reviewed starter lifecycle for disposable Multipass workspaces."
+    },
+    "workspaceView": {
+      "revokeTitle": "Remove workspace access?",
+      "allowTitle": "Allow workspace access?",
+      "revokeDescription": "Remove permission to read and select tabs, see Git review status, and rename tabs in this workspace.",
+      "allowDescription": "Allow this plugin to read tab titles, select tabs, and see Git checkout and review status in this workspace. You can remove access in the plugin’s settings.",
+      "remove": "Remove access",
+      "save": "Save access",
+      "allow": "Allow access",
+      "rename": "Also allow renaming chat and terminal tabs",
+      "settingsTitle": "Workspace access",
+      "settingsRename": "Read tabs and reviews, select and rename tabs",
+      "settingsRead": "Read tabs and reviews, select tabs",
+      "fatigue": "Companion fatigue",
+      "fatigueDescription": "Share whether each verified companion is near its current session limit.",
+      "portraits": "Notification portraits",
+      "portraitsDescription": "Let Orca display companion portraits in notifications for matching terminals in this workspace.",
+      "scopeChanged": "The workspace view has changed.",
+      "activeOnly": "The workspace view uses the active workspace.",
+      "accessDenied": "Allow access to this workspace first.",
+      "targetChanged": "The tab or workspace has changed.",
+      "renameDenied": "Rename access is unavailable for this tab.",
+      "emptyTitle": "Enter a tab title."
     }
   },
   "checks": {

@@ -1,9 +1,11 @@
 import { create } from 'zustand'
+import type { PluginPanelPlacement } from '../../../../../shared/plugins/contributions/plugin-panel-placement'
 
 /** What `orca plugin shot` changes for one capture: never written to settings or the layout. */
 type PluginViewCaptureState = {
-  /** Right-sidebar panel width in CSS pixels, or null for the user's own. */
+  /** Panel width in CSS pixels, or null for the user's own. */
   panelWidth: number | null
+  panelPlacement: PluginPanelPlacement
   /** Paint Orca dark (true) or light (false), or null for the Appearance setting. */
   dark: boolean | null
   /** A capture is running: Orca's floating controls stay out of the picture. */
@@ -18,6 +20,7 @@ type PluginViewCaptureState = {
   begin: (overrides: {
     owner?: string
     panelWidth: number | null
+    panelPlacement?: PluginPanelPlacement
     dark: boolean | null
     editorFileId?: string | null
     editorSize?: { width: number; height: number } | null
@@ -29,6 +32,7 @@ type PluginViewCaptureState = {
 
 export const usePluginViewCaptureStore = create<PluginViewCaptureState>()((set) => ({
   panelWidth: null,
+  panelPlacement: 'right',
   dark: null,
   capturing: false,
   editorFileId: null,
@@ -39,6 +43,7 @@ export const usePluginViewCaptureStore = create<PluginViewCaptureState>()((set) 
     set((state) => ({
       editorFileId: null,
       editorSize: null,
+      panelPlacement: 'right',
       ...overrides,
       owner: owner ?? null,
       capturing: true,
@@ -56,6 +61,7 @@ export const usePluginViewCaptureStore = create<PluginViewCaptureState>()((set) 
         ? state
         : {
             panelWidth: null,
+            panelPlacement: 'right',
             dark: null,
             capturing: false,
             editorFileId: null,

@@ -1,3 +1,4 @@
+import type { WorkspaceCompanionsOptions } from './panels/plugin-workspace-companions'
 import type { PluginWorkerFactory } from './workers/worker-supervision/plugin-worker-startup'
 import type { KeybindingOverrides } from '../../shared/keybindings/types'
 import type {
@@ -10,6 +11,7 @@ import type { PluginAppearanceService } from './appearance/plugin-appearance-ser
 import type { PluginEditorTypographySource } from './appearance/plugin-editor-typography'
 
 export type PluginServiceOptions = {
+  workspaceCompanions?: WorkspaceCompanionsOptions
   userDataPath: string
   hostVersion: string
   isPluginSystemEnabled: () => boolean

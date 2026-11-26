@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pokémon Herd</title>
+    <link rel="stylesheet" href="./herd.css" />
+    <link rel="stylesheet" href="./catalog/picker.css" />
+    <link rel="stylesheet" href="./move-editor.css" />
+  </head>
+  <body data-view="world">
+    <header id="herd-heading">
+      <h1 id="workspace">Pokémon Herd</h1>
+      <span id="count"></span>
+    </header>
+    <section id="trainer" aria-label="Trainer" hidden>
+      <strong id="wallet"></strong>
+      <span id="work"></span>
+      <span id="candy" hidden></span>
+    </section>
+    <p role="status" id="progress-error" hidden></p>
+    <nav aria-label="Herd views" class="toolbar">
+      <button id="show-world" aria-controls="world" aria-pressed="true">World</button>
+      <button id="show-world-actions" aria-haspopup="true" aria-controls="world-actions">
+        World actions
+      </button>
+      <button id="show-party" aria-controls="herd" aria-pressed="false">Party</button>
+      <button type="button" id="open-trainer" aria-keyshortcuts="B Alt+Shift+B">Trainer</button>
+      <button
+        id="show-settings"
+        aria-controls="herd-settings"
+        aria-expanded="false"
+        aria-keyshortcuts="S"
+      >
+        Settings
+      </button>
+    </nav>
+    <section id="herd-settings" aria-label="Pokémon Herd settings" hidden>
+      <nav class="settings-pages" aria-label="Settings pages">
+        <button type="button" aria-controls="herd-guide" aria-pressed="false">Guide</button>
+        <button type="button" aria-controls="world-settings" aria-pressed="false">Settings</button>
+      </nav>
+      <div class="settings-content">
+        <article id="herd-guide" aria-labelledby="guide-title" hidden>
+          <h2 id="guide-title">How to play</h2>
+          <section>
+            <h3>Meet your companions</h3>
+            <p>
+              Each agent has a Pokémon. Click it in the World to focus its terminal. Right-click it,
+              or press Shift+F10 with it focused, to pet it, use an item, or teach moves. Agent work
+              earns Pokédollars and can trigger evolution.
+            </p>
+          </section>
+          <section>
+            <h3>Catch wild Pokémon</h3>
+            <p>
+              Click a visitor to collect its gift, then again to throw a ball. Set your ball or
+              Berry in World actions. Drag a companion onto the visitor to weaken it, or use the
+              encounter’s Battle controls. Low health helps you catch it. Stop before the visitor
+              faints.
+            </p>
+          </section>
+          <section>
+            <h3>Prepare for battle</h3>
+            <p>
+              Use Teach moves on a companion or a Trainer Party or Box card. Keep up to four moves
+              and save them for the selected form. Use Reset to default to restore its original set.
+              Turn on Choose moves against trainers to pick attacks yourself.
+            </p>
+            <p>
+              Use Spar in the encounter controls to train with another companion. When a raid egg
+              hatches, send a companion against the boss. Defeat it for a chance to catch it.
+            </p>
+          </section>
+          <section>
+            <h3>Explore the Trainer pages</h3>
+            <p>
+              Open Trainer or press B with the World focused. Buy balls in Shop, bring a Pokémon out
+              of the Box, or complete all three daily Research tasks to earn Ultra Balls and an
+              Azure Flute that calls a legendary visitor.
+            </p>
+          </section>
+          <section>
+            <h3>Make the Herd yours</h3>
+            <p>
+              Use Settings to adjust scenery, visitor frequency, evolution, and sounds. Trainer mode
+              limits new companions to caught species and the Kanto starters. Press S with the World
+              focused to reopen Settings.
+            </p>
+          </section>
+        </article>
+        <form id="world-settings" aria-label="World settings" hidden>
+          <fieldset>
+            <legend>Scenery</legend>
+            <label
+              >Rows
+              <select name="rows">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </label>
+            <label
+              >Pokémon size
+              <select name="scale">
+                <option value="0.5">Small</option>
+                <option value="0.75" selected>Medium</option>
+                <option value="1">Large</option>
+                <option value="1.25">Extra large</option>
+              </select>
+            </label>
+            <label
+              >Background
+              <select name="background">
+                <option value="scenery">Scenery</option>
+                <option value="plain">Plain</option>
+              </select>
+            </label>
+            <label
+              >Sky
+              <select name="sky">
+                <option value="muted">Muted</option>
+                <option value="bright">Bright</option>
+              </select>
+            </label>
+            <label><input type="checkbox" name="weather" checked /> Weather</label>
+            <label><input type="checkbox" name="campfire" checked /> Campfire</label>
+            <label><input type="checkbox" name="tags" checked /> Name tags</label>
+          </fieldset>
+          <fieldset>
+            <legend>Encounters</legend>
+            <label
+              >Wild visitors
+              <select name="visitors">
+                <option value="off">Off</option>
+                <option value="rare">Rare (10–25 min)</option>
+                <option value="often" selected>Often (3–8 min)</option>
+                <option value="lots">Frequent (1–3 min)</option>
+              </select>
+            </label>
+            <label><input type="checkbox" name="outbreaks" checked /> Mass outbreaks</label>
+            <label><input type="checkbox" name="raids" checked /> New raids</label>
+            <label><input type="checkbox" name="spar" checked /> World sparring</label>
+            <label><input type="checkbox" name="family" checked /> Show sub-agents</label>
+            <label><input type="checkbox" name="tired" checked /> Tired near the limit</label>
+            <label
+              ><input type="checkbox" name="chooseMoves" /> Choose moves against trainers</label
+            >
+          </fieldset>
+          <fieldset>
+            <legend>Companion care</legend>
+            <label><input type="checkbox" name="evolve" checked /> Evolve through work</label>
+            <label><input type="checkbox" name="pickup" checked /> Pick up items while idle</label>
+          </fieldset>
+          <fieldset>
+            <legend>Companion selection</legend>
+            <label><input type="checkbox" name="trainer" /> Trainer mode</label>
+            <label><input type="checkbox" name="legendsOpen" /> Open legendary Pokémon</label>
+            <small
+              >Trainer mode limits new companions to caught species and the Kanto starters.</small
+            >
+          </fieldset>
+          <fieldset>
+            <legend>Audio</legend>
+            <label><input type="checkbox" name="battleSounds" /> Battle sounds</label>
+            <label><input type="checkbox" name="cryBlocked" /> Cry when an agent needs input</label>
+            <label><input type="checkbox" name="cryDone" /> Cry when an agent finishes</label>
+            <label><input type="checkbox" name="cryRare" /> Cry when a rare visitor appears</label>
+            <label><input type="checkbox" name="sound" /> Pet and sparring sounds</label>
+            <button type="button" id="preview-sound">Preview sound</button>
+          </fieldset>
+          <button type="submit">Save settings</button>
+          <p role="status" id="settings-status"></p>
+          <fieldset id="workspace-companions" hidden>
+            <legend>Workspace access</legend>
+            <button type="button" data-companion-access="fatigue" aria-pressed="false">
+              Companion fatigue
+            </button>
+            <button type="button" data-companion-access="portraits" aria-pressed="false">
+              Notification portraits
+            </button>
+            <p role="status"></p>
+          </fieldset>
+        </form>
+      </div>
+    </section>
+    <p role="status" id="message">Loading agents…</p>
+    <button id="retry" hidden>Retry</button>
+    <dialog id="trainer-game" class="trainer-dialog" aria-labelledby="trainer-game-title">
+      <header>
+        <h2 id="trainer-game-title">Trainer</h2>
+        <strong id="trainer-game-wallet"></strong>
+        <button type="button" id="close-trainer">Close</button>
+      </header>
+      <nav id="trainer-tabs" aria-label="Trainer pages"></nav>
+      <div id="trainer-view"></div>
+      <footer>
+        <span role="status" id="trainer-feedback"></span>
+        <button type="button" id="trainer-action-retry" hidden>Retry action</button>
+      </footer>
+    </dialog>
+    <div id="world"></div>
+    <p id="care-status" role="status"></p>
+    <p id="focus-status" role="status" hidden></p>
+    <section id="encounters" aria-label="Encounters"></section>
+    <ul id="herd" aria-label="Agent Pokémon" hidden></ul>
+    <div id="world-actions" popover="auto" role="group" aria-label="World actions"></div>
+    <template id="companion">
+      <li>
+        <div class="field" aria-hidden="true">
+          <div class="trail"><canvas class="sprite" width="80" height="80"></canvas></div>
+        </div>
+        <div class="caption">
+          <div class="identity"><strong></strong><small></small></div>
+          <span class="state"></span>
+        </div>
+        <small class="task" hidden></small>
+        <div class="progress" hidden>
+          <span class="career"></span>
+          <span class="growth"></span>
+          <button type="button" class="care">Care</button>
+        </div>
+      </li>
+    </template>
+    <script type="module" src="./herd.js"></script>
+  </body>
+</html>

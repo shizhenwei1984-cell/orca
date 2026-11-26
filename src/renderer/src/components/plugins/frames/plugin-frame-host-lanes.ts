@@ -1,3 +1,11 @@
+import {
+  WORKSPACE_VIEW_METHODS,
+  workspaceViewFrameMethods
+} from '../../../../../shared/plugins/frames/plugin-workspace-view'
+import {
+  MOVE_PLUGIN_PANEL_METHOD,
+  OPEN_PLUGIN_PANEL_METHOD
+} from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import { PLUGIN_DECLARATIVE_RENDER_LANE } from '../../../../../shared/plugins/declarative/plugin-declarative-limits'
 import { PLUGIN_DECLARATIVE_MESSAGES } from '../../../../../shared/plugins/declarative/plugin-declarative-message-names'
 import type { PluginFrameHello } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
@@ -72,7 +80,7 @@ export function pluginFrameHello(
     surface,
     // Why derived: an iframe must not claim a minor whose methods it is never offered.
     api: { major: PLUGIN_HOST_API_MAJOR, minor: pluginHostApiMinorFor(methods) },
-    methods,
+    methods: [...methods, ...workspaceViewFrameMethods(surface, transport === 'guest')],
     theme: currentPluginFrameTheme(),
     locale: getIntlLocale()
   }
@@ -90,7 +98,13 @@ export function createPluginFrameGestureGate(
 ): (method: string, context: PluginFrameMessageContext) => boolean {
   let consumed = 0
   return (method, context) => {
-    if (getPluginHostMethodSpec(method)?.userActivation !== true) {
+    if (
+      method !== OPEN_PLUGIN_PANEL_METHOD &&
+      method !== WORKSPACE_VIEW_METHODS.access &&
+      method !== WORKSPACE_VIEW_METHODS.refresh &&
+      method !== MOVE_PLUGIN_PANEL_METHOD &&
+      getPluginHostMethodSpec(method)?.userActivation !== true
+    ) {
       return true
     }
     if (consumeHostActivation) {

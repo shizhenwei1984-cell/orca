@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { desktopWorkspaceCompanions } from '../../plugins/panels/plugin-companion-fatigue'
 import { PluginImageCache } from '../../plugins/media/plugin-image-cache'
 import { installPluginImageProtocolHandler } from '../../plugins/media/plugin-image-protocol'
 import { getPluginDesktopFrameServices } from '../../plugins/panels/desktop-actions/plugin-frame-desktop-services'
@@ -114,7 +115,8 @@ export async function initializeMainProcessPlugins(core: DesktopCore, store: Sto
       revokePluginConsent({ store, pluginService: core.pluginService, pluginKey })
   })
   const bundledPluginRoot = bundledPluginRootForApp(app)
-  core.pluginService = new PluginService({
+  const pluginService = new PluginService({
+    workspaceCompanions: desktopWorkspaceCompanions(runtime, core, store),
     userDataPath: app.getPath('userData'),
     hostVersion: pluginHostVersion(app.getVersion()),
     // Feature flag: with the setting off, discovery returns nothing and no
@@ -137,7 +139,7 @@ export async function initializeMainProcessPlugins(core: DesktopCore, store: Sto
     editorTypography: bindPluginEditorTypography(store, () => core.pluginService),
     bundledPluginRoot
   })
-  const pluginService = core.pluginService
+  core.pluginService = pluginService
   core.stopTeamPluginPolicy?.()
   core.stopTeamPluginPolicy = watchTeamPluginPolicy(
     pluginService,
@@ -179,15 +181,14 @@ export async function initializeMainProcessPlugins(core: DesktopCore, store: Sto
   })
   core.pluginAutoUpdater = pluginAutoUpdater
   core.pluginUpdateReviewNotices = new PluginUpdateReviewNotices({
-    pluginsDataDir: getPluginsDataDir(app.getPath('userData')),
+    pluginsDataDir,
     getHeld: () => pluginAutoUpdater.getHeldForReview(),
     findName: (pluginKey) => pluginService.findValidPlugin(pluginKey)?.manifest.name ?? null,
     isKillListed: (pluginKey) => Boolean(getPluginBlock(pluginKey))
   })
-  // Why packaged only (like the safety list): dev and e2e runs must not update fixtures unasked.
-  const autoUpdateScheduled = app.isPackaged || process.env.ORCA_PLUGIN_AUTO_UPDATE === '1'
   const syncPluginAutoUpdate = (runNow: boolean): void => {
-    if (!autoUpdateScheduled) {
+    // Why packaged only (like the safety list): dev and e2e runs must not update fixtures unasked.
+    if (!app.isPackaged && process.env.ORCA_PLUGIN_AUTO_UPDATE !== '1') {
       return
     }
     const enabled =

@@ -1,4 +1,10 @@
-import { EDITOR_METHODS, FRAME_EVENTS, type PluginFrameTheme } from './plugin-frame-bridge'
+import { workspaceViewFrameMethods } from './plugin-workspace-view'
+import {
+  EDITOR_METHODS,
+  FRAME_EVENTS,
+  OPEN_PLUGIN_PANEL_METHOD,
+  type PluginFrameTheme
+} from './plugin-frame-bridge'
 import { PLUGIN_ERROR_CODES, PLUGIN_PROTOCOL_VERSION } from './plugin-protocol'
 import { PLUGIN_DECLARATIVE_POST_GLOBAL, PLUGIN_FRAME_TRANSPORT_GLOBAL } from './plugin-frame-guest'
 import { PLUGIN_HOST_API_MAJOR } from '../workers/plugin-host-api-major'
@@ -48,13 +54,14 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
     protocol: PLUGIN_PROTOCOL_VERSION,
     surface,
     api: { major: PLUGIN_HOST_API_MAJOR, minor: pluginHostApiMinorFor(methods) },
-    methods,
+    methods: [...methods, ...workspaceViewFrameMethods(surface, transport !== 'parent')],
     codes: PLUGIN_ERROR_CODES,
     events: FRAME_EVENTS,
     editor: EDITOR_METHODS,
     // Iframes get no user-gesture API at all: Orca cannot verify their gestures. A components
     // panel's hidden guest never has activation; its `orca` module routes these through the
     // press grant with host.call instead.
+    openPanel: surface === 'panel' && transport === 'guest' ? OPEN_PLUGIN_PANEL_METHOD : null,
     user: transport === 'guest' ? PLUGIN_FRAME_USER_METHODS : null,
     tokensStyleId: PANEL_SHELL_TOKENS_STYLE_ID,
     maxPending: 256,
@@ -178,6 +185,8 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
       applyTheme(m.payload)
     } else if (m.kind === 'evt' && m.event === E.push) {
       receivePush(m.payload)
+    } else if (m.kind === 'evt' && m.event === E.panelActivated) {
+      Promise.all(emit(E.panelActivated, m.payload)).catch(function (error) { console.error(error) })
     } else if (m.kind === 'evt' && m.event === E.editorDocument && C.surface === 'editor') {
       latest = Object.freeze(m.payload)
       waiting.splice(0).forEach(function (resolve) { resolve(latest) })
@@ -200,26 +209,7 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
     }),
     on: on
   }
-${PLUGIN_FRAME_FACADES_SCRIPT}  if (C.user) {
-    orca.shell = Object.freeze({
-      openExternal: function (url) { return userCall(C.user.openExternal, { url: String(url) }) }
-    })
-    orca.files = Object.freeze({
-      saveAs: function (options) {
-        var o = options || {}
-        var data = ArrayBuffer.isView(o.data)
-          ? o.data.buffer.slice(o.data.byteOffset, o.data.byteOffset + o.data.byteLength)
-          : o.data
-        var params = { data: data }
-        if (o.suggestedName !== undefined) params.suggestedName = o.suggestedName
-        if (o.mimeType !== undefined) params.mimeType = o.mimeType
-        return userCall(C.user.saveAs, params).then(function (result) {
-          return { status: result && result.status === 'saved' ? 'saved' : 'cancelled' }
-        })
-      }
-    })
-  }
-  Object.defineProperty(orca, 'api', { get: function () { return api }, enumerable: true })
+${PLUGIN_FRAME_FACADES_SCRIPT}  Object.defineProperty(orca, 'api', { get: function () { return api }, enumerable: true })
   Object.defineProperty(orca, 'locale', {
     get: function () { return locale || navigator.language }, enumerable: true
   })

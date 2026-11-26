@@ -1,0 +1,73 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: Apache-2.0. Adapted for Orca from Pokémon Sidebar. See NOTICE. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pokémon Sidebar</title>
+    <link rel="stylesheet" href="./sidebar.css" />
+    <link rel="stylesheet" href="../panel/catalog/picker.css" />
+    <link rel="stylesheet" href="../panel/move-editor.css" />
+  </head>
+  <body>
+    <header>
+      <nav aria-label="Sidebar views">
+        <button id="workspaces" type="button" aria-pressed="true">Workspaces</button>
+        <button id="agents" type="button" aria-pressed="false">
+          Agents <span id="count"></span>
+        </button>
+      </nav>
+      <div id="filters">
+        <input
+          id="search"
+          type="search"
+          aria-label="Search workspaces and agents"
+          placeholder="Search"
+        />
+        <div id="agent-filters">
+          <select id="sort" aria-label="Group agents">
+            <option value="priority">Priority</option>
+            <option value="workspace">Workspace</option>
+            <option value="project">Project</option>
+            <option value="prefix">Prefix</option>
+          </select>
+          <select id="status" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            <option value="blocked">Blocked</option>
+            <option value="done">Done</option>
+            <option value="working">Working</option>
+            <option value="waiting">Waiting for input</option>
+          </select>
+        </div>
+      </div>
+    </header>
+    <main id="list" aria-label="Workspace and agent navigation" aria-busy="true"></main>
+    <p id="feedback" role="status">Loading workspaces…</p>
+    <footer>
+      <button id="rail" type="button" aria-pressed="false">Collapse</button>
+      <div class="footer-tools">
+        <button type="button" popovertarget="preferences">View options</button>
+        <button id="refresh" type="button">Refresh</button>
+      </div>
+    </footer>
+    <div id="preferences" popover aria-label="View options">
+      <label><input type="checkbox" id="stacked" /> Stack workspaces and agents</label>
+      <label><input type="checkbox" id="hidden-projects" /> Show hidden projects</label>
+      <button id="hide-sidebar" type="button">Hide right sidebar</button>
+    </div>
+    <div id="actions" popover aria-label="Actions"></div>
+    <dialog id="confirm" aria-labelledby="confirm-title">
+      <form id="confirm-form">
+        <h2 id="confirm-title"></h2>
+        <label id="confirm-field">Name <input id="confirm-name" maxlength="200" required /></label>
+        <p id="confirm-message"></p>
+        <p id="confirm-error" role="status"></p>
+        <div class="dialog-actions">
+          <button id="cancel" type="button">Cancel</button>
+          <button id="submit" type="submit"></button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="./sidebar.mjs"></script>
+  </body>
+</html>

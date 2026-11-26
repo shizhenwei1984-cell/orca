@@ -1,0 +1,247 @@
+.catalog-picker {
+  box-sizing: border-box;
+  width: min(640px, calc(100% - 16px));
+  max-width: none;
+  max-height: calc(100% - 16px);
+  padding: 16px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-popover);
+  color: var(--orca-popover-foreground);
+  font: 14px var(--orca-font-sans, sans-serif);
+  overflow-wrap: anywhere;
+}
+
+.catalog-picker[open] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.catalog-picker [hidden] {
+  display: none;
+}
+
+.catalog-picker h2,
+.catalog-picker h3,
+.catalog-picker p {
+  margin: 0;
+}
+
+.catalog-picker h2 {
+  font-size: 16px;
+}
+
+.catalog-picker h3 {
+  font-size: 14px;
+}
+
+.catalog-picker button,
+.catalog-picker input,
+.catalog-picker select {
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  accent-color: var(--orca-primary);
+}
+
+.catalog-picker button,
+.catalog-picker input[type='search'],
+.catalog-picker select {
+  min-height: 28px;
+  border: 1px solid var(--orca-border);
+  border-radius: calc(var(--orca-radius) - 2px);
+  background: var(--orca-background);
+  padding: 2px 8px;
+}
+
+.catalog-picker button:not(:disabled):hover {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+
+.catalog-picker button:disabled {
+  opacity: 0.5;
+}
+
+.catalog-picker :focus-visible {
+  outline: 2px solid var(--orca-ring);
+  outline-offset: -2px;
+}
+
+.catalog-heading,
+.catalog-toolbar,
+.catalog-pagination,
+.catalog-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.catalog-picker [data-cancel] {
+  border-color: transparent;
+  background: transparent;
+}
+
+.catalog-search,
+.catalog-search > label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.catalog-picker details {
+  color: var(--orca-muted-foreground);
+}
+
+.catalog-picker summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.catalog-filters,
+.catalog-variants {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.catalog-filters > label,
+.catalog-variants > label {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.catalog-picker small,
+.catalog-toolbar [role='status'],
+.catalog-pagination span,
+.catalog-preview p,
+.catalog-art [role='status'] {
+  font-size: 12px;
+  white-space: normal;
+  color: var(--orca-muted-foreground);
+}
+
+.catalog-list {
+  min-height: 44px;
+  max-height: min(28vh, 240px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+
+.catalog-list button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+
+.catalog-list [data-current='true'],
+.catalog-list [aria-pressed='true'] {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
+}
+
+.catalog-list [aria-pressed='true'] {
+  border-color: var(--orca-ring);
+}
+
+.catalog-preview {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+}
+
+.catalog-art {
+  display: grid;
+  width: min(100%, 144px);
+  min-height: 108px;
+  place-items: center;
+  align-content: center;
+  background: var(--orca-muted);
+  border-radius: calc(var(--orca-radius) - 2px);
+  text-align: center;
+}
+
+.catalog-art canvas {
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+
+.catalog-preview-details {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.catalog-preview-details p:not(:empty) {
+  margin-top: 4px;
+}
+
+.catalog-picker [data-choose],
+.catalog-picker [data-choose]:not(:disabled):hover {
+  flex: none;
+  background: var(--orca-primary);
+  color: var(--orca-primary-foreground);
+}
+
+.catalog-preview-actions,
+.catalog-evolutions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-start: 8px;
+}
+
+.catalog-evolutions button[aria-pressed='true'] {
+  border-color: var(--orca-ring);
+  background: var(--orca-accent);
+}
+
+.catalog-picker [data-abilities] {
+  margin-block-start: 8px;
+  font-size: 12px;
+}
+
+.catalog-picker [data-abilities] ul {
+  margin-block: 4px;
+  padding-inline-start: 20px;
+}
+
+.catalog-box-preview h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
+
+.catalog-box-preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+}

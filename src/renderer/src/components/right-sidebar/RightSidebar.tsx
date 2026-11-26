@@ -74,7 +74,9 @@ function RightSidebarInner(): React.JSX.Element {
   const [focusVaultSearch, setFocusVaultSearch] = useState(false)
   const userRightSidebarWidth = useAppStore((s) => s.rightSidebarWidth)
   // `orca plugin shot --width` sizes the panel for one capture without touching the saved width.
-  const captureWidth = usePluginViewCaptureStore((s) => s.panelWidth)
+  const captureWidth = usePluginViewCaptureStore((s) =>
+    s.panelPlacement === 'right' ? s.panelWidth : null
+  )
   const rightSidebarWidth = captureWidth ?? userRightSidebarWidth
   const setRightSidebarWidth = useAppStore((s) => s.setRightSidebarWidth)
   const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar)

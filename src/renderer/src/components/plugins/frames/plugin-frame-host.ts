@@ -1,6 +1,8 @@
 import {
   FRAME_EVENTS,
   PANEL_CONTROL_MESSAGE_MAX_BYTES,
+  MOVE_PLUGIN_PANEL_METHOD,
+  OPEN_PLUGIN_PANEL_METHOD,
   readPanelPongId
 } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
@@ -63,6 +65,7 @@ export type PluginFrameDeclarativeChannel = {
 
 export type PluginFrameHostOptions = {
   surface: 'panel' | 'editor'
+  onPanelPreferredHeight?: (height: number) => void
   declarative?: PluginFrameDeclarativeChannel
   getFrameWindow: () => PluginFrameWindow | null
   /** Null until main issues one; host calls answer `unavailable` meanwhile. */
@@ -71,6 +74,9 @@ export type PluginFrameHostOptions = {
   /** False once the frame document/session has been replaced. */
   isActive?: () => boolean
   onPong?: (pingId: number) => void
+  onPanelActivationReady?: (workspaceId: unknown) => void
+  onOpenPanel?: (params: unknown) => PluginHostCallOutcome
+  onMovePanel?: (params: unknown) => PluginHostCallOutcome
   editor?: PluginFrameEditorChannel
   /** Injectable for tests; defaults to the shared per-plugin budget. */
   budget?: PanelMessageBudget
@@ -223,6 +229,18 @@ export function createPluginFrameEnvelopeHandler(
             pluginEvent(FRAME_EVENTS.hello, pluginFrameHello(options.surface, context.transport))
           )
           options.editor?.onReady()
+        } else if (message.event === FRAME_EVENTS.panelPreferredHeight) {
+          const height = message.payload
+          if (
+            context.transport === 'guest' &&
+            typeof height === 'number' &&
+            Number.isSafeInteger(height) &&
+            height > 0
+          ) {
+            options.onPanelPreferredHeight?.(height)
+          }
+        } else if (message.event === FRAME_EVENTS.panelActivationReady) {
+          options.onPanelActivationReady?.(message.payload)
         } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.render) {
           options.declarative?.onRender(message.payload)
         } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.error) {
@@ -277,6 +295,33 @@ export function createPluginFrameEnvelopeHandler(
     }
     if (!sessionToken) {
       respond(pluginFailure(request.id, pluginError('unavailable', 'plugin session is not ready')))
+      return
+    }
+    if (request.method === OPEN_PLUGIN_PANEL_METHOD) {
+      const result = options.onOpenPanel?.(request.params) ?? {
+        ok: false as const,
+        code: 'not_permitted' as const,
+        error: translate(
+          'auto.components.rightSidebar.pluginPanelBridgeHost.cannotOpenPanels',
+          'This frame cannot open plugin panels.'
+        )
+      }
+      respond(pluginOutcomeResponse(request.id, result))
+      return
+    }
+    if (request.method === MOVE_PLUGIN_PANEL_METHOD) {
+      const result =
+        context.transport === 'guest' && !options.declarative && options.isActive?.() !== false
+          ? options.onMovePanel?.(request.params)
+          : undefined
+      respond(
+        result
+          ? pluginOutcomeResponse(request.id, result)
+          : pluginFailure(
+              request.id,
+              pluginError('not_permitted', 'This frame cannot move panels.')
+            )
+      )
       return
     }
     const settled = options.trackHostCall?.()

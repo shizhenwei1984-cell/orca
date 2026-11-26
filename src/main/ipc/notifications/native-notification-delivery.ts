@@ -19,6 +19,7 @@ import {
 } from './native-notification-lifecycle'
 import { recordNotificationDeliveryOutcome } from './notification-permission-probe'
 import { getTrustedUIRendererWindow } from '../ui'
+import { notificationCompanionPortrait } from '../../notifications/companion-notification-portraits'
 import {
   cancelPendingDesktopNotification,
   closeDesktopNotification,
@@ -33,8 +34,10 @@ export function deliverNativeNotification(
   if (getEffectiveNotificationSoundId(settings) !== 'system') {
     notificationOptions.silent = true
   }
+  const icon = notificationCompanionPortrait(args)
   const notification = new Notification({
     ...notificationOptions,
+    ...(icon ? { icon } : {}),
     ...macosNotificationIdentity(args)
   })
   if (args.notificationId) {

@@ -1,0 +1,52 @@
+// The mod's own settings (the Settings dialog), in shared state as { v: 1, ... }. Pure.
+// Where the strip sits, its rows and background live in the layout instead (place.js).
+
+export const DEFAULTS = {
+  cryBlocked: false, // its Pokémon cries when an agent needs you
+  cryDone: false, // and when one finishes
+  cryRare: true,
+  battleSounds: false, // battles' sounds (gathering, a shot, a hit, a ball's shakes): the 🔇 on the strip // and a rare wild one (shiny, Alpha, legendary) as it walks in
+  evolve: true, // Pokémon evolve as their agents work
+  pickup: true, // idle Pokémon find items
+  weather: true, // rain while agents wait on you, a storm when they wait long
+  spar: true, // two idle Pokémon now and then spar
+  chooseMoves: false, // against a trainer: you pick each move (chips over yours, CHOOSE_MS), else the AI
+  family: true, // a sub-agent is its agent's Pokémon, younger, and follows it
+  campfire: true, // at night with every agent resting, the herd sleeps round a fire
+  tired: true, // near the 5-hour limit (Usage Limits) the herd sweats and walks slower
+  visitors: 'often', // how often a wild Pokémon walks across the strip: VISIT_EVERY
+  newFrom: 'any', // new agents' Pokémon: from every species ("any") or from the favourites ("favorites")
+  autoUpdate: true, // a newer version out on GitHub: installed by itself (else the Update pill)
+  trainer: false, // Trainer mode: only Pokémon you caught (and the starters) can be chosen or come to new agents
+  raids: true, // every 20 jobs a day, a Raid egg: its boss is hit by your agents' finished jobs
+  outbreaks: true, // once a day, a Mass Outbreak: one species walks by for 20 minutes
+  legendsOpen: false, // legendary Pokémon open to everyone, without catching one first
+  sidebar: false // publish shared "agent-icons" / "agent-cards" for Better Sidebar (opt-in: it needs a patch)
+}
+
+// Visitors: off, or every so many minutes, [from, to] (a random time in between).
+export const VISIT_EVERY = { off: null, rare: [10, 25], often: [3, 8], lots: [1, 3] }
+
+export function loadSettings(raw) {
+  const out = { ...DEFAULTS }
+  if (raw?.v !== 1) {
+    return out
+  }
+  for (const k of Object.keys(DEFAULTS)) {
+    if (typeof DEFAULTS[k] === 'boolean' && typeof raw[k] === 'boolean') {
+      out[k] = raw[k]
+    }
+  }
+  // Visitors was a switch before it had a pace: on is the default pace, off stays off.
+  if (raw.newFrom === 'favorites') {
+    out.newFrom = 'favorites'
+  }
+  if (raw.visitors === false) {
+    out.visitors = 'off'
+  } else if (typeof raw.visitors === 'string' && Object.hasOwn(VISIT_EVERY, raw.visitors)) {
+    out.visitors = raw.visitors
+  }
+  return out
+}
+
+export const withSetting = (s, key, value) => ({ v: 1, ...s, [key]: value })

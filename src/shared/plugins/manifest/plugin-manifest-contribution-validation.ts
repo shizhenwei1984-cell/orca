@@ -1,4 +1,5 @@
 import type { RefinementCtx } from 'zod'
+import type { PluginCommandPanelTarget } from '../contributions/plugin-command-contribution'
 import { isPluginCommandAliasActionId } from '../contributions/plugin-command-actions'
 import { getKeybindingConflictIdentity } from '../../keybindings/matching-key'
 import {
@@ -14,9 +15,10 @@ type PathContribution = { path: string }
 type ContributionValidationManifest = {
   main?: string
   contributes: {
-    panels: IdentifiedContribution[]
+    panels: (IdentifiedContribution & { actions?: string[] })[]
     commands: (IdentifiedContribution & {
       action?: string
+      openPanel?: PluginCommandPanelTarget
       replaces?: string
       when?: 'global' | 'workspace'
     })[]
@@ -167,6 +169,32 @@ export function validatePluginManifestContributions(
   validatePluginStatusBarItems(manifest.contributes, ctx)
   const commands = new Map(manifest.contributes.commands.map((command) => [command.id, command]))
   for (const [index, command] of manifest.contributes.commands.entries()) {
+    if (command.openPanel) {
+      const panel = manifest.contributes.panels.find(({ id }) => id === command.openPanel?.panel)
+      if (
+        !panel?.actions?.includes(command.openPanel.action) ||
+        command.when !== 'workspace' ||
+        command.action ||
+        command.replaces
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['contributes', 'commands', index, 'openPanel'],
+          message:
+            'requires a declared action in a same-plugin HTML panel and when "workspace", without action or replaces'
+        })
+      }
+      if (
+        command.openPanel.activeTerminal &&
+        !manifest.capabilities.some(({ kind }) => kind === 'workspace:read')
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['contributes', 'commands', index, 'openPanel', 'activeTerminal'],
+          message: 'requires the "workspace:read" capability'
+        })
+      }
+    }
     if (command.action !== undefined && !isPluginCommandAliasActionId(command.action)) {
       ctx.addIssue({
         code: 'custom',
@@ -198,7 +226,9 @@ export function validatePluginManifestContributions(
 
   if (
     !manifest.main &&
-    manifest.contributes.commands.some((command) => command.action === undefined)
+    manifest.contributes.commands.some(
+      (command) => command.action === undefined && command.openPanel === undefined
+    )
   ) {
     ctx.addIssue({
       code: 'custom',

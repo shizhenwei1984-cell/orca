@@ -75,6 +75,8 @@ export function installAgentTaskCompleteNotify(session: ConnectPanePtySession): 
       )
     }
 
+    const ptyId = session.transport.getPtyId()
+    const incarnationId = session.remotePtyIncarnationId
     const dispatch = (): void => {
       session.clearPendingAgentTaskCompleteNotification()
       if (
@@ -94,7 +96,8 @@ export function installAgentTaskCompleteNotify(session: ConnectPanePtySession): 
         source: 'agent-task-complete',
         terminalTitle: title,
         paneKey: session.cacheKey,
-        ptyId: session.transport.getPtyId(),
+        ptyId,
+        incarnationId,
         workspaceOwner: captureNotificationTransportOwner(session.transport),
         ...(options.agentCompletionSource
           ? { agentCompletionSource: options.agentCompletionSource }

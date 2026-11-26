@@ -20,9 +20,11 @@ import {
 } from '@/store/plugins/catalog/plugin-contribution-catalog'
 import { useTranslate } from '@/i18n/use-translate'
 import { isWebClientLocation } from '@/app-shell/platform/web-client-location'
+import { PluginPanelPlacementControls } from '../../plugins/view/PluginPanelPlacementControls'
 
 type PluginPanelProps = {
   tabKey: string
+  onPanelPreferredHeight?: (height: number) => void
 }
 
 function PluginPanelMessage({ children }: { children: React.ReactNode }): React.JSX.Element {
@@ -33,13 +35,15 @@ function PluginPanelMessage({ children }: { children: React.ReactNode }): React.
   )
 }
 
-function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
+function PluginPanelContent({
+  panel,
+  tabKey,
+  onPanelPreferredHeight
+}: PluginPanelProps & {
+  panel: ReturnType<typeof usePluginPanels>[number] | null
+}): React.JSX.Element {
   const t = useTranslate()
-  const panels = usePluginPanels()
   const setPanelHealth = usePluginPanelsStore((state) => state.setPanelHealth)
-  const panel = isPluginPanelTabKey(tabKey)
-    ? (panels.find((entry) => entry.tabKey === tabKey) ?? null)
-    : null
   const frameRef = useRef<PluginFrameElement | null>(null)
   const { entry, markUnresponsive, remountGone } = usePluginFrameEntry(
     'panel',
@@ -57,10 +61,12 @@ function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
   const panelFrameKey = entry.status === 'ready' ? `${tabKey}:${entry.revision}` : null
   const { onFrameLoad } = usePluginFrameHost({
     surface: 'panel',
+    panelTabKey: panel?.tabKey,
     frameRef,
     // Why null: a declarative panel's own host wires its hidden guest instead.
     frameKey: declarative ? null : panelFrameKey,
     sessionToken: entry.status === 'ready' ? entry.sessionToken : null,
+    onPanelPreferredHeight,
     onUnresponsive: markUnresponsive,
     onGuestGone: remountGone
   })
@@ -159,6 +165,25 @@ function PluginPanel({ tabKey }: PluginPanelProps): React.JSX.Element {
       onLoad={onFrameLoad}
       title={panel.title}
     />
+  )
+}
+
+function PluginPanel({ tabKey, onPanelPreferredHeight }: PluginPanelProps): React.JSX.Element {
+  const panels = usePluginPanels()
+  const panel = isPluginPanelTabKey(tabKey)
+    ? (panels.find((entry) => entry.tabKey === tabKey) ?? null)
+    : null
+  return (
+    <>
+      {panel?.defaultPlacement && !onPanelPreferredHeight ? (
+        <PluginPanelPlacementControls panel={panel} />
+      ) : null}
+      <PluginPanelContent
+        panel={panel}
+        tabKey={tabKey}
+        onPanelPreferredHeight={onPanelPreferredHeight}
+      />
+    </>
   )
 }
 

@@ -2,11 +2,13 @@ import { z } from 'zod'
 import { safePluginDisplayText } from '../manifest/plugin-display-text'
 import { pluginIdSchema, pluginRelativePathSchema } from '../manifest/plugin-manifest-fields'
 import { PLUGIN_ENUM_SINCE_KEY } from '../manifest/plugin-engine-floor-keys'
+import { PLUGIN_PANEL_PLACEMENTS } from './plugin-panel-placement'
 import {
   pluginPathFieldDoc,
   pluginFieldDoc,
   PLUGIN_PANEL_PATH_ICON_SINCE,
   PLUGIN_PANEL_UI_SINCE,
+  PLUGIN_PANEL_PLACEMENT_SINCE,
   PLUGIN_SCHEMA_SINCE_V1,
   PLUGIN_SOURCE_MODULES_SINCE
 } from '../manifest/plugin-schema-field-docs'
@@ -18,6 +20,8 @@ import {
 } from './plugin-panel-path-icon'
 
 export const PLUGIN_PANEL_LIMIT = 64
+export const PLUGIN_PANEL_ACTIVATION_SINCE = '1.4.274'
+export const pluginPanelActionIdSchema = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/)
 
 /** Icons a panel (and a component panel's controls) may name; the renderer bundles exactly
  *  these. One vocabulary for manifests and components. Grow additively, with a since below. */
@@ -140,6 +144,18 @@ export const pluginPanelContributionSchema = z
         ['dist/panel.html']
       )
     ),
+    actions: z
+      .array(pluginPanelActionIdSchema)
+      .min(1)
+      .max(16)
+      .optional()
+      .meta(
+        pluginFieldDoc(
+          'Action IDs accepted by this HTML panel. A command can target one, as can another panel of this plugin during a person’s click or key press.',
+          PLUGIN_PANEL_ACTIVATION_SINCE,
+          [['show-report']]
+        )
+      ),
     ui: z
       .enum(PLUGIN_PANEL_UI_KINDS)
       .optional()
@@ -149,6 +165,16 @@ export const pluginPanelContributionSchema = z
           PLUGIN_PANEL_UI_SINCE,
           ['components']
         )
+      ),
+    defaultPlacement: z
+      .enum(PLUGIN_PANEL_PLACEMENTS)
+      .optional()
+      .meta(
+        pluginFieldDoc(
+          'Opts into movable desktop workspace panels and sets the initial position. A user can move it between the bottom, left sidebar, and right sidebar. Without this field the panel stays in the right sidebar.',
+          PLUGIN_PANEL_PLACEMENT_SINCE,
+          ['bottom']
+        )
       )
   })
   .strict()
@@ -156,6 +182,15 @@ export const pluginPanelContributionSchema = z
     path: ['entry'],
     message: 'a components panel entry must be a .js, .mjs, .ts, .tsx, .mts or .jsx module'
   })
+  .refine(
+    (panel) =>
+      !panel.actions ||
+      (panel.ui !== 'components' && new Set(panel.actions).size === panel.actions.length),
+    {
+      path: ['actions'],
+      message: 'actions must be unique and belong to an HTML panel'
+    }
+  )
   .meta({
     id: 'PanelContribution',
     description: 'A sidebar panel. Requires the `sandboxed-ui` execution profile or higher.'

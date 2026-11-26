@@ -106,7 +106,7 @@ export class PluginWorkerController {
       }
       const declaredCommands = new Set(
         plugin.manifest.contributes.commands
-          .filter((command) => command.action === undefined)
+          .filter((command) => command.action === undefined && command.openPanel === undefined)
           .map((command) => command.id)
       )
       const undeclaredCommand = handle.commands.find((command) => !declaredCommands.has(command))

@@ -40,6 +40,8 @@ import { PROJECTS_SECTION_GROUP_KEY } from '../../../../shared/sidebar-list/sect
 import { useBotsEnabled } from '@/lib/bot-catalog'
 import { StartupWorktreeRefreshStatus } from './worktree-list/listing/StartupWorktreeRefreshStatus'
 import { WorktreeCardsIntroNotice } from './workspace-card/template/WorktreeCardsIntroNotice'
+import { PluginPanelDock } from '../plugins/view/PluginPanelDock'
+import { usePluginViewCaptureStore } from '@/store/plugins/capture/plugin-view-capture'
 import {
   selectRailPageHidesWorkspaceList,
   selectWorkspaceListOpen,
@@ -114,7 +116,10 @@ function Sidebar({
   const rowsMounted = useAppStore((s) => s.sidebarOpen)
   const hiddenByRailPage = useAppStore(selectRailPageHidesWorkspaceList)
   useRailPageListFocusRelease(hiddenByRailPage)
-  const sidebarWidth = useAppStore((s) => s.sidebarWidth)
+  const captureWidth = usePluginViewCaptureStore((s) =>
+    s.panelPlacement === 'left' ? s.panelWidth : null
+  )
+  const sidebarWidth = useAppStore((s) => captureWidth ?? s.sidebarWidth)
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth)
   const repos = useAppStore((s) => s.repos)
   const botsEnabled = useBotsEnabled()
@@ -331,6 +336,7 @@ function Sidebar({
                 </SidebarContentViewport>
                 <SidebarSectionDragOverlay sidebarStyle={leftSidebarStyle} />
               </DndContext>
+              {sidebarOpen ? <PluginPanelDock placement="left" /> : null}
 
               {/* mt-auto keeps the toolbar at the bottom when both sections are folded and nothing grows. */}
               <div className="relative mt-auto shrink-0">

@@ -1,7 +1,7 @@
 import { normalizeStatusBarUsageFormat } from '../../../../../shared/status-bar/status-bar-usage-format'
 import type { UISlice, UISliceGet, UISliceSet } from './ui-slice-contract'
 import type { AppState } from '../../types'
-import { normalizeRightSidebarRoute } from '../right-sidebar/right-sidebar-route'
+import { hydrateSidebarRoutes } from '../right-sidebar/right-sidebar-route'
 import {
   applyManualRepoOrder,
   normalizeManualRepoOrder
@@ -129,7 +129,7 @@ export function createUiHydrationActions(set: UISliceSet, _get: UISliceGet): Par
           ),
           sidebarOpen: typeof ui.sidebarOpen === 'boolean' ? ui.sidebarOpen : true,
           rightSidebarOpen: typeof ui.rightSidebarOpen === 'boolean' ? ui.rightSidebarOpen : true,
-          ...normalizeRightSidebarRoute(ui.rightSidebarTab, ui.rightSidebarExplorerView),
+          ...hydrateSidebarRoutes(ui),
           ...sanitizeActivityBarArrangement(ui, s),
           groupBy: (ui.groupBy as UISlice['groupBy'] | 'parent') === 'parent' ? 'repo' : ui.groupBy,
           sortBy,
