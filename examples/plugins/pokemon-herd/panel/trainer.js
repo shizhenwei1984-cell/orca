@@ -181,21 +181,12 @@ async function changeCompanion(pokemon, opener) {
     opener.disabled = true
   }
   try {
-    await openCompanionPicker(
-      pokemon,
-      game,
-      async (action) => {
-        if (!isCurrent()) {
-          throw new Error('That Pokémon is no longer available.')
-        }
-        const result = await submit(action, true)
-        if (!result.ok) {
-          throw new Error(result.message)
-        }
-      },
+    await openCompanionPicker(pokemon, game, {
+      terminalIds: getTerminals(),
+      submit: (action) => submit(action, true),
       isCurrent,
       signal
-    )
+    })
   } catch (error) {
     if (!signal.aborted) {
       status.textContent = error.message

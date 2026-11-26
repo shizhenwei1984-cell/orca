@@ -1,4 +1,5 @@
 import { abilityName, abilityOf } from './encounters/rules/abilities.js'
+import { entryKey } from './catalog/dex.mjs'
 import { appearanceOf, catalogUnlocks } from './catalog/trainer-catalog.mjs'
 import { canBreed, LAY, LAY_MIN, whyNot } from './trainer-rules/breed.mjs'
 import { duplicates, releasePay, sortBox } from './trainer-rules/box.mjs'
@@ -68,6 +69,30 @@ export function showPokemon(pokemon, slot, save, at, member, hpOf) {
     releasePay: member ? null : releasePay(pick),
     inCare: save.care.pair.includes(slot),
     items: itemOptions(pokemon, slot, save.bag, at, hpOf)
+  }
+}
+
+export function catalogBox(save, closed, entry) {
+  const entries = Object.entries(boxedPokemon(save, closed))
+  if (!entry) {
+    return [...new Set(entries.map(([, pokemon]) => entryKey(pokemon)))]
+  }
+  const matching = entries
+    .filter(([, pokemon]) => entryKey(pokemon) === entryKey(entry))
+    .sort(([, a], [, b]) => (b.boxedAt ?? 0) - (a.boxedAt ?? 0))
+  return {
+    count: matching.length,
+    entries: matching.slice(0, 3).map(([slot, pokemon]) => {
+      const pick = trainerPick(pokemon)
+      return {
+        ref: { slot, id: pokemonId(pokemon, slot) },
+        name: nameFor(pick),
+        shiny: pick.shiny === true,
+        alpha: pick.alpha === true,
+        jobs: pokemon.jobs,
+        friendship: pokemon.friendship
+      }
+    })
   }
 }
 

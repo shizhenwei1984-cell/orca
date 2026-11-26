@@ -6,6 +6,7 @@
     <title>Pokémon Herd</title>
     <link rel="stylesheet" href="./herd.css" />
     <link rel="stylesheet" href="./catalog/picker.css" />
+    <link rel="stylesheet" href="./move-editor.css" />
   </head>
   <body>
     <header>
@@ -186,29 +187,6 @@
         <span role="status" id="trainer-feedback"></span>
         <button type="button" id="trainer-action-retry" hidden>Retry action</button>
       </footer>
-    </dialog>
-    <dialog id="move-editor" class="trainer-dialog" aria-labelledby="move-editor-title">
-      <header>
-        <h2 id="move-editor-title">Teach moves</h2>
-        <button type="button" id="close-move-editor">Close</button>
-      </header>
-      <form id="move-editor-form">
-        <label class="trainer-field" id="move-editor-form-field">
-          Form
-          <select name="form"></select>
-        </label>
-        <fieldset>
-          <legend>Learnable moves</legend>
-          <p id="move-editor-count" aria-live="polite"></p>
-          <div id="move-editor-options"></div>
-        </fieldset>
-        <div class="trainer-toolbar">
-          <button type="submit">Save moves</button>
-          <button type="button" id="reset-moves">Reset to default</button>
-          <button type="button" id="retry-moves" hidden>Retry action</button>
-        </div>
-      </form>
-      <p id="move-editor-status" role="status"></p>
     </dialog>
     <div id="world"></div>
     <p id="care-status" role="status"></p>

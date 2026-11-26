@@ -1,6 +1,7 @@
 import { entryOf, megaForms } from '../catalog/dex.mjs'
-import { chosenOf, learnableOf, movesetOf, powerOf } from './rules/moves.js'
-import { fighterKey } from './rules/trainer.js'
+import { chosenOf, learnableOf, movesetOf } from './rules/moves.js'
+import { describeMove } from './move-facts.js'
+import { fighterKey, statsFull, typesOf } from './rules/trainer.js'
 
 const megaSlot = (key) => {
   const kind = /^\d+m([XY]?)$/.exec(String(key))?.[1]
@@ -25,19 +26,29 @@ export function moveForms(pick) {
   ]
 }
 
-export function moveLoadout(pick, key) {
-  const names = chosenMoves(pick, key)
-  const chosen = chosenOf(key, names)
-  return {
-    selected: (chosen ?? movesetOf(key)).map(({ name }) => name),
-    custom: !!names,
-    options: learnableOf(key).map((move) => ({
-      name: move.name,
-      type: move.type,
-      kind: move.status ? 'Status' : move.physical ? 'Physical' : 'Special',
-      power: powerOf(move.name)
-    }))
-  }
+export function moveEditorForms(pick) {
+  return moveForms(pick).map((form) => {
+    const { key } = form
+    const [, attack, , specialAttack] = statsFull(key)
+    const stats = { attack, specialAttack, types: typesOf(key) }
+    const names = chosenMoves(pick, key)
+    const selected = chosenOf(key, names) ?? movesetOf(key)
+    const learnable = new Map(learnableOf(key).map((move) => [move.name, move]))
+    const options = new Map(selected.map((move) => [move.name, move]))
+    for (const [name, move] of learnable) {
+      options.set(name, move)
+    }
+    return {
+      ...form,
+      stats,
+      selected: [...new Set(selected.map(({ name }) => name))],
+      custom: !!names,
+      options: [...options.values()].map((move) => ({
+        ...describeMove(move, stats),
+        learnable: learnable.has(move.name)
+      }))
+    }
+  })
 }
 
 export function withMoveLoadout(pokemon, key, moves, revision) {

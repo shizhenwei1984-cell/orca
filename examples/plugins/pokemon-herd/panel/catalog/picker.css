@@ -208,3 +208,40 @@
   background: var(--orca-primary);
   color: var(--orca-primary-foreground);
 }
+
+.catalog-preview-actions,
+.catalog-evolutions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-block-start: 8px;
+}
+
+.catalog-evolutions button[aria-pressed='true'] {
+  border-color: var(--orca-ring);
+  background: var(--orca-accent);
+}
+
+.catalog-picker [data-abilities] {
+  margin-block-start: 8px;
+  font-size: 12px;
+}
+
+.catalog-picker [data-abilities] ul {
+  margin-block: 4px;
+  padding-inline-start: 20px;
+}
+
+.catalog-box-preview h4 {
+  margin: 8px 0 4px;
+  font-size: 12px;
+}
+
+.catalog-box-preview > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+}

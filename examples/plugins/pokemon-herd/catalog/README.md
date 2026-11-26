@@ -6,7 +6,7 @@ The picker's names, types, and unlock filters work offline. Normal Bulbasaur, Ch
 
 `trainer.game` supplies the party's current appearance, identity reference and catalog unlocks. The trainer's serialized `choose` action validates that reference, species, form, gender, Mega and shiny unlock before applying the pick. `trainer.read` projects the current appearance for the cards and world, including when the companion evolves.
 
-The worker stores favorite catalog keys and the new-companion source under `catalog.preferences`. Starters are the default. Favorites and All available Pokémon use the trainer's unlocks. When the favorite pool has no eligible Pokémon, the worker uses a starter.
+The worker stores favorite catalog keys and the new-companion source under `catalog.preferences`. All available Pokémon is the default for new installs. Existing saves without a source preference keep Starters, and explicit choices keep their saved value. Favorites and All available Pokémon use the trainer’s unlocks. When the favorite pool has no eligible Pokémon, the worker uses a starter.
 
 `loadCatalogSprite(pick, pose, { working, season, signal })` returns a PNG and frame metadata or `null`. The worker requests validated animation names and catalog folders at one pinned SpriteCollab revision. It rejects redirects and bounds response sizes and PNG dimensions. The worker stores successful sheets and their credits in two 224 KiB Orca storage buckets, with least recently used sheets evicted within each bucket. Individual PNG downloads are limited to 160 KiB. Both trainer save banks can use 4.5 MiB of the host's 5 MiB plugin storage limit. Bundled art is always available, and sheets retained in the cache can be reused offline after a worker restart.
 

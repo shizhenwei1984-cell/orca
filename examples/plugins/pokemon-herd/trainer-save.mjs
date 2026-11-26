@@ -7,6 +7,10 @@ const MAX_CHUNKS = 12
 const MAX_SAVE_BYTES = 64 * 1024 * 1024
 const chunkKey = (bank, index) => `trainer:${bank}:${index}`
 
+export async function hasTrainerSave(storage) {
+  return (await storage.get(ROOT)) != null
+}
+
 export async function readTrainer(storage) {
   const root = await storage.get(ROOT)
   if (root?.format !== 'gzip-json') {
