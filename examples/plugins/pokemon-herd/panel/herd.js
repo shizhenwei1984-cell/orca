@@ -1,9 +1,5 @@
-const species = [
-  { name: 'Pikachu', walk: 4, idle: 6 },
-  { name: 'Bulbasaur', walk: 6, idle: 3 },
-  { name: 'Charmander', walk: 4, idle: 4 },
-  { name: 'Squirtle', walk: 4, idle: 8 }
-]
+import { species, starterDex } from './pokemon.mjs'
+
 const poses = {
   working: ['Working', 'walk', '640ms'],
   waiting: ['Waiting for input', 'idle', '1s'],
@@ -16,17 +12,33 @@ const retry = document.querySelector('#retry')
 const count = document.querySelector('#count')
 const heading = document.querySelector('#workspace')
 const template = document.querySelector('#companion')
+const trainer = document.querySelector('#trainer')
+const wallet = document.querySelector('#wallet')
+const work = document.querySelector('#work')
+const candy = document.querySelector('#candy')
+const progressError = document.querySelector('#progress-error')
+const number = new Intl.NumberFormat()
 let revision = 0
 let context
+let agentReadFailed = false
 let terminals = new Set()
 const companions = new Map()
+let progress = new Map()
+let readingProgress = false
+let progressDirty = false
 
-function speciesFor(agent) {
-  let hash = 0
-  for (const char of agent.sessionId || agent.terminalId || agent.agent || 'Pokémon') {
-    hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0
+function duration(ms) {
+  const sec = Math.floor(ms / 1000)
+  const min = Math.floor(sec / 60)
+  const hours = Math.floor(min / 60)
+  if (hours) {
+    return `${hours}h ${min % 60}m`
   }
-  return species[hash % species.length]
+  return min ? `${min}m ${sec % 60}s` : `${sec}s`
+}
+
+function jobCount(jobs) {
+  return `${number.format(jobs)} ${jobs === 1 ? 'job' : 'jobs'}`
 }
 
 function updatePose(row, pokemon, state) {
@@ -39,16 +51,40 @@ function updatePose(row, pokemon, state) {
   sprite.style.setProperty('--duration', duration)
 }
 
+function paintCompanion({ row, starter, state }, member) {
+  const dex = member?.dex ?? starter
+  const current = species[dex]
+  updatePose(row, species[member?.starter ?? starter], state)
+  row.querySelector('small').textContent = current.name
+  row.querySelector('.progress').hidden = !member
+  if (member) {
+    const reward = member.lastReward ? ` · +₽${number.format(member.lastReward)} last job` : ''
+    row.querySelector('.career').textContent =
+      `${jobCount(member.jobs)} · ${duration(member.workMs)} worked${reward}`
+    const evolution = current.evolution
+    const next = evolution?.jobs
+      ? ` · ${member.stageJobs}/${evolution.jobs} to ${species[evolution.dex].name}`
+      : evolution?.item
+        ? ` · Evolves with a ${evolution.item}`
+        : ''
+    row.querySelector('.growth').textContent = `Friendship ${member.friendship}/100${next}`
+  }
+}
+
 function addAgent(agent) {
   const row = template.content.firstElementChild.cloneNode(true)
-  const pokemon = speciesFor(agent)
+  const companion = {
+    row,
+    starter: starterDex(agent),
+    state: agent.state,
+    lastAt: agent.receivedAt ?? 0
+  }
   const title = agent.title || agent.agent || 'Agent'
   const name = row.querySelector('strong')
   name.textContent = name.title = title
-  row.querySelector('small').textContent = pokemon.name
-  updatePose(row, pokemon, agent.state)
+  paintCompanion(companion, progress.get(agent.terminalId))
   if (agent.terminalId) {
-    companions.set(agent.terminalId, { row, pokemon })
+    companions.set(agent.terminalId, companion)
   }
   herd.append(row)
 }
@@ -67,10 +103,50 @@ function updateCount() {
 function applyStatus(event) {
   const companion = companions.get(event.terminalId)
   if (companion) {
-    updatePose(companion.row, companion.pokemon, event.state)
+    if (event.receivedAt > companion.lastAt) {
+      companion.lastAt = event.receivedAt
+      companion.state = event.state
+      paintCompanion(companion, progress.get(event.terminalId))
+    }
   } else {
     addAgent(event)
   }
+}
+
+async function readProgress() {
+  progressDirty = true
+  if (readingProgress) {
+    return
+  }
+  readingProgress = true
+  while (progressDirty) {
+    progressDirty = false
+    const version = revision
+    try {
+      const view = await window.orca.plugin.request('trainer.read', { terminalIds: [...terminals] })
+      if (version !== revision) {
+        continue
+      }
+      wallet.textContent = `₽${number.format(view.money)}`
+      work.textContent = `${jobCount(view.jobs)} · ${duration(view.ms)} worked`
+      candy.textContent = `${number.format(view.candy)} Rare Candy`
+      candy.hidden = view.candy === 0
+      trainer.hidden = false
+      progressError.hidden = true
+      retry.hidden = !agentReadFailed
+      progress = new Map(view.companions.map((member) => [member.terminalId, member]))
+      for (const [id, companion] of companions) {
+        paintCompanion(companion, progress.get(id))
+      }
+    } catch (error) {
+      if (version === revision) {
+        progressError.hidden = false
+        progressError.textContent = `Could not read trainer progress. ${error.message}`
+        retry.hidden = false
+      }
+    }
+  }
+  readingProgress = false
 }
 
 // Events received during a snapshot also apply to its result.
@@ -80,11 +156,14 @@ async function refresh(nextContext) {
   context = nextContext
   terminals = new Set(context?.terminals.map((terminal) => terminal.id))
   heading.textContent = context?.displayName || 'Pokémon Herd'
-  retry.hidden = true
+  agentReadFailed = false
+  retry.hidden = progressError.hidden
   herd.replaceChildren()
   companions.clear()
+  progress.clear()
   pendingStates = null
   updateCount()
+  void readProgress()
   if (!context) {
     return
   }
@@ -118,6 +197,7 @@ async function refresh(nextContext) {
 }
 
 function showError(error) {
+  agentReadFailed = true
   message.hidden = false
   message.textContent = `Could not read agents. ${error.message}`
   retry.hidden = false
@@ -138,6 +218,7 @@ async function readContext() {
 }
 
 retry.onclick = readContext
+window.orca.plugin.on('trainer.changed', readProgress)
 window.orca.on('workspace.changed', ({ context }) => refresh(context))
 window.orca.on('agent.status.changed', (event) => {
   if (!context) {
@@ -154,7 +235,9 @@ window.orca.on('agent.status.changed', (event) => {
     return
   }
   if (pendingStates) {
-    pendingStates.set(event.terminalId, event)
+    if (!(pendingStates.get(event.terminalId)?.receivedAt >= event.receivedAt)) {
+      pendingStates.set(event.terminalId, event)
+    }
   } else {
     applyStatus(event)
     updateCount()

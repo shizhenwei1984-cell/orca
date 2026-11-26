@@ -22,8 +22,34 @@ h1 {
 }
 #count,
 small,
-#message {
+#message,
+#work,
+#candy,
+.progress {
   color: var(--orca-muted-foreground);
+}
+#trainer:not([hidden]),
+.progress:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
+  font-size: 12px;
+}
+#trainer {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--orca-border);
+  border-radius: var(--orca-radius);
+  background: var(--orca-card);
+  color: var(--orca-card-foreground);
+}
+.progress {
+  padding: 0 12px 8px;
+}
+#progress-error {
+  color: var(--orca-destructive);
 }
 #count,
 .state {

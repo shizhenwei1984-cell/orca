@@ -11,6 +11,12 @@
       <h1 id="workspace">Pokémon Herd</h1>
       <span id="count"></span>
     </header>
+    <section id="trainer" aria-label="Trainer" hidden>
+      <strong id="wallet"></strong>
+      <span id="work"></span>
+      <span id="candy" hidden></span>
+    </section>
+    <p role="status" id="progress-error" hidden></p>
     <p role="status" id="message">Loading agents…</p>
     <button id="retry" hidden>Retry</button>
     <ul id="herd" aria-label="Agent Pokémon"></ul>
@@ -22,6 +28,10 @@
         <div class="caption">
           <div class="identity"><strong></strong><small></small></div>
           <span class="state"></span>
+        </div>
+        <div class="progress" hidden>
+          <span class="career"></span>
+          <span class="growth"></span>
         </div>
       </li>
     </template>

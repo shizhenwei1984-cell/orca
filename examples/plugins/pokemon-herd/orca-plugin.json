@@ -2,14 +2,16 @@
   "manifestVersion": 2,
   "id": "pokemon-herd",
   "name": "Pokémon Herd",
-  "version": "0.1.0",
-  "description": "Watch the terminal agents in your workspace as pixel-art Pokémon.",
+  "version": "0.2.0",
+  "description": "Raise a herd of Pokémon as your terminal agents work.",
   "engines": {
-    "orca": ">=1.4.259"
+    "orca": ">=1.4.260"
   },
-  "execution": "sandboxed-ui",
+  "execution": "trusted-worker",
   "pluginApi": 1,
+  "main": "worker.mjs",
   "contributes": {
+    "events": [{ "on": "agent.status.changed" }],
     "panels": [
       {
         "id": "pokemon-herd",
@@ -25,6 +27,9 @@
     },
     {
       "kind": "agent:read"
+    },
+    {
+      "kind": "storage:own"
     }
   ]
 }
