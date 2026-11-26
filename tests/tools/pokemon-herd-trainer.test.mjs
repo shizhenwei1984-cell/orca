@@ -155,3 +155,76 @@ test('an unbound companion can join only its unique live pane and original works
   ).toBe(save)
   expect(await read([agent, { ...agent, terminalId: 'term-shadow' }])).toBe(save)
 })
+
+test('a natural crossing in a chat-only workspace stays bound to its active room', async () => {
+  const { registerEncounterHandlers } =
+    await import('../../examples/plugins/pokemon-herd/encounters/trainer-encounters.mjs')
+  const { activateTrainer, deactivate } =
+    await import('../../examples/plugins/pokemon-herd/worker.mjs')
+  const room = 'identity:forest'
+  let active = room
+  let now = new Date(2026, 10, 26, 12).getTime()
+  const seed = recordStatus(loadTrainer(null), {
+    workspaceId: room,
+    sessionId: 'chat',
+    paneKey: 'native-chat',
+    state: 'idle',
+    receivedAt: now
+  })
+  const values = new Map([['trainer', seed]])
+  const handlers = new Map()
+  activateTrainer(
+    {
+      host: {
+        async call(method) {
+          switch (method) {
+            case 'workspace.list':
+              return { workspaces: [{ id: room }, { id: 'identity:lake' }] }
+            case 'workspace.readContext':
+              return { workspaceId: active, terminals: [] }
+            case 'terminal.list':
+              return { terminals: [] }
+            default:
+              throw new Error(method)
+          }
+        }
+      },
+      storage: { get: (key) => values.get(key), set: (key, value) => values.set(key, value) },
+      panels: { handle: (method, fn) => handlers.set(method, fn), post() {} },
+      events: { on() {} }
+    },
+    {
+      registerEncounterHandlers: (host, options) =>
+        registerEncounterHandlers(host, {
+          ...options,
+          clock: () => now,
+          rnd: () => 0.5
+        })
+    }
+  )
+  try {
+    const scope = { workspaceId: room, terminalIds: [] }
+    const read = () => handlers.get('encounter.read')(scope)
+    const first = await read()
+    expect(first?.nextVisit).toBeGreaterThan(now)
+    now = first.nextVisit
+    const crossing = await read()
+    expect(crossing.party).toEqual([])
+    expect(crossing.visitor.appearedAt).toBe(now)
+    const gift = () =>
+      handlers.get('encounter.command')({
+        ...scope,
+        revision: crossing.revision,
+        sequence: 1,
+        client: 'a'.repeat(36),
+        action: { type: 'gift', id: crossing.visitor.id }
+      })
+    active = 'identity:lake'
+    expect(await read()).toBeNull()
+    expect(await gift()).toMatchObject({ ok: false })
+    active = room
+    expect(await gift()).toEqual({ ok: true })
+  } finally {
+    deactivate()
+  }
+})

@@ -466,16 +466,32 @@ export function registerEncounterHandlers(
   })
 
   async function contextFor(save, input, catalog, at, fresh) {
+    const scope = roomScope(
+      save,
+      await getScope(save, input.terminalIds, catalog, { fresh, requested: input.workspaceId })
+    )
+    if (!scope.slots.length) {
+      const room = scope.workspaceId
+      // Legacy folder frames omit the room id, so they cannot bind a terminal-free request.
+      const companions = Object.entries(save.party).filter(
+        ([slot, member]) => member.workspaceId === room && member.pokemon && !scope.closed.has(slot)
+      )
+      const chatRoom =
+        room &&
+        room === input.workspaceId &&
+        (room.startsWith('identity:') || room.startsWith('folder:')) &&
+        !input.terminalIds.length &&
+        companions.length > 0 &&
+        companions.every(([, member]) => !member.terminalId)
+      const active = chatRoom && (await orca.host.call('workspace.readContext'))
+      if (active?.workspaceId !== room) {
+        scope.workspaceId = null
+      }
+    }
     return {
       ...input,
       settings: await preferences(save.settings),
-      ...roomScope(
-        save,
-        await getScope(save, input.terminalIds, catalog, {
-          fresh,
-          requested: input.workspaceId
-        })
-      ),
+      ...scope,
       at,
       rnd
     }
@@ -486,7 +502,7 @@ export function registerEncounterHandlers(
     return store.transact(
       async (save, catalog) => {
         const context = await contextFor(save, input, catalog, clock(), false)
-        if (!context.workspaceId || !context.slots.length) {
+        if (!context.workspaceId) {
           return { save, result: null }
         }
         const next = applyEncounter(save, { type: 'tick' }, context)
@@ -526,7 +542,10 @@ export function registerEncounterHandlers(
       }
       const context = await contextFor(save, input, catalog, at, true)
       try {
-        if (!context.workspaceId || !context.slots.length) {
+        if (
+          !context.workspaceId ||
+          (!context.slots.length && !['gift', 'throw', 'call'].includes(action.type))
+        ) {
           throw new Error('Open a workspace with an active Pokémon.')
         }
         const state = stateFor(save, context.workspaceId)
