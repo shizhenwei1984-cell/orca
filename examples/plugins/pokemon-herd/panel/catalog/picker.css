@@ -9,10 +9,12 @@
   background: var(--orca-popover);
   color: var(--orca-popover-foreground);
   font: 14px var(--orca-font-sans, sans-serif);
+  overflow-wrap: anywhere;
 }
 
 .catalog-picker[open] {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -40,6 +42,8 @@
   box-sizing: border-box;
   font: inherit;
   color: inherit;
+  max-inline-size: 100%;
+  min-inline-size: 0;
   accent-color: var(--orca-primary);
 }
 
@@ -72,6 +76,7 @@
 .catalog-pagination,
 .catalog-action {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -85,6 +90,7 @@
 .catalog-search,
 .catalog-search > label {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
 }
 
@@ -110,6 +116,7 @@
 .catalog-filters > label,
 .catalog-variants > label {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 4px;
   max-width: 100%;
@@ -121,6 +128,7 @@
 .catalog-preview p,
 .catalog-art [role='status'] {
   font-size: 12px;
+  white-space: normal;
   color: var(--orca-muted-foreground);
 }
 
@@ -171,7 +179,7 @@
 
 .catalog-art {
   display: grid;
-  width: 144px;
+  width: min(100%, 144px);
   min-height: 108px;
   place-items: center;
   align-content: center;

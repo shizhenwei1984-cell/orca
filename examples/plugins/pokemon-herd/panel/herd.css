@@ -221,14 +221,14 @@ small,
   white-space: nowrap;
   font-size: 12px;
 }
-ul:not([hidden]) {
+#herd:not([hidden]) {
   padding: 0;
   margin: 12px 0;
   list-style: none;
   display: grid;
   gap: 12px;
 }
-li {
+#herd > li {
   overflow: hidden;
   border: 1px solid var(--orca-border);
   border-radius: var(--orca-radius);
