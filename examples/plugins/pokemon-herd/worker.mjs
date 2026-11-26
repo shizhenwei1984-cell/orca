@@ -1,3 +1,5 @@
+import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
+import { registerSidebar } from './sidebar/worker.mjs'
 import { recordStatus, trainerView, workingMinutes } from './trainer.mjs'
 import { trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
@@ -155,6 +157,8 @@ export function activateTrainer(
   { registerEncounterHandlers, encounterTrainerAction, settleEncounterWork } = {}
 ) {
   const store = createTrainerStore(orca)
+  registerSidebar(orca, store)
+  registerCatalogSprites(orca)
   const list = getTerminalLists(orca)
 
   async function getScope(save, ids, fresh = false) {
