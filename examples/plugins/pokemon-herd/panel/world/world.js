@@ -68,6 +68,7 @@ export function mountWorld(container, callbacks = {}) {
   let boostText = ''
   let hovered
   let lastFocus
+  let focusedId
   let fixedTime = null
   let pair = null
   let lastTick = -Infinity
@@ -262,11 +263,13 @@ export function mountWorld(container, callbacks = {}) {
     const timestamp = now()
     if (force || timestamp - lastTick >= TICK_MS || timestamp < lastTick) {
       atmosphere(timestamp)
-      const focused = [...actors.values()].find(({ entity }) => entity.focused)
-      if (lastFocus !== undefined && focused && lastFocus !== focused) {
-        focusActor(focused, timestamp)
+      if (lastFocus !== undefined && focusedId && lastFocus !== focusedId) {
+        const focused = actors.get(focusedId)
+        if (focused) {
+          focusActor(focused, timestamp)
+        }
       }
-      lastFocus = focused ?? null
+      lastFocus = focusedId
       const next = tickWorld(actors, field, options, timestamp, !pair && timestamp !== lastTick)
       pair = next ?? advanceSpar(pair, field, options, timestamp)
       lastTick = timestamp
@@ -303,7 +306,7 @@ export function mountWorld(container, callbacks = {}) {
         })
       )
     }
-    const heads = paintActors(actorList(), { ...field, now: timestamp, hovered })
+    const heads = paintActors(actorList(), { ...field, now: timestamp, hovered, focusedId })
     if (force || frame - lastScenery >= 125) {
       landscape({ ...field, now: timestamp, heads })
       lastScenery = frame
@@ -478,6 +481,15 @@ export function mountWorld(container, callbacks = {}) {
       setGeometry()
       if (patch.agents) {
         syncAgents(patch.agents)
+        if (!('focusedId' in patch)) {
+          focusedId = patch.agents.find(({ focused }) => focused)?.id ?? null
+        }
+      }
+      if ('focusedId' in patch) {
+        focusedId = patch.focusedId
+        if (focusedId === undefined) {
+          lastFocus = undefined
+        }
       }
       if (patch.boosts) {
         boosts = patch.boosts

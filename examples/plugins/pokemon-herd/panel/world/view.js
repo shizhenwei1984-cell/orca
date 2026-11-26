@@ -70,7 +70,12 @@ export function assignEntity(actor, entity) {
 function setLabel(actor, status, tags) {
   const { entity, button, tag } = actor
   const name = entity.label || entity.species || 'Companion'
-  const label = [name, entity.species && entity.species !== name ? entity.species : null, status]
+  const label = [
+    entity.parentId ? `Sub-agent of ${name}` : name,
+    entity.species && entity.species !== name ? entity.species : null,
+    status,
+    entity.task
+  ]
     .filter(Boolean)
     .join(' · ')
   if (button.getAttribute('aria-label') !== label) {
@@ -83,7 +88,7 @@ function setLabel(actor, status, tags) {
 
 export function paintActors(
   list,
-  { width, rowHeight, ground, now, settings, reduced, hovered, season }
+  { width, rowHeight, ground, now, settings, reduced, hovered, season, focusedId }
 ) {
   const rows = Array.from({ length: settings.rows }, () => [])
   const heads = Array.from({ length: settings.rows }, () => [])
@@ -95,7 +100,7 @@ export function paintActors(
       from: actor.track?.from,
       settled: !actor.moving,
       since: actor.settledAt,
-      rank: entity.focused ? -1 : rank,
+      rank: entity.id === focusedId ? -1 : rank,
       text: entity.label || entity.species || 'Companion'
     })
   }
@@ -137,19 +142,11 @@ export function paintActors(
       const flash = actor.flashUntil > now || evolved ? '✦' : ''
       const resting = entity.state === 'done' ? '✓' : actor.mood === 'sleep' ? 'zZ' : ''
       const icon = careIcon || attentionIcon || flash || reactIcon(actor, now) || resting
-      const rival =
-        entity.rivalGroup &&
-        actor.mood === 'working' &&
-        list.some(
-          (other) =>
-            other !== actor &&
-            other.mood === 'working' &&
-            other.entity.rivalGroup === entity.rivalGroup
-        )
+      const rival = entity.sameFolderRival && actor.mood === 'working'
 
       actor.lastPaint = now
       button.dataset.mood = visitor ? 'wild' : actor.mood
-      button.dataset.focused = entity.focused ? 'true' : 'false'
+      button.dataset.focused = String(entity.id === focusedId)
       button.dataset.petted = String(care === 'pet')
       button.dataset.care = care
       button.dataset.evolution = evolution
@@ -167,7 +164,8 @@ export function paintActors(
         status,
         hungry && 'Hungry',
         pickup && `Found ${pickup.name}`,
-        evolved && 'Evolved'
+        evolved && 'Evolved',
+        rival && 'Working in the same folder as another agent'
       ]
       setLabel(actor, description.filter(Boolean).join(' · '), settings.tags || visitor)
       const scale = settings.scale * (entity.parentId ? 1.5 : 2)

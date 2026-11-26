@@ -262,6 +262,7 @@ export function tickWorld(actors, field, options, now, selectPair) {
         !lead ||
         actor.mood !== 'working' ||
         lead.mood !== 'working' ||
+        lead.entity.leadWorking === false ||
         actor.dragging ||
         lead.dragging ||
         now - (lead.lastCombo ?? -Infinity) < COMBO_GAP ||

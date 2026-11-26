@@ -15,6 +15,8 @@ export const pluginWorkspaceContextSchema = z
     workspaceId: pluginWorkspaceIdSchema.optional(),
     branch: z.string().max(PLUGIN_WORKSPACE_LABEL_MAX_LENGTH),
     displayName: z.string().max(PLUGIN_WORKSPACE_LABEL_MAX_LENGTH),
+    /** In desktop frame events, the selected pane if it belongs to the listed workspace. */
+    focusedTerminalId: z.string().min(1).max(PLUGIN_TERMINAL_ID_MAX_LENGTH).nullable().optional(),
     /** Terminals of the focused workspace, so callers can address a specific
      *  terminal id — the API has no "active terminal" write target. */
     terminals: z

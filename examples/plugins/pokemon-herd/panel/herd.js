@@ -11,6 +11,8 @@ import { mountHerdStrip } from './herd-strip.js'
 import { bindWorldPreferences } from './world-preferences.js'
 import { mountWorld } from './world/world.js'
 import { seasonAt } from './world/scene.js'
+import { youngOf } from '../encounters/rules/picks.js'
+import { nameOf } from '../encounters/rules/dex.js'
 
 const poses = {
   working: ['Working', 'walk'],
@@ -50,6 +52,7 @@ let readingProgress = false
 let progressDirty = false
 let focusRequest
 let menuRequest
+let showFamily = true
 const care = mountWorldCare(orca, careStatus, (action) => {
   if (action.type === 'pet') {
     preferences.play('pet')
@@ -105,8 +108,13 @@ const encounters = mountEncounterGame(encounterContainer, {
   signal
 })
 const preferences = bindWorldPreferences(orca, signal, (settings) => {
+  const familyChanged = showFamily !== settings.family
+  showFamily = settings.family
   world.update({ settings })
   encounters.update({ settings })
+  if (familyChanged) {
+    paintRoster()
+  }
 })
 
 function careFor(agent, action, message) {
@@ -301,7 +309,8 @@ actions.addEventListener('beforetoggle', (event) => {
 })
 
 async function focusTerminal(agent, event) {
-  if (!event.isTrusted || !workspace?.terminals.has(agent.id)) {
+  const terminalId = agent.parentId ?? agent.id
+  if (!event.isTrusted || !workspace?.terminals.has(terminalId)) {
     return
   }
   focusRequest?.abort()
@@ -313,7 +322,7 @@ async function focusTerminal(agent, event) {
     const result = await orca.plugin.request(
       'terminal.focus',
       {
-        terminalId: agent.id,
+        terminalId,
         ...(workspaceId ? { workspaceId } : {})
       },
       { signal: request.signal }
@@ -369,6 +378,7 @@ function paintCompanion(row, appearance, state, member, season) {
 
 function paintRoster() {
   const entities = []
+  const children = []
   const stale = new Set(cards.keys())
   const { a, b, t } = seasonAt(new Date())
   for (const agent of roster) {
@@ -382,6 +392,10 @@ function paintRoster() {
     const label = agent.title || agent.agent || 'Agent'
     const name = row.querySelector('strong')
     name.textContent = name.title = label
+    const task = workspace?.terminals.has(agent.terminalId) ? agent.task?.title?.trim() : ''
+    const caption = row.querySelector('.task')
+    caption.textContent = task || ''
+    caption.hidden = !task
     const member = progress.get(agent.terminalId)
     const starter = starterDex(agent)
     row.querySelector('.care').onclick = () => trainerGame.openParty(agent.terminalId)
@@ -399,8 +413,25 @@ function paintRoster() {
         evolvedAt: member?.evolvedAt,
         evolvedFrom: member?.evolvedFrom,
         state: agent.state,
-        stateStartedAt: agent.stateStartedAt
+        stateStartedAt: agent.stateStartedAt,
+        leadWorking: agent.leadWorking,
+        sameFolderRival: agent.sameFolderRival,
+        task
       })
+      if (showFamily && agent.children?.length) {
+        const young = youngOf(appearance)
+        for (const child of agent.children) {
+          children.push({
+            id: child.id,
+            parentId: agent.terminalId,
+            label,
+            species: nameOf(young.dex),
+            appearance: young,
+            state: child.state,
+            stateStartedAt: child.state === 'idle' ? undefined : child.startedAt
+          })
+        }
+      }
     }
   }
   for (const key of stale) {
@@ -409,7 +440,10 @@ function paintRoster() {
     row.remove()
     cards.delete(key)
   }
-  world.update({ agents: entities })
+  world.update({
+    agents: [...entities, ...children],
+    focusedId: workspace?.context.focusedTerminalId ?? null
+  })
   if (workspace) {
     const scope = workspace.scope
     publish('roster', {
@@ -484,6 +518,7 @@ async function readProgress() {
 }
 
 async function readAgents(current) {
+  clearTimeout(current.agentRefresh)
   current.dirty = true
   if (current.reading) {
     return
@@ -504,7 +539,7 @@ async function readAgents(current) {
       }
       const previous = new Map(roster.map((agent) => [agent.terminalId, agent.state]))
       const seen = new Set()
-      roster = agents.filter(({ terminalId }) => {
+      const next = agents.filter(({ terminalId }) => {
         if (!terminalId) {
           return true
         }
@@ -514,6 +549,10 @@ async function readAgents(current) {
         seen.add(terminalId)
         return true
       })
+      if (current.error || JSON.stringify(next) !== JSON.stringify(roster)) {
+        roster = next
+        paintRoster()
+      }
       for (const agent of roster) {
         if (!previous.has(agent.terminalId) || previous.get(agent.terminalId) === agent.state) {
           continue
@@ -533,7 +572,6 @@ async function readAgents(current) {
         }
       }
       current.error = false
-      paintRoster()
       showRosterStatus()
     } catch (error) {
       if (!current.read.signal.aborted) {
@@ -545,6 +583,12 @@ async function readAgents(current) {
     updateRetry()
   }
   current.reading = false
+  if (
+    !current.read.signal.aborted &&
+    roster.some(({ state, task }) => state === 'working' || task)
+  ) {
+    current.agentRefresh = setTimeout(() => void readAgents(current), 5000)
+  }
 }
 
 function refresh(context) {
@@ -557,6 +601,7 @@ function refresh(context) {
       ? context.workspaceId === previous.context.workspaceId
       : [...terminals].some((id) => previous.terminals.has(id)))
   previous?.read.abort()
+  clearTimeout(previous?.agentRefresh)
   workspace = context
     ? {
         context,
@@ -574,7 +619,7 @@ function refresh(context) {
     trainerGame.reset()
     roster = []
     progress = new Map()
-    world.update({ agents: [], visitor: null })
+    world.update({ agents: [], visitor: null, focusedId: undefined })
   } else {
     roster = roster.filter(({ terminalId }) => terminals.has(terminalId))
   }
@@ -625,6 +670,22 @@ mountHerdStrip(orca, worldContainer, signal)
 let activationSubscription
 
 function onWorkspaceChanged({ context }) {
+  const prior = workspace?.context
+  if (
+    prior &&
+    context &&
+    prior.workspaceId === context.workspaceId &&
+    prior.displayName === context.displayName &&
+    prior.branch === context.branch &&
+    prior.terminals.length === context.terminals.length &&
+    prior.terminals.every(
+      ({ id, title }, i) => id === context.terminals[i].id && title === context.terminals[i].title
+    )
+  ) {
+    workspace.context = context
+    world.update({ focusedId: context.focusedTerminalId ?? null })
+    return
+  }
   refresh(context)
   activationSubscription?.dispose()
   if (context && orca.plugin.onActivate) {
@@ -680,6 +741,7 @@ window.addEventListener(
     trainerGame.reset()
     focusRequest?.abort()
     workspace?.read.abort()
+    clearTimeout(workspace?.agentRefresh)
     workspace?.scope.abort()
     activationSubscription?.dispose()
     for (const subscription of subscriptions) {

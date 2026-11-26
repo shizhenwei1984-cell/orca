@@ -245,6 +245,12 @@ small {
   font-size: 12px;
   margin-top: 2px;
 }
+.task {
+  padding: 0 12px;
+}
+.task[hidden] {
+  display: none;
+}
 li[data-state='blocked'] .state {
   color: var(--orca-destructive);
 }
