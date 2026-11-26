@@ -2,6 +2,7 @@ import { useContext, useSyncExternalStore } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useTranslate } from '@/i18n/use-translate'
+import { recomputeOn } from '@/lib/recompute-on'
 import { ConfirmationDialogContext } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import { Button } from '../../ui/button'
 import { DetailRow, DetailSection } from './PluginDetailSections'
@@ -35,7 +36,7 @@ function subscribe(change: () => void): () => void {
 export function PluginWorkspaceAccess({ pluginKey, name }: { pluginKey: string; name: string }) {
   const t = useTranslate()
   const confirm = useContext(ConfirmationDialogContext)
-  useSyncExternalStore(subscribe, () => {
+  const version = useSyncExternalStore(subscribe, () => {
     const workspace = settingsWorkspace()
     if (!workspace) {
       return null
@@ -43,9 +44,11 @@ export function PluginWorkspaceAccess({ pluginKey, name }: { pluginKey: string; 
     const key = workspaceViewGrantKey(pluginKey, workspace)
     return JSON.stringify([key, workspace.name, workspaceViewGrant(key)])
   })
-  const scope = settingsWorkspace()
-  const key = scope && workspaceViewGrantKey(pluginKey, scope)
-  const grant = key && workspaceViewGrant(key)
+  const { scope, key, grant } = recomputeOn([version, pluginKey], () => {
+    const scope = settingsWorkspace()
+    const key = scope && workspaceViewGrantKey(pluginKey, scope)
+    return { scope, key, grant: key && workspaceViewGrant(key) }
+  })
   if (!scope || !key || !grant || !confirm) {
     return null
   }

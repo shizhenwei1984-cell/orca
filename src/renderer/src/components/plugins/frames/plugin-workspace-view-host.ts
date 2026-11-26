@@ -1,5 +1,6 @@
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
+import { selectWorktreesByRepo } from '@/store/workspaces/catalog/workspace-record-fields'
 import type { ConfirmationDialogContextValue } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import type {
   PluginHostCallOutcome,
@@ -104,7 +105,7 @@ export function createPluginWorkspaceViewHost(options: {
         state.openFiles !== previous.openFiles ||
         state.hostedReviewCache !== previous.hostedReviewCache ||
         state.prCache !== previous.prCache ||
-        state.worktreesByRepo !== previous.worktreesByRepo)
+        selectWorktreesByRepo(state) !== selectWorktreesByRepo(previous))
     ) {
       if (
         state.unifiedTabsByWorktree[scope.worktreeId] !==
