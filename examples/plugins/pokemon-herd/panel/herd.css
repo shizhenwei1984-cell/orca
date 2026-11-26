@@ -264,7 +264,20 @@ small,
   white-space: nowrap;
   font-size: 12px;
 }
+:root[data-orca-panel-placement='bottom'] {
+  --party-flow: column;
+  --party-card-width: min(100%, 18rem);
+}
+@media (orientation: landscape) {
+  :root:not([data-orca-panel-placement]) {
+    --party-flow: column;
+    --party-card-width: min(100%, 18rem);
+  }
+}
 #herd:not([hidden]) {
+  grid-auto-flow: var(--party-flow, row);
+  grid-auto-columns: var(--party-card-width, 100%);
+  overflow-x: auto;
   padding: 0;
   margin: 12px 0;
   list-style: none;

@@ -28,7 +28,8 @@ import {
   createPluginFrameEnvelopeHandler,
   createPluginFrameMessageHandler,
   type PluginFrameDeclarativeChannel,
-  type PluginFrameEditorChannel
+  type PluginFrameEditorChannel,
+  type PluginFrameHostOptions
 } from './plugin-frame-host'
 import {
   pluginFrameWindowOf,
@@ -128,7 +129,10 @@ export function usePluginFrameHost(options: {
       workspaceView?.dispose()
       unregisterActivation?.()
     }
-    const hostOptions = {
+    const dock = element.closest<HTMLElement>('[data-plugin-panel-placement]')?.dataset
+      .pluginPanelPlacement
+    const hostOptions: PluginFrameHostOptions = {
+      placement: panelTabKey ? (dock === 'bottom' || dock === 'left' ? dock : 'right') : undefined,
       surface,
       onPanelPreferredHeight,
       getFrameWindow,

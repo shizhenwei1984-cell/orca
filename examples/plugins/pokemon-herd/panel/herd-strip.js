@@ -7,7 +7,7 @@ export function mountHerdStrip(orca, world, signal) {
   let preferredHeight = 0
   const settings = document.querySelector('#herd-settings')
   const expanded =
-    '.trainer-dialog[open], .catalog-picker[open], #herd-settings:not([hidden]), #encounters:not([hidden]), #herd:not([hidden])'
+    '.trainer-dialog[open], .catalog-picker[open], #herd-settings:not([hidden]), #encounters:not([hidden]), :root:not([data-orca-panel-placement="bottom"]) #herd:not([hidden])'
   const updateHeight = () => {
     const padding = Number.parseFloat(getComputedStyle(document.body).paddingBottom)
     document.body.style.setProperty(

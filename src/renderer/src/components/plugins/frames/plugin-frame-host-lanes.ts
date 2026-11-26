@@ -3,6 +3,7 @@ import {
   workspaceViewFrameMethods
 } from '../../../../../shared/plugins/frames/plugin-workspace-view'
 import {
+  FRAME_EVENTS,
   MOVE_PLUGIN_PANEL_METHOD,
   OPEN_PLUGIN_PANEL_METHOD
 } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
@@ -14,7 +15,10 @@ import {
   createPanelMessageBudget,
   type PanelMessageBudget
 } from '../../../../../shared/plugins/frames/plugin-panel-message-budget'
-import { PLUGIN_PROTOCOL_VERSION } from '../../../../../shared/plugins/frames/plugin-protocol'
+import {
+  pluginEvent,
+  PLUGIN_PROTOCOL_VERSION
+} from '../../../../../shared/plugins/frames/plugin-protocol'
 import { isPluginJsonObject } from '../../../../../shared/plugins/manifest/plugin-json-object'
 import {
   getPluginHostMethodSpec,
@@ -70,20 +74,22 @@ export function pluginWebviewFrameWindow(webview: PluginFrameWebview): PluginFra
   return frameWindow
 }
 
-export function pluginFrameHello(
+export function pluginFrameHelloEvent(
   surface: 'panel' | 'editor',
-  transport: PluginFrameTransport = 'iframe'
-): PluginFrameHello {
+  transport: PluginFrameTransport = 'iframe',
+  placement?: PluginFrameHello['placement']
+) {
   const methods = pluginFrameMethodsFor(surface, transport === 'guest')
-  return {
+  return pluginEvent(FRAME_EVENTS.hello, {
     protocol: PLUGIN_PROTOCOL_VERSION,
     surface,
+    ...(placement && { placement }),
     // Why derived: an iframe must not claim a minor whose methods it is never offered.
     api: { major: PLUGIN_HOST_API_MAJOR, minor: pluginHostApiMinorFor(methods) },
     methods: [...methods, ...workspaceViewFrameMethods(surface, transport === 'guest')],
     theme: currentPluginFrameTheme(),
     locale: getIntlLocale()
-  }
+  } satisfies PluginFrameHello)
 }
 
 /**

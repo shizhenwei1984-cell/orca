@@ -28,7 +28,12 @@ export function terminal(row, { rail, current, signal, focus, actions, showWorks
   const { name, key, terminalId, agent, pokemon } = row
   const state = agent && STATUS[agent.state]
   const age = agent && elapsed(agent.stateStartedAt)
-  const description = [name, state && `${state} · ${age}`, pokemon?.name]
+  const children = agent?.children ?? []
+  const childCount = children.length
+    ? `${children.length} sub-agent${children.length === 1 ? '' : 's'}`
+    : ''
+  const rival = agent?.sameFolderRival ? 'Same-folder rival' : ''
+  const description = [name, state && `${state} · ${age}`, pokemon?.name, rival, childCount]
     .filter(Boolean)
     .join(' · ')
   const control = terminalId ? button('', focus) : element('div')
@@ -69,6 +74,9 @@ export function terminal(row, { rail, current, signal, focus, actions, showWorks
     const status = element('span', '', 'state meta')
     status.append(element('span', '', 'dot'), element('span', state), element('time', age))
     copy.append(status)
+    if (rival) {
+      copy.append(element('span', rival, 'meta'))
+    }
     if (showWorkspace) {
       const { name, project } = row.workspace
       const label = project && project !== name ? `${project} · ${name}` : name
@@ -108,6 +116,23 @@ export function terminal(row, { rail, current, signal, focus, actions, showWorks
   wrapper.append(control)
   if (terminalId) {
     menu(wrapper, `Actions for ${name}`, actions, key)
+  }
+  if (children.length) {
+    const list = element('ul', '', 'terminal-list')
+    list.setAttribute('aria-label', 'Sub-agents')
+    for (const child of children) {
+      const item = element('li', '', 'state meta')
+      item.dataset.state = child.state
+      item.append(
+        element('span', '', 'dot'),
+        element('span', `Sub-agent · ${STATUS[child.state] ?? 'Idle'}`),
+        element('time', elapsed(child.startedAt))
+      )
+      list.append(item)
+    }
+    const group = element('div')
+    group.append(wrapper, list)
+    return group
   }
   return wrapper
 }
