@@ -28,7 +28,7 @@ import { validateChoice } from './catalog/trainer-catalog.mjs'
 import { genderFrom } from './encounters/rules/gender.js'
 import { abilSlot } from './encounters/rules/abilities.js'
 import { KEPT_ITEMS } from './encounters/rules/form-items.js'
-import { moveForms, moveLoadout, withMoveLoadout } from './encounters/move-loadouts.js'
+import { moveEditorForms, moveForms, withMoveLoadout } from './encounters/move-loadouts.js'
 import { learnableOf, MAX_MOVES } from './encounters/rules/moves.js'
 import {
   MINUTE,
@@ -99,7 +99,7 @@ function resolveMoveTarget(save, target, { slots, closed }) {
 
 export function readMoveEditor(save, target, context) {
   const pokemon = resolveMoveTarget(save, target, context)
-  return moveForms(pokemon).map((form) => ({ ...form, ...moveLoadout(pokemon, form.key) }))
+  return moveEditorForms(pokemon)
 }
 
 function putPokemon(save, slot, pokemon) {

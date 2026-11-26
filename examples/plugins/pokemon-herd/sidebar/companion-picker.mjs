@@ -15,13 +15,21 @@ export async function choosePokemon(row, onSaved) {
   if (current?.ref.id !== row.pokemon.ref.id || current?.ref.slot !== row.pokemon.ref.slot) {
     throw new Error('This Pokémon changed. Refresh the sidebar and try again.')
   }
-  await openCompanionPicker(current, game, async (action) => {
-    const payload = { client, sequence: ++sequence, terminalIds, action }
-    const send = () => plugin.request('trainer.command', payload)
-    const result = await send().catch(send)
-    if (!result.ok) {
-      throw new Error(result.message)
+  let pending
+  await openCompanionPicker(current, game, {
+    terminalIds,
+    submit: async (action) => {
+      if (pending && JSON.stringify(pending.action) !== JSON.stringify(action)) {
+        throw new Error('Retry the pending trainer action first.')
+      }
+      pending ??= { client, sequence: ++sequence, terminalIds, action }
+      const send = () => plugin.request('trainer.command', pending)
+      const result = await send().catch(send)
+      pending = undefined
+      if (result.ok) {
+        onSaved()
+      }
+      return result
     }
-    onSaved()
   })
 }

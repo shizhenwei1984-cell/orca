@@ -1,4 +1,4 @@
-import { loadSettings } from '../encounters/rules/settings.js'
+import { DEFAULTS, loadSettings } from '../encounters/rules/settings.js'
 import {
   canChoose,
   entryOf,
@@ -67,17 +67,23 @@ export function initialCatalogPick(save, { source, favorites }, rnd, settings) {
   return entry && appearanceOf({ dex: entry.dex, form: entry.form })
 }
 
-export function registerCatalogPreferences(orca, selectionSettings) {
+export function registerCatalogPreferences(orca, { hasSave, selectionSettings }) {
   let current
-  let tail = Promise.resolve()
+  let tail = read().catch((error) => orca.log(error.message))
 
   async function read() {
     if (!current) {
-      const stored = await orca.storage.get(PREFERENCES)
-      current ??= {
-        source: SOURCES.includes(stored?.source) ? stored.source : 'starters',
-        favorites: favoriteKeys(stored?.favorites)
+      const [stored, existingSave] = await Promise.all([orca.storage.get(PREFERENCES), hasSave()])
+      const source = SOURCES.includes(stored?.source)
+        ? stored.source
+        : existingSave
+          ? 'starters'
+          : DEFAULTS.newFrom
+      const next = { source, favorites: favoriteKeys(stored?.favorites) }
+      if (stored?.source !== source) {
+        await orca.storage.set(PREFERENCES, next)
       }
+      current = next
     }
     return current
   }

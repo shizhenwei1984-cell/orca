@@ -8,8 +8,9 @@ import { dueCare, recordStatus, sampleCare, trainerView, workingMinutes } from '
 import { pokemonId, readMoveEditor, trainerAction } from './trainer-actions.mjs'
 import { MAX_MOVES } from './encounters/rules/moves.js'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
-import { readTrainer, writeTrainer } from './trainer-save.mjs'
-import { gameView } from './trainer-view.mjs'
+import { hasTrainerSave, readTrainer, writeTrainer } from './trainer-save.mjs'
+import { catalogBox, gameView } from './trainer-view.mjs'
+import { entryOf } from './catalog/dex.mjs'
 import { registerSidebar } from './sidebar/worker.mjs'
 import { registerTerminalFocus } from './terminal-focus.mjs'
 import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
@@ -209,9 +210,12 @@ export function activateTrainer(
   registerCatalogSprites(orca)
   const workspaces = listTrainerWorkspaces(orca)
   const store = createTrainerStore(orca, workspaces)
-  const catalogPreferences = registerCatalogPreferences(orca, async () => {
-    const { trainer, legendsOpen } = await preferences(await store.read((save) => save.settings))
-    return { trainer, legendsOpen }
+  const catalogPreferences = registerCatalogPreferences(orca, {
+    hasSave: () => hasTrainerSave(orca.storage),
+    async selectionSettings() {
+      const { trainer, legendsOpen } = await preferences(await store.read((save) => save.settings))
+      return { trainer, legendsOpen }
+    }
   })
   registerSidebar(orca, store, workspaces)
   const list = getTerminalLists(orca)
@@ -446,6 +450,17 @@ export function activateTrainer(
       const next = settleBadges(save, scope.slots)
       const settings = await preferences(save.settings)
       return { save: next, result: gameView(next, { ...scope, at: Date.now(), query, settings }) }
+    })
+  })
+  orca.panels.handle('trainer.catalog-box', (input) => {
+    const ids = terminalIds(input)
+    const entry = entryOf(input.entry)
+    if (input.entry !== undefined && !entry) {
+      throw new Error('Unknown catalog entry.')
+    }
+    return store.transact(async (save, catalog) => {
+      const { closed } = await getScope(save, ids, catalog)
+      return { save, result: catalogBox(save, closed, entry) }
     })
   })
   orca.panels.handle('trainer.moves', (input) => {

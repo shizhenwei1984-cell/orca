@@ -5,11 +5,14 @@ import {
   entryOf,
   favoriteKeys,
   genderChoices,
+  isLegendary,
   megaForms,
   REGIONS,
   searchEntries,
   TYPES
 } from '../../catalog/dex.mjs'
+import { showAbilities, showEvolutionLine } from './preview-info.mjs'
+import { openMovePreview } from '../move-editor.js'
 import { loadCatalogSprite, playCatalogSprite } from './sprite.mjs'
 
 const PAGE_SIZE = 36
@@ -21,7 +24,8 @@ const pickerMarkup = `
     <h2 id="catalog-title">Choose a Pokémon</h2>
     <button type="button" data-cancel>Cancel</button>
   </header>
-  <form class="catalog-search">
+  <div class="catalog-current" hidden><button type="button" data-teach></button></div>
+  <div class="catalog-search" role="search">
     <label>Search Pokémon<input type="search" placeholder="Name, number, form or type" autofocus></label>
     <details>
       <summary>Filters</summary>
@@ -31,11 +35,13 @@ const pickerMarkup = `
         <label>Second type<select name="secondType"></select></label>
         <label><input type="checkbox" name="mega"> Mega evolution</label>
         <label><input type="checkbox" name="favorite"> Favorites</label>
+        <label><input type="checkbox" name="legendary"> Legendary</label>
+        <label data-box-filter hidden><input type="checkbox" name="boxed"> In the Box</label>
         <label><input type="checkbox" name="available"> Available to choose</label>
         <label data-source hidden>New companions<select name="source"><option value="starters">Starters</option><option value="any">All available Pokémon</option><option value="favorites">Favorites</option></select></label>
       </div>
     </details>
-  </form>
+  </div>
   <div class="catalog-toolbar">
     <span data-count role="status"></span>
     <button type="button" data-random>Random</button>
@@ -63,9 +69,20 @@ const pickerMarkup = `
         <label data-gender>Gender<select name="gender"></select></label>
         <label data-mega>Preview form<select name="megaView"></select></label>
         <label data-mega>Mega evolution<select name="megaMode"><option value="auto">While working</option><option value="on">Always</option><option value="off">Off</option></select></label>
+        <label data-mega-kind>Preferred Mega<select name="megaKind"></select></label>
         <label data-shiny><input type="checkbox" name="shiny"> Preview shiny</label>
       </div>
       <p data-availability></p>
+      <div class="catalog-preview-actions">
+        <button type="button" data-moves>Inspect moves</button>
+        <button type="button" data-close-preview>Close preview</button>
+      </div>
+      <details data-abilities hidden>
+        <summary>Abilities</summary>
+        <ul></ul>
+      </details>
+      <div class="catalog-evolutions" aria-label="Evolution line" hidden></div>
+      <div class="catalog-box-preview" hidden></div>
     </div>
   </section>
   <footer class="catalog-action">
@@ -74,25 +91,20 @@ const pickerMarkup = `
   </footer>
 `
 
-/** @typedef {import('../../catalog/dex.mjs').Pick} Pick */
-/**
- * @param {{ current?: Pick | null, onSelect: (pick: Pick) => void | Promise<void>,
- * onClose?: () => void, favorites?: string[],
- * onFavoritesChange?: (keys: string[], change: {key: string, favorite: boolean}) => string[] | Promise<string[] | void> | void,
- * source?: string, onSourceChange?: (source: string) => Promise<void>,
- * unlocks?: import('../../catalog/dex.mjs').Unlocks, taken?: ReadonlySet<number> }} options
- * @returns {HTMLDialogElement}
- */
 export function openCatalogPicker({
   current = null,
+  currentName,
   onSelect,
-  onClose,
   favorites = [],
   onFavoritesChange,
-  source = 'starters',
+  source = 'any',
   onSourceChange,
   unlocks = {},
-  taken = new Set()
+  taken = new Set(),
+  onTeach,
+  boxed,
+  loadBox,
+  onBringOut
 }) {
   const dialog = document.createElement('dialog')
   dialog.className = 'catalog-picker'
@@ -108,12 +120,20 @@ export function openCatalogPicker({
   const sourceField = field('source')
   const available = field('available')
   const megaFilter = field('mega')
+  const legendary = field('legendary')
+  const boxFilter = field('boxed')
   const list = find('.catalog-list')
   const preview = find('.catalog-preview')
   const pose = field('pose')
   const gender = field('gender')
   const megaView = field('megaView')
   const megaMode = field('megaMode')
+  const megaKind = field('megaKind')
+  const inspect = find('[data-moves]')
+  const teach = find('[data-teach]')
+  const abilities = find('[data-abilities]')
+  const evolutions = find('.catalog-evolutions')
+  const boxPreview = find('.catalog-box-preview')
   const shiny = field('shiny')
   const canvas = find('canvas')
   const artStatus = find('[data-art-status]')
@@ -133,10 +153,18 @@ export function openCatalogPicker({
   let scheduled
   let saving = false
   let savingFavorite = false
+  let boxQuery
   const currentEntry = entryOf(current)
   const currentKey = currentEntry && entryKey(currentEntry)
-  const eligible = (entry) => canChoose(entry, unlocks)
-  const selectable = (entry) => entry === currentEntry || eligible(entry)
+  const selectable = (entry) => entry === currentEntry || canChoose(entry, unlocks)
+  find('[data-box-filter]').hidden = !boxed?.size
+  teach.textContent = `Teach moves · ${currentName}`
+  teach.parentElement.hidden = !onTeach
+  teach.onclick = () => {
+    if (!saving) {
+      void onTeach(teach)
+    }
+  }
   const randomChoices = () =>
     results.filter((entry) => entry !== selected && entry !== currentEntry && selectable(entry))
 
@@ -150,12 +178,20 @@ export function openCatalogPicker({
   available.checked = unlocks.trainer === true
 
   function renderResults() {
+    const filterKeys = favoriteFilter.checked ? keys : boxed
+    const filtered =
+      favoriteFilter.checked && boxFilter.checked
+        ? keys.filter((key) => boxed.has(key))
+        : boxFilter.checked || favoriteFilter.checked
+          ? filterKeys
+          : undefined
     results = searchEntries(search.value, {
       region: region.value,
       types: [type.value, secondType.value].filter(Boolean),
       mega: megaFilter.checked,
-      keys: favoriteFilter.checked ? new Set(keys) : undefined,
-      available: unlocks.trainer ? eligible : available.checked ? selectable : undefined
+      legends: legendary.checked,
+      keys: filtered && new Set(filtered),
+      available: available.checked ? selectable : undefined
     })
     const pages = Math.max(1, Math.ceil(results.length / PAGE_SIZE))
     page = Math.min(page, pages - 1)
@@ -197,8 +233,11 @@ export function openCatalogPicker({
     favorite.textContent = favoriteOn ? 'Favorited' : 'Favorite'
     const canPreviewShiny = mega?.shiny ?? selected.shiny
     find('[data-shiny]').hidden = !canPreviewShiny
+    const same = currentKey === key
     find('[data-availability]').textContent = !selectable(selected)
-      ? 'This Pokémon is locked.'
+      ? isLegendary(selected.dex) && !unlocks.legendsOpen && !unlocks.caught?.has(selected.dex)
+        ? 'Catch this Legendary Pokémon or open legendary Pokémon in Settings to choose it.'
+        : 'Trainer mode: catch one or evolve a companion to choose it.'
       : shiny.checked &&
           canPreviewShiny &&
           !unlocks.shinyUnlocked?.has(selected.dex) &&
@@ -206,6 +245,12 @@ export function openCatalogPicker({
         ? 'Catch a shiny to choose its shiny form directly.'
         : ''
     choose.disabled = saving || !selectable(selected)
+    choose.textContent = same
+      ? 'Keep Pokémon'
+      : currentName
+        ? `Replace ${currentName}`
+        : 'Choose Pokémon'
+    showAbilities(abilities, selected, mega)
   }
 
   function renderArt() {
@@ -273,11 +318,19 @@ export function openCatalogPicker({
       )
     }
     megaMode.value = current?.mega ?? 'auto'
+    megaKind.replaceChildren(
+      ...megas.map(({ kind }) => new Option(kind ? `Mega ${kind}` : 'Mega', kind))
+    )
+    if (same && megas.some(({ kind }) => kind === current.megaKind)) {
+      megaKind.value = current.megaKind
+    }
+    find('[data-mega-kind]').hidden = megas.length < 2
     for (const control of dialog.querySelectorAll('[data-mega]')) {
       control.hidden = !megas.length
     }
     shiny.checked = same && current.shiny === true
     find('#catalog-preview-title').textContent = entry.name
+    abilities.open = false
     preview.hidden = false
     random.disabled = !randomChoices().length
     for (const button of list.querySelectorAll('button')) {
@@ -285,6 +338,87 @@ export function openCatalogPicker({
     }
     renderChoice()
     renderArt()
+    showEvolutionLine(evolutions, entry, (nextEntry) => {
+      if (nextEntry !== selected && !saving) {
+        const keepShiny = shiny.checked
+        showPreview(nextEntry)
+        if (keepShiny && nextEntry.shiny) {
+          shiny.checked = true
+          renderChoice()
+          renderArt()
+        }
+        evolutions.querySelector('[aria-pressed="true"]')?.focus()
+      }
+    })
+    void renderBoxPreview(entry)
+  }
+
+  async function renderBoxPreview(entry) {
+    boxPreview.hidden = true
+    boxPreview.replaceChildren()
+    if (!boxed?.has(entryKey(entry))) {
+      return
+    }
+    const { dex, form } = entry
+    const query = loadBox({ dex, ...(form && { form }) })
+    boxQuery = query
+    try {
+      const { count, entries } = await query
+      if (boxQuery !== query || entry !== selected || !dialog.open || !count) {
+        return
+      }
+      const heading = document.createElement('h4')
+      heading.textContent =
+        count > entries.length
+          ? `In the Box · ${entries.length} of ${count} shown`
+          : `In the Box (${count})`
+      boxPreview.append(heading)
+      for (const individual of entries) {
+        const row = document.createElement('div')
+        const name = document.createElement('span')
+        name.textContent = [
+          individual.name,
+          individual.shiny && 'Shiny',
+          individual.alpha && 'Alpha',
+          `Friendship ${individual.friendship}/100`,
+          individual.nature,
+          `${individual.jobs} jobs`,
+          individual.held && `Holding ${individual.held}`,
+          individual.ball && `Caught in ${individual.ball}`
+        ]
+          .filter(Boolean)
+          .join(' · ')
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.textContent = 'Bring out'
+        button.setAttribute('aria-label', `Bring out ${individual.name}`)
+        button.onclick = () => void commitSelection(() => onBringOut(individual.ref))
+        row.append(name, button)
+        boxPreview.append(row)
+      }
+      boxPreview.hidden = false
+    } catch (error) {
+      if (boxQuery === query && entry === selected && dialog.open) {
+        saveStatus.textContent = error.message
+      }
+    }
+  }
+
+  inspect.onclick = () => {
+    if (!saving) {
+      const mega = megaForms(selected)[Number(megaView.value) - 1]
+      void openMovePreview(selected, mega?.kind, () => inspect.focus())
+    }
+  }
+  find('[data-close-preview]').onclick = () => {
+    selected = undefined
+    preview.hidden = true
+    clearTimeout(scheduled)
+    art?.abort()
+    choose.disabled = true
+    choose.textContent = 'Choose Pokémon'
+    renderResults()
+    search.focus()
   }
 
   const resetPage = () => {
@@ -300,21 +434,21 @@ export function openCatalogPicker({
     clearTimeout(scheduled)
     art?.abort()
     dialog.remove()
-    onClose?.()
   }
 
   function closePicker() {
     dialog.close()
     cleanup()
   }
-  find('.catalog-search').addEventListener('submit', (event) => {
-    event.preventDefault()
-    if (!saving && results.length) {
-      showPreview(results.length === 1 ? results[0] : results[page * PAGE_SIZE])
-    }
-  })
   search.addEventListener('input', resetPage)
   search.addEventListener('keydown', (event) => {
+    if (event.isComposing) {
+      return
+    }
+    if (event.key === 'Enter' && !saving && results.length === 1) {
+      event.preventDefault()
+      showPreview(results[0])
+    }
     if (event.key === 'ArrowDown' && list.firstElementChild) {
       event.preventDefault()
       list.firstElementChild.firstElementChild.focus()
@@ -356,7 +490,6 @@ export function openCatalogPicker({
   }
   retry.onclick = renderArt
   find('[data-source]').hidden = !onSourceChange || unlocks.trainer
-  available.closest('label').hidden = !!unlocks.trainer
   sourceField.value = source
   sourceField.onchange = async () => {
     sourceField.disabled = true
@@ -380,9 +513,8 @@ export function openCatalogPicker({
     saveStatus.textContent = ''
     const key = entryKey(selected)
     const enabled = !keys.includes(key)
-    const updated = enabled ? [...keys, key] : keys.filter((saved) => saved !== key)
     try {
-      keys = (await onFavoritesChange?.(updated, { key, favorite: enabled })) ?? updated
+      keys = await onFavoritesChange({ key, favorite: enabled })
       renderChoice()
       renderResults()
     } catch {
@@ -399,9 +531,7 @@ export function openCatalogPicker({
     const same = currentKey === entryKey(selected)
     const { dex, form } = selected
     const megas = megaForms(selected)
-    const kind =
-      megas[Number(megaView.value) - 1]?.kind ??
-      megas.find(({ kind }) => same && kind === current.megaKind)?.kind
+    const kind = megas.length > 1 ? megaKind.value : undefined
     const nextGender = gender.value
     const nextPick = {
       dex,
@@ -414,12 +544,29 @@ export function openCatalogPicker({
       ...(kind !== undefined ? { megaKind: kind } : {}),
       ...(nextGender ? { gender: nextGender } : {})
     }
+    const previous = {
+      ...current,
+      mega: current?.mega ?? 'auto',
+      megaKind: current?.megaKind ?? megas[0]?.kind,
+      shiny: !!current?.shiny
+    }
+    if (same && Object.entries(nextPick).every(([key, value]) => value === previous[key])) {
+      closePicker()
+      return
+    }
+    await commitSelection(() => onSelect(nextPick))
+  }
+
+  async function commitSelection(action) {
+    if (saving) {
+      return
+    }
     saving = true
     choose.disabled = true
     saveStatus.textContent = ''
     find('[data-cancel]').disabled = true
     try {
-      await onSelect(nextPick)
+      await action()
     } catch (error) {
       saveStatus.textContent = error.message || 'Could not save Pokémon. Try again.'
       saving = false

@@ -3,6 +3,7 @@ import catalog from './pokerdr-data.json' with { type: 'json' }
 const { FEMALE_RATE, FEMALE_SHINY, FEMALE_SPRITE, MEGA, REGIONAL, SEASONAL, SPECIES, ENTRY_TYPES } =
   catalog
 const legendary = new Set(catalog.LEGENDARY)
+export const isLegendary = (dex) => legendary.has(dex)
 export const TYPES = catalog.TYPES
 export const REGIONS = [
   'Kanto',
@@ -103,19 +104,20 @@ export function canChoose(entry, unlocks = {}) {
     return false
   }
   const caught = unlocks.caught?.has(entry.dex)
-  if (!unlocks.legendsOpen && legendary.has(entry.dex) && !caught) {
+  if (!unlocks.legendsOpen && isLegendary(entry.dex) && !caught) {
     return false
   }
   return !unlocks.trainer || caught || STARTERS.includes(entry.dex)
 }
 
-export function searchEntries(query, { region, types = [], mega, keys, available } = {}) {
+export function searchEntries(query, { region, types = [], mega, legends, keys, available } = {}) {
   const search = fold(query.trim()).replace(/^#/, '')
   const terms = search.split(/\s+/).filter(Boolean)
   return [...entries.values()].filter((entry) => {
     if (
       (region && entry.region !== region) ||
       (mega && !megaForms(entry).length) ||
+      (legends && !isLegendary(entry.dex)) ||
       (keys && !keys.has(entryKey(entry))) ||
       (available && !available(entry))
     ) {

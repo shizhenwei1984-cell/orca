@@ -387,42 +387,6 @@ button:disabled {
   width: 64px;
 }
 
-#move-editor-form:not([hidden]) {
-  display: grid;
-  gap: 8px;
-  overflow: auto;
-}
-#move-editor-form-field[hidden],
-#move-editor-status:empty {
-  display: none;
-}
-#move-editor fieldset {
-  min-inline-size: 0;
-  margin: 0;
-  padding: 8px;
-  border: 1px solid var(--orca-border);
-  border-radius: var(--orca-radius);
-}
-#move-editor-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
-  gap: 4px;
-  max-block-size: 190px;
-  overflow: auto;
-  margin-block-start: 4px;
-}
-#move-editor-options label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  overflow-wrap: anywhere;
-}
-#move-editor-options small {
-  display: block;
-  white-space: normal;
-}
-
 #trainer-tabs,
 .trainer-toolbar {
   display: flex;
