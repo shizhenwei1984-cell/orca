@@ -1,4 +1,5 @@
 import { species, starterDex } from './pokemon.mjs'
+import { mountTrainer } from './trainer.js'
 
 const poses = {
   working: ['Working', 'walk', '640ms'],
@@ -26,6 +27,7 @@ const companions = new Map()
 let progress = new Map()
 let readingProgress = false
 let progressDirty = false
+const trainerGame = mountTrainer(() => [...terminals].slice(0, 50))
 
 function duration(ms) {
   const sec = Math.floor(ms / 1000)
@@ -46,6 +48,10 @@ function updatePose(row, pokemon, state) {
   row.dataset.state = state
   row.querySelector('.state').textContent = label
   const sprite = row.querySelector('.sprite')
+  sprite.hidden = !pokemon?.walk
+  if (!pokemon?.walk) {
+    return
+  }
   sprite.style.backgroundImage = `url('./sprites/${pokemon.name.toLowerCase()}-${pose}.png')`
   sprite.style.setProperty('--frames', pose === 'sleep' ? 2 : pokemon[pose])
   sprite.style.setProperty('--duration', duration)
@@ -55,13 +61,13 @@ function paintCompanion({ row, starter, state }, member) {
   const dex = member?.dex ?? starter
   const current = species[dex]
   updatePose(row, species[member?.starter ?? starter], state)
-  row.querySelector('small').textContent = current.name
+  row.querySelector('small').textContent = member?.name ?? current?.name ?? `#${dex}`
   row.querySelector('.progress').hidden = !member
   if (member) {
     const reward = member.lastReward ? ` · +₽${number.format(member.lastReward)} last job` : ''
     row.querySelector('.career').textContent =
       `${jobCount(member.jobs)} · ${duration(member.workMs)} worked${reward}`
-    const evolution = current.evolution
+    const evolution = current?.evolution
     const next = evolution?.jobs
       ? ` · ${member.stageJobs}/${evolution.jobs} to ${species[evolution.dex].name}`
       : evolution?.item
@@ -82,6 +88,7 @@ function addAgent(agent) {
   const title = agent.title || agent.agent || 'Agent'
   const name = row.querySelector('strong')
   name.textContent = name.title = title
+  row.querySelector('.care').onclick = () => trainerGame.openParty(agent.terminalId)
   paintCompanion(companion, progress.get(agent.terminalId))
   if (agent.terminalId) {
     companions.set(agent.terminalId, companion)
@@ -123,7 +130,9 @@ async function readProgress() {
     progressDirty = false
     const version = revision
     try {
-      const view = await window.orca.plugin.request('trainer.read', { terminalIds: [...terminals] })
+      const view = await window.orca.plugin.request('trainer.read', {
+        terminalIds: [...terminals].slice(0, 50)
+      })
       if (version !== revision) {
         continue
       }
@@ -164,6 +173,7 @@ async function refresh(nextContext) {
   pendingStates = null
   updateCount()
   void readProgress()
+  void trainerGame.refresh(true)
   if (!context) {
     return
   }
