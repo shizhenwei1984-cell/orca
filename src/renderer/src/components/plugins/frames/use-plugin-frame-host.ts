@@ -1,5 +1,21 @@
+import { translate } from '@/i18n/i18n'
 import { runPluginPanelCommandFromGuestChord } from '@/lib/plugins/commands/plugin-command-execution'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject
+} from 'react'
+import { ConfirmationDialogContext } from '@/components/dismiss/confirmation/confirmation-dialog-context'
+import {
+  WORKSPACE_VIEW_AUTHORIZATION,
+  WORKSPACE_VIEW_CHANGED,
+  isWorkspaceViewMethod
+} from '../../../../../shared/plugins/frames/plugin-workspace-view'
+import { createPluginWorkspaceViewHost } from './plugin-workspace-view-host'
 import { FRAME_EVENTS } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
   PLUGIN_FRAME_IPC_CHANNEL,
@@ -8,6 +24,7 @@ import {
 import { pluginEvent } from '../../../../../shared/plugins/frames/plugin-protocol'
 import { pluginPanelPushSchema } from '../../../../../shared/plugins/workers/plugin-panel-bridge-protocol'
 import {
+  callPanelActionViaPreload,
   createPluginFrameEnvelopeHandler,
   createPluginFrameMessageHandler,
   type PluginFrameDeclarativeChannel,
@@ -57,6 +74,7 @@ export function usePluginFrameHost(options: {
     consumeHostActivation,
     trackHostCall
   } = options
+  const confirm = useContext(ConfirmationDialogContext)
   const [loadedFrameKey, setLoadedFrameKey] = useState<string | null>(null)
   const onUnresponsiveRef = useRef(options.onUnresponsive)
   const onGuestGoneRef = useRef(options.onGuestGone)
@@ -87,9 +105,20 @@ export function usePluginFrameHost(options: {
       return
     }
     let active = true
+    const workspaceView =
+      surface === 'panel' && panelTabKey && !(element instanceof HTMLIFrameElement)
+        ? createPluginWorkspaceViewHost({
+            tabKey: panelTabKey,
+            sessionToken: () => sessionTokenRef.current,
+            confirm,
+            onChange: (reset) =>
+              getFrameWindow()?.postMessage(pluginEvent(WORKSPACE_VIEW_CHANGED, { reset }), '*')
+          })
+        : null
     let unregisterActivation: (() => void) | undefined
     const deactivate = (): void => {
       active = false
+      workspaceView?.dispose()
       unregisterActivation?.()
     }
     const hostOptions = {
@@ -98,8 +127,24 @@ export function usePluginFrameHost(options: {
       getFrameWindow,
       getSessionToken: () => sessionTokenRef.current,
       isActive: () => active,
+      callHostMethod: async (call: Parameters<typeof callPanelActionViaPreload>[0]) => {
+        if (call.action === WORKSPACE_VIEW_AUTHORIZATION) {
+          return {
+            ok: false as const,
+            code: 'not_permitted' as const,
+            error: translate(
+              'auto.components.rightSidebar.pluginPanelBridgeHost.actionsUnavailable',
+              'Plugin actions are not available in this client.'
+            )
+          }
+        }
+        return isWorkspaceViewMethod(call.action) && workspaceView
+          ? workspaceView.call(call)
+          : callPanelActionViaPreload(call)
+      },
       onOpenPanel: panelTabKey
-        ? (params: unknown) => openSiblingPluginPanel(panelTabKey, params)
+        ? (params: unknown) =>
+            openSiblingPluginPanel(panelTabKey, params, workspaceView?.permitsHandle)
         : undefined,
       onPanelActivationReady: (workspaceId: unknown) => {
         if (panelTabKey) {
@@ -167,6 +212,7 @@ export function usePluginFrameHost(options: {
       element.removeEventListener('render-process-gone', onGone)
     }
   }, [
+    confirm,
     consumeHostActivation,
     declarative,
     editor,

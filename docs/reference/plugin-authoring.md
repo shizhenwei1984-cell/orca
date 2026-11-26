@@ -316,6 +316,24 @@ export async function setup() {
 }
 ```
 
+### Desktop panel workspace view
+
+Use `orca.host.has('workspace.view')` to feature-detect this extension in an isolated desktop panel. It is available to approved panel sessions. Worker calls, custom editors, and paired web frames have no access to it.
+
+Call `orca.host.call('workspace.view')` with no parameters. The host chooses the workspace currently shown in the panel's Orca window. The result is null when none is available. Otherwise it includes:
+
+- `workspace`, an opaque handle for this panel session and the current selection.
+- `workspaceId`, the public catalog ID when available, and `hostId`, the execution host. Legacy workspaces may have only the opaque handle.
+- `grant`, either null, `read`, or `rename`. Read includes selecting a listed tab. Rename adds the title write.
+- `tabs`, up to 50 rows with opaque `id`, `type` (`terminal`, `editor`, or `chat`) and display `title`. `selected` identifies the selected row or is null. `truncated` indicates additional rows.
+- `git`, null for folders, denied workspaces, and missing Git status. For a Git checkout it contains the checkout kind, branch when applicable, primary checkout flag, upstream ahead/behind counts when available, and review badge state. The review contains a number, provider and canonical HTTP(S) link when available. It can report loading or unavailable.
+
+Call `workspace.viewAccess` with `{ workspace }` from a trusted click or key press to open Orca's permission dialog. Pass `revoke: true` to request removal. The native prompt names the plugin, workspace, and execution host. Access persists in the profile and can also be removed from the plugin detail page.
+
+Call `workspace.selectTab` with `{ workspace, tab }`, or `workspace.renameTab` with `{ workspace, tab, title }`. Use the returned IDs, which expire on workspace or host switches, closure, or permission changes. Rename applies to terminals and structured chats using native title behavior. Editor rename moves a file and is outside this permission. The opaque workspace handle can also address instances without a public ID in `orca.plugin.openPanel` while read access is active.
+
+Call `workspace.refreshReview` with `{ workspace }` from a trusted click or key press. This uses Orca's native review refresh. Open a projected link with `orca.shell.openExternal`, which retains Orca's own confirmation. Listen with `orca.on('workspace.viewChanged', callback)` and re-read on a notification. A notification with `reset: true` invalidates the old snapshot immediately.
+
 ### Custom editors
 
 A custom editor opens files that end in one of its `extensions` (with the dot, such as

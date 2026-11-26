@@ -2,8 +2,9 @@
 // Adapted for Orca from Pokémon Sidebar's lists, cards, menus and controls. See NOTICE.
 import { choosePokemon } from './companion-picker.mjs'
 import { agentGroups, groupsOf, projectKey, workspaceRows } from './navigation.mjs'
-import { button, element, menu, popup } from './row-controls.mjs'
+import { button, element, keyboardMenu, menu, popup } from './row-controls.mjs'
 import { terminal } from './terminal-card.mjs'
+import { workspaceView } from './workspace-view.mjs'
 
 const { host, plugin } = window.orca
 const byId = (id) => document.getElementById(id)
@@ -110,6 +111,9 @@ function workspaceActions(workspace, project) {
         )
     ])
   }
+  if (scopedView.matches(workspace)) {
+    items.push(...scopedView.accessItems(scopedView.current()))
+  }
   if (project) {
     const hidden = !project.hidden
     items.push([
@@ -173,7 +177,7 @@ function terminalActions(row) {
               .openPanel({
                 panel: 'pokemon-herd',
                 action,
-                workspaceId: workspace.id,
+                workspaceId: scopedView.activationTarget(workspace),
                 input: [terminalId, pokemon.ref.slot, pokemon.ref.id]
               })
               .catch(announce)
@@ -210,8 +214,9 @@ function terminalRow(row, rail, showWorkspace = false) {
   })
 }
 
-function workspaceSection(workspace, rows, project, rail) {
-  const current = workspace.id === index.activeWorkspace
+function workspaceSection(workspace, rows, project, rail, query) {
+  const scope = scopedView.forWorkspace(workspace)
+  const current = Boolean(scope) || workspace.id === index.activeWorkspace
   const section = element('section')
   const title = button('', () =>
     invoke('sidebar.openWorkspace', { workspaceId: workspace.id }, () => {
@@ -242,6 +247,7 @@ function workspaceSection(workspace, rows, project, rail) {
     title.dataset.current = String(current)
     title.setAttribute('aria-label', title.title)
     title.oncontextmenu = openActions
+    keyboardMenu(title, () => workspaceActions(workspace, project))
     section.append(title)
   } else {
     const wrapper = element('div', '', 'workspace-row')
@@ -263,6 +269,9 @@ function workspaceSection(workspace, rows, project, rail) {
       workspace.id
     )
     section.append(wrapper)
+  }
+  if (scope) {
+    section.append(scopedView.content(scope, rail, query))
   }
   if (rows.length) {
     const nested = element('div', '', 'terminal-list')
@@ -325,6 +334,7 @@ function render() {
   const workspaces = index.workspaces.filter((w) => prefs.hidden || !projectFor(w)?.hidden)
   const matches = (...labels) =>
     !query || labels.some((label) => label?.toLocaleLowerCase().includes(query))
+  const scope = scopedView.current()
   const rooms = workspaces.map((workspace) => ({
     workspace,
     matches: matches(workspace.name, workspace.branch, workspace.project),
@@ -356,18 +366,26 @@ function render() {
         )
       )
     }
+    if (scope && !workspaces.some(scopedView.matches)) {
+      contents.append(scopedView.standalone(scope, rail, query))
+    }
     const visible = rooms.flatMap(({ workspace, matches: workspaceMatches, rows }) => {
       const selected = workspaceMatches
         ? rows
         : rows.filter((r) => matches(r.name, r.pokemon?.name))
-      return workspaceMatches || selected.length ? [{ workspace, rows: selected }] : []
+      const scopedTabMatches =
+        scopedView.matches(workspace) && scope.tabs.some((tab) => matches(tab.title))
+      return workspaceMatches || selected.length || scopedTabMatches
+        ? [{ workspace, rows: selected }]
+        : []
     })
     const draw = ({ workspace, rows }) =>
       workspaceSection(
         workspace,
         rows.filter((row) => !pinnedKeys.has(row.key)),
         projectFor(workspace),
-        rail
+        rail,
+        query
       )
     if (rail) {
       const stack = element('div', '', 'rail-list')
@@ -545,7 +563,10 @@ byId('status').onchange = render
 byId('search').oninput = render
 byId('stacked').onchange = (event) => setPrefs({ stacked: event.target.checked })
 byId('hidden-projects').onchange = (event) => setPrefs({ hidden: event.target.checked })
-byId('refresh').onclick = () => schedule({ index: true, all: true })
+byId('refresh').onclick = () => {
+  schedule({ index: true, all: true })
+  scopedView.refresh()
+}
 byId('hide-sidebar').onclick = () => {
   byId('preferences').hidePopover()
   void invoke('sidebar.toggleRightSidebar')
@@ -556,6 +577,8 @@ setInterval(() => {
     render()
   }
 }, 30_000)
+
+const scopedView = workspaceView({ onChange: render, announce, ask })
 
 try {
   const stored = await readStorage(prefsKey)

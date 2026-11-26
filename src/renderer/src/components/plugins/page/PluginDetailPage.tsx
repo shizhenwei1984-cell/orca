@@ -38,6 +38,7 @@ import {
 } from '../presentation/plugin-install-count'
 import { PluginAuthorByline, PluginMoreFromAuthor } from './PluginAuthor'
 import { PluginPageIcon } from './PluginPageIcon'
+import { PluginWorkspaceAccess } from './PluginWorkspaceAccess'
 
 type PluginDetailPageProps = {
   entry: PluginListEntry
@@ -343,6 +344,7 @@ export function PluginDetailPage({
           {plugin && controls?.kind !== 'review' ? (
             <PluginAccessSection capabilities={plugin.capabilities} trust={model.trust} />
           ) : null}
+          {plugin ? <PluginWorkspaceAccess pluginKey={plugin.pluginKey} name={name} /> : null}
           {plugin ? (
             <PluginSettingsSection
               pluginKey={plugin.pluginKey}

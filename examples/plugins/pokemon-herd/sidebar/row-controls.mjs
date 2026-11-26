@@ -51,3 +51,12 @@ export function menu(row, label, getItems, key) {
   }
   row.append(trigger)
 }
+
+export function keyboardMenu(control, items) {
+  control.onkeydown = (event) => {
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      event.preventDefault()
+      popup(control, items())
+    }
+  }
+}

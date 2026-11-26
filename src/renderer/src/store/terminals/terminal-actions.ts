@@ -146,6 +146,7 @@ export type TerminalActions = {
     title: string | null,
     opts?: {
       recordInteraction?: boolean
+      isCurrent?: () => boolean
     }
   ) => void
   setTabColor: (tabId: string, color: string | null, opts?: { recordInteraction?: boolean }) => void

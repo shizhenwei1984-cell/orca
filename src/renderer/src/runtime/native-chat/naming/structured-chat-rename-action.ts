@@ -9,7 +9,11 @@ import {
 const intents = new WeakMap<() => AppState, Map<string, object>>()
 
 /** Capture the submitted occurrence and address before the rename module loads or navigation moves. */
-export function captureStructuredChatRename(get: () => AppState, tab: Tab) {
+export function captureStructuredChatRename(
+  get: () => AppState,
+  tab: Tab,
+  isCurrent?: () => boolean
+) {
   const state = get()
   const target = structuredAgentSessionTargetForTab(state, tab)
   const retainAlias = legacyStructuredChatRenameOwner(state, tab) === null
@@ -29,6 +33,7 @@ export function captureStructuredChatRename(get: () => AppState, tab: Tab) {
   const current = () => {
     const entry = currentTab()
     return (
+      isCurrent?.() !== false &&
       slots.get(key) === intent &&
       entry?.worktreeId === tab.worktreeId &&
       entry.contentType === tab.contentType &&

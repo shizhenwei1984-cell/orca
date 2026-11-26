@@ -30598,6 +30598,25 @@
       "t0f9f5503": "GitHub's own VS Code themes: Light Default, Dark Default, Dark Dimmed and the high-contrast variants.",
       "t0b4f7e19": "Unofficial ports of VS Code's default color themes: Dark Modern, Light Modern, Dark+ and Light+.",
       "tc86eed7d": "A reviewed starter lifecycle for disposable Multipass workspaces."
+    },
+    "workspaceView": {
+      "revokeTitle": "Remove workspace access?",
+      "allowTitle": "Allow workspace access?",
+      "revokeDescription": "Remove permission to read and select tabs, see Git review status, and rename tabs in this workspace.",
+      "allowDescription": "Allow this plugin to read tab titles, select tabs, and see Git checkout and review status in this workspace. You can remove access in the plugin’s settings.",
+      "remove": "Remove access",
+      "save": "Save access",
+      "allow": "Allow access",
+      "rename": "Also allow renaming chat and terminal tabs",
+      "settingsTitle": "Workspace access",
+      "settingsRename": "Read tabs and reviews, select and rename tabs",
+      "settingsRead": "Read tabs and reviews, select tabs",
+      "scopeChanged": "The workspace view has changed.",
+      "activeOnly": "The workspace view uses the active workspace.",
+      "accessDenied": "Allow access to this workspace first.",
+      "targetChanged": "The tab or workspace has changed.",
+      "renameDenied": "Rename access is unavailable for this tab.",
+      "emptyTitle": "Enter a tab title."
     }
   },
   "checks": {
