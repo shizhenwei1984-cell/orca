@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store/index'
 import type { ActiveRightSidebarTab } from '../../../../../shared/ui-chrome/ui-chrome-types'
 import type { PluginPanelsFetchStatus } from '@/store/plugins/catalog/plugin-contribution-catalog'
@@ -7,6 +7,11 @@ import { resolveRightSidebarEffectiveTab } from './right-sidebar-effective-tab'
 import { useInstalledPluginRouteReconciliation } from '../plugin-panels/use-installed-plugin-route-reconciliation'
 import type { ActivityBarItem } from './activity-bar-buttons'
 import { openBotConnectorPage } from '@/components/bots/bot-connector-page'
+import {
+  canPlacePluginPanel,
+  openPluginPanel
+} from '@/components/plugins/view/plugin-panel-placement'
+import { isPluginPanelTabKey } from '../../../../../shared/plugins/frames/plugin-tab-key'
 
 // The last route request the panel saw, kept across unmounts: Settings unmounts it, and a request
 // made there (open a bot's Connectors) is still new when the panel mounts again.
@@ -37,6 +42,23 @@ export function useRightSidebarTabRouting({
   const setRightSidebarTab = useAppStore((s) => s.setRightSidebarTab)
   const showRightSidebarFiles = useAppStore((s) => s.showRightSidebarFiles)
   const setRightSidebarEffectiveTab = useAppStore((s) => s.setRightSidebarEffectiveTab)
+  const canPlacePanel = useAppStore(canPlacePluginPanel)
+  const placements = useAppStore((s) => s.pluginPanelDock.placements)
+  const dockedTabs = useMemo(
+    () =>
+      new Set(
+        visibleItems
+          .filter(
+            ({ id, defaultPlacement }) =>
+              canPlacePanel &&
+              defaultPlacement &&
+              isPluginPanelTabKey(id) &&
+              (placements[id] ?? defaultPlacement) !== 'right'
+          )
+          .map(({ id }) => id)
+      ),
+    [canPlacePanel, placements, visibleItems]
+  )
 
   const rememberedFolderTabByWorkspaceKeyRef = useRef<Record<string, ActiveRightSidebarTab>>({})
   const lastRightSidebarRouteRequestIdRef = useRef(seenRouteRequestId ?? rightSidebarRouteRequestId)
@@ -56,7 +78,7 @@ export function useRightSidebarTabRouting({
       : null
   const effectiveTab = resolveRightSidebarEffectiveTab({
     normalizedActiveTab,
-    visibleItems,
+    visibleItems: visibleItems.filter(({ id }) => !dockedTabs.has(id)),
     activeFolderWorkspaceKey,
     rememberedFolderTab: requestedFolderTab ?? rememberedFolderTab,
     leadWithFirstTab: isBotPage
@@ -88,6 +110,10 @@ export function useRightSidebarTabRouting({
     rememberedFolderTabByWorkspaceKeyRef.current[activeFolderWorkspaceKey] = effectiveTab
   }, [activeFolderWorkspaceKey, effectiveTab, visibleItems])
   const selectActivityTab = (tab: ActiveRightSidebarTab, fromKeyboard: boolean): void => {
+    if (dockedTabs.has(tab)) {
+      openPluginPanel(tab)
+      return
+    }
     if (activeFolderWorkspaceKey) {
       rememberedFolderTabByWorkspaceKeyRef.current[activeFolderWorkspaceKey] = tab
     }

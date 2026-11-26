@@ -208,6 +208,11 @@ worker runs as you and can read your files, saved logins and SSH keys like any o
 
 ### Panels, workers and data
 
+Set `defaultPlacement` to `bottom`, `left` or `right` to let users move a panel in the desktop
+workspace. For an isolated HTML panel, call `window.orca.panel?.setPreferredHeight(pixels)`
+to request the content height in CSS pixels. Orca applies the request to the bottom and left
+positions within the available workspace height. The right sidebar uses its usual full height.
+
 A plugin's panels, custom editors and worker are one program. A panel asks its own worker, the
 worker pushes back, and both read the same storage, settings and secrets (with the same
 capabilities). Every surface spells it the same way: frames on `window.orca`, components panels

@@ -87,6 +87,7 @@ export const UI_STATE_GLOBAL_FIELDS = [
   'sidebarOpen',
   'rightSidebarOpen',
   'rightSidebarTab',
+  'pluginPanelDock',
   'rightSidebarExplorerView',
   'rightSidebarWidth',
   'activityBarPosition',

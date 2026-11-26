@@ -126,6 +126,7 @@ export function usePersistedUIWriter(): void {
       sidebarOpen: s.sidebarOpen,
       rightSidebarOpen: s.rightSidebarOpen,
       rightSidebarTab: s.rightSidebarTab,
+      pluginPanelDock: s.pluginPanelDock,
       rightSidebarExplorerView: s.rightSidebarExplorerView,
       rightSidebarWidth: s.rightSidebarWidth,
       activityBarPosition: s.activityBarPosition,

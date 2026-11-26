@@ -7,6 +7,7 @@ export const PLUGIN_MANIFEST_V2_SINCE = '1.4.245'
 export const PLUGIN_DERIVED_PUBLISHER_SINCE = '1.4.246'
 /** First release that reads panel `ui` (`components` panels) and the extended icon set. */
 export const PLUGIN_PANEL_UI_SINCE = '1.4.246'
+export const PLUGIN_PANEL_PLACEMENT_SINCE = '1.4.274'
 /** First release whose components panels draw catalog 2 (`ui.catalog` 2: Table, Tree, Tabs, ...). */
 export const PLUGIN_COMPONENTS_CATALOG_2_SINCE = '1.4.247'
 /** First release whose components panels draw catalog 4 (`ui.catalog` 4: Box). */

@@ -599,6 +599,19 @@
             "html",
             "components"
           ]
+        },
+        "defaultPlacement": {
+          "description": "Opts into movable desktop workspace panels and sets the initial position. A user can move it between the bottom, left sidebar, and right sidebar. Without this field the panel stays in the right sidebar.",
+          "x-orca-since": "1.4.274",
+          "examples": [
+            "bottom"
+          ],
+          "type": "string",
+          "enum": [
+            "bottom",
+            "left",
+            "right"
+          ]
         }
       },
       "required": [

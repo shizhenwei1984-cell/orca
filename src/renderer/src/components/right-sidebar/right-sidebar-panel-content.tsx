@@ -48,6 +48,7 @@ export function RightSidebarPanelContent({
       data-right-sidebar-panel=""
       // `orca plugin shot` captures exactly this rect.
       data-plugin-panel-surface={isPluginPanelTabKey(effectiveTab) ? effectiveTab : undefined}
+      data-plugin-panel-placement={isPluginPanelTabKey(effectiveTab) ? 'right' : undefined}
     >
       <Suspense fallback={effectiveTab === 'bot-chats' ? <BotChatsSkeleton toolbar /> : null}>
         {effectiveTab === 'explorer' && <FileExplorer />}

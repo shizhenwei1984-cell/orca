@@ -17,7 +17,8 @@
         "id": "pokemon-herd",
         "title": "Pokémon Herd",
         "icon": "activity",
-        "entry": "panel/index.html"
+        "entry": "panel/index.html",
+        "defaultPlacement": "bottom"
       },
       {
         "id": "pokemon-sidebar",

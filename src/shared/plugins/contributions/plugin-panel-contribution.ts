@@ -2,10 +2,12 @@ import { z } from 'zod'
 import { safePluginDisplayText } from '../manifest/plugin-display-text'
 import { pluginIdSchema, pluginRelativePathSchema } from '../manifest/plugin-manifest-fields'
 import { PLUGIN_ENUM_SINCE_KEY } from '../manifest/plugin-engine-floor-keys'
+import { PLUGIN_PANEL_PLACEMENTS } from './plugin-panel-placement'
 import {
   pluginPathFieldDoc,
   pluginFieldDoc,
   PLUGIN_PANEL_UI_SINCE,
+  PLUGIN_PANEL_PLACEMENT_SINCE,
   PLUGIN_SCHEMA_SINCE_V1,
   PLUGIN_SOURCE_MODULES_SINCE
 } from '../manifest/plugin-schema-field-docs'
@@ -137,6 +139,16 @@ export const pluginPanelContributionSchema = z
           'How the panel draws its UI. `html` (default) shows `entry` as a web page in an isolated frame; `components` runs `entry` as a hidden module and Orca draws the component tree it returns with its own controls.',
           PLUGIN_PANEL_UI_SINCE,
           ['components']
+        )
+      ),
+    defaultPlacement: z
+      .enum(PLUGIN_PANEL_PLACEMENTS)
+      .optional()
+      .meta(
+        pluginFieldDoc(
+          'Opts into movable desktop workspace panels and sets the initial position. A user can move it between the bottom, left sidebar, and right sidebar. Without this field the panel stays in the right sidebar.',
+          PLUGIN_PANEL_PLACEMENT_SINCE,
+          ['bottom']
         )
       )
   })
