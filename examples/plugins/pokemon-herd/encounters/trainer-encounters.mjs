@@ -1,0 +1,408 @@
+import { isDeepStrictEqual } from 'node:util'
+import { pokemonId, trainerAction } from '../trainer-actions.mjs'
+import {
+  changeItems,
+  creditResearch,
+  MINUTE,
+  registerCaught,
+  registerSeen,
+  resolvePartyMember,
+  savedPokemon,
+  settleBadges,
+  trainerPerks,
+  trainerPick
+} from '../trainer-game.mjs'
+import { createEncounterState, hpOf } from './encounter-state.js'
+import { renderEncounterSnapshot } from './encounter-view.js'
+import { transitionEncounter } from './encounters.js'
+import { isWalkable } from './rules/dex.js'
+import { addMoney } from './rules/items.js'
+import { BAIT, AUTO_BAIT, dayOf } from './rules/trainer.js'
+import { TOWER_HEAL_IDS } from './rules/trainers.js'
+import { weatherNow } from './rules/weather.js'
+import { VISIT_EVERY } from './rules/settings.js'
+
+const playerActions = new Set([
+  'attack',
+  'call',
+  'gift',
+  'heal',
+  'nearby',
+  'raid-hit',
+  'spar',
+  'throw',
+  'tower-start',
+  'tower-quit',
+  'withdraw'
+])
+const stateFor = (save, workspaceId) =>
+  Object.hasOwn(save.encounters ?? {}, workspaceId) ? save.encounters[workspaceId] : null
+const workspaceOf = (member) => member?.workspaceListId ?? member?.workspaceId
+
+function roomScope(save, scope, requested) {
+  const rooms = new Set(scope.slots.map((slot) => workspaceOf(save.party[slot])).filter(Boolean))
+  const workspaceId = requested || (rooms.size === 1 ? rooms.values().next().value : null)
+  const slots = scope.slots.filter((slot) => {
+    const room = workspaceOf(save.party[slot])
+    return workspaceId && (!room || room === workspaceId) && save.party[slot]?.pokemon
+  })
+  return { ...scope, slots, workspaceId }
+}
+
+function rulesFor(save, { slots, at, rnd, settings, rain }) {
+  const party = Object.fromEntries(
+    slots.map((slot) => [slot, trainerPick(save.party[slot].pokemon)])
+  )
+  const ownedPicks = [
+    ...Object.values(save.party).flatMap(({ pokemon }) => (pokemon ? [trainerPick(pokemon)] : [])),
+    ...Object.values(save.box).map(trainerPick)
+  ]
+  const top = new Map()
+  for (const { pokemon } of Object.values(save.party)) {
+    if (pokemon) {
+      top.set(pokemon.dex, (top.get(pokemon.dex) ?? 0) + pokemon.jobs)
+    }
+  }
+  const topDex = [...top].sort((a, b) => b[1] - a[1])[0]?.[0]
+  return {
+    now: at,
+    random: rnd,
+    party,
+    ownedPicks,
+    items: save.bag.items,
+    dex: save.dex,
+    daily: save.daily,
+    jobs: save.work.jobs,
+    topDex,
+    perks: trainerPerks(save, slots),
+    workingSlots: slots.filter((slot) => save.party[slot].run?.state === 'working'),
+    weather: rain === 'rain' || rain === 'storm' ? weatherNow(rain) : undefined,
+    settings,
+    xAttack: save.boosts?.['x-attack'] > at
+  }
+}
+
+function applyEncounter(save, action, context) {
+  const { workspaceId, slots, at, key } = context
+  const prior = stateFor(save, workspaceId)
+  const current =
+    prior && save.towerPaid && prior.tower.run
+      ? { ...prior, tower: { ...prior.tower, paid: save.towerPaid } }
+      : prior
+  const { state, deltas, error } = transitionEncounter(current, action, rulesFor(save, context))
+  if (error) {
+    throw new Error(error)
+  }
+  if (isDeepStrictEqual(prior, state)) {
+    return save
+  }
+
+  const stateWithRevision = { ...state, revision: (prior?.revision ?? 0) + 1 }
+  const paid = state.tower.paid
+  const towerPaid =
+    paid &&
+    (!save.towerPaid ||
+      paid.day > save.towerPaid.day ||
+      (paid.day === save.towerPaid.day && paid.floor > save.towerPaid.floor))
+      ? paid
+      : save.towerPaid
+  let next = {
+    ...save,
+    encounters: { ...save.encounters, [workspaceId]: stateWithRevision },
+    towerBest: Math.max(save.towerBest ?? 0, state.tower.best),
+    ...(towerPaid && { towerPaid })
+  }
+  if (Object.keys(deltas.items).length) {
+    next = changeItems(next, deltas.items)
+    if (!next) {
+      throw new Error('The Bag changed. Try again.')
+    }
+  }
+  if (deltas.money || deltas.marks.trainers || deltas.marks.fullHearts) {
+    const { marks } = next.bag
+    next = {
+      ...next,
+      bag: {
+        ...addMoney(next.bag, deltas.money),
+        marks: {
+          ...marks,
+          ...(deltas.marks.trainers && { trainers: (marks.trainers ?? 0) + deltas.marks.trainers }),
+          ...(deltas.marks.fullHearts && { fullHearts: true })
+        }
+      }
+    }
+  }
+  if (Object.keys(deltas.party).length) {
+    const party = { ...next.party }
+    for (const [slot, pick] of Object.entries(deltas.party)) {
+      party[slot] = { ...party[slot], pokemon: savedPokemon(pick, party[slot].pokemon) }
+    }
+    next = { ...next, party }
+  }
+  if (deltas.seen.length) {
+    next = registerSeen(next, deltas.seen)
+    if (!next.visitors) {
+      next = { ...next, visitors: true }
+    }
+  }
+  for (const [id, pick] of Object.entries(deltas.box)) {
+    next = registerCaught(next, pick, `catch:${key ?? workspaceId}:${id}`, at, slots, {
+      research: false
+    })
+  }
+  for (const { event, count } of deltas.research) {
+    next = creditResearch(next, at, slots, event, count)
+  }
+  return settleBadges(next, slots)
+}
+
+export function settleEncounterWork(before, after, context) {
+  const { at } = context
+  const scope = roomScope(after, context, context.workspaceId)
+  const { workspaceId } = scope
+  const day = dayOf(at)
+  if (!workspaceId || after.daily?.day !== day) {
+    return after
+  }
+  const previous = before.daily?.day === day ? (before.daily.count.work ?? 0) : 0
+  const added = (after.daily.count.work ?? 0) - previous
+  if (!(added > 0)) {
+    return after
+  }
+  const cursor = Object.hasOwn(after.encounterWork ?? {}, workspaceId)
+    ? after.encounterWork[workspaceId]
+    : null
+  if (cursor?.day > day) {
+    return after
+  }
+  const start = cursor?.day === day ? cursor.ms : 0
+  const ms = start + Math.round(added * MINUTE)
+  const next = applyEncounter(
+    after,
+    {
+      type: 'work',
+      before: start / MINUTE,
+      after: ms / MINUTE
+    },
+    { rnd: Math.random, ...context, ...scope }
+  )
+  return { ...next, encounterWork: { ...next.encounterWork, [workspaceId]: { day, ms } } }
+}
+
+export function encounterTrainerAction(save, action, context) {
+  const scope = { ...context, ...roomScope(save, context, context.workspaceId) }
+  const prior = stateFor(save, scope.workspaceId)
+  const slot = action.target?.slot
+  if (action.type === 'use' && TOWER_HEAL_IDS.includes(action.item) && scope.slots.includes(slot)) {
+    if (pokemonId(save.party[slot].pokemon, slot) !== action.target.id) {
+      throw new Error('That Pokémon is no longer available.')
+    }
+    return applyEncounter(save, { type: 'heal', slot, item: action.item }, scope)
+  }
+  return trainerAction(save, action, {
+    ...context,
+    battles: {
+      hpOf: (slot) =>
+        prior && scope.slots.includes(slot) ? hpOf(prior, slot, context.at) : undefined,
+      swap: (next, slot) =>
+        scope.slots.includes(slot)
+          ? applyEncounter(next, { type: 'party-switch', slot }, scope)
+          : next
+    }
+  })
+}
+
+function requestScope(input) {
+  const { workspaceId, terminalIds, settings, rain } = input ?? {}
+  if (
+    (workspaceId != null && (typeof workspaceId !== 'string' || workspaceId.length > 1024)) ||
+    !Array.isArray(terminalIds) ||
+    terminalIds.length > 50 ||
+    terminalIds.some((id) => typeof id !== 'string' || id.length > 1024)
+  ) {
+    throw new Error('Invalid encounter workspace.')
+  }
+  return {
+    workspaceId,
+    terminalIds,
+    rain,
+    settings: {
+      ...(Object.hasOwn(VISIT_EVERY, settings?.visitors) && { visitors: settings.visitors }),
+      ...Object.fromEntries(
+        ['spar', 'chooseMoves', 'raids', 'outbreaks']
+          .filter((key) => typeof settings?.[key] === 'boolean')
+          .map((key) => [key, settings[key]])
+      )
+    }
+  }
+}
+
+function snapshotFor(save, context) {
+  const state = stateFor(save, context.workspaceId) ?? createEncounterState(context.at)
+  const snapshot = renderEncounterSnapshot(state, rulesFor(save, context))
+  return {
+    ...snapshot,
+    workspaceId: context.workspaceId,
+    revision: state.revision ?? 0,
+    party: snapshot.party.map((pick) => {
+      const { pokemon, terminalId } = save.party[pick.slot]
+      return { ...pick, pokemonId: pokemonId(pokemon, pick.slot), terminalId }
+    })
+  }
+}
+
+function verifyAction(save, state, context, action) {
+  for (const [field, idField] of [
+    ['slot', 'pokemonId'],
+    ['opponent', 'opponentId']
+  ]) {
+    if (action[field] === undefined) {
+      continue
+    }
+    const slot = action[field]
+    const member =
+      typeof slot === 'string' && context.slots.includes(slot) ? save.party[slot] : null
+    if (
+      !member?.pokemon ||
+      pokemonId(member.pokemon, slot) !== action[idField] ||
+      resolvePartyMember(save, member.terminalId)?.slot !== slot
+    ) {
+      throw new Error('That Pokémon is no longer available.')
+    }
+  }
+  if (
+    action.type === 'throw' &&
+    typeof action.bait === 'string' &&
+    action.bait !== AUTO_BAIT &&
+    (!Object.hasOwn(BAIT, action.bait) || !(save.bag.items[action.bait] > 0))
+  ) {
+    throw new Error('That Berry is unavailable.')
+  }
+  if (action.type === 'nearby' && !state?.visitor?.act) {
+    throw new Error('That visitor has already moved on.')
+  }
+}
+
+export function registerEncounterHandlers(
+  orca,
+  { store, getScope, clock = Date.now, rnd = Math.random }
+) {
+  const cries = new Map()
+  orca.panels.handle('encounter.cry', async ({ dex } = {}) => {
+    if (!Number.isInteger(dex) || !isWalkable(dex)) {
+      return null
+    }
+    if (cries.has(dex)) {
+      return cries.get(dex)
+    }
+    if (cries.size >= 32) {
+      cries.delete(cries.keys().next().value)
+    }
+    const source = `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${dex}.ogg`
+    const load = (async () => {
+      const response = await fetch(source, { redirect: 'error', signal: AbortSignal.timeout(6500) })
+      if (!response.ok || !response.body) {
+        return null
+      }
+      const chunks = []
+      let length = 0
+      for await (const chunk of response.body) {
+        length += chunk.length
+        if (length > 128 * 1024) {
+          return null
+        }
+        chunks.push(chunk)
+      }
+      const bytes = Buffer.concat(chunks)
+      const magic = bytes.toString('ascii', 0, 4)
+      if (magic === 'OggS') {
+        return `data:audio/ogg;base64,${bytes.toString('base64')}`
+      }
+      if (magic.startsWith('ID3') || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0)) {
+        return `data:audio/mpeg;base64,${bytes.toString('base64')}`
+      }
+      return null
+    })().catch(() => {
+      if (cries.get(dex) === load) {
+        cries.delete(dex)
+      }
+      return null
+    })
+    cries.set(dex, load)
+    return load
+  })
+
+  async function contextFor(save, input, at, fresh) {
+    return {
+      ...input,
+      ...roomScope(save, await getScope(save, input.terminalIds, fresh), input.workspaceId),
+      at,
+      rnd
+    }
+  }
+
+  orca.panels.handle('encounter.read', (raw) => {
+    const input = requestScope(raw)
+    return store.transact(
+      async (save) => {
+        const context = await contextFor(save, input, clock(), false)
+        if (!context.workspaceId || !context.slots.length) {
+          return { save, result: null }
+        }
+        const next = applyEncounter(save, { type: 'tick' }, context)
+        return { save: next, result: snapshotFor(next, context) }
+      },
+      (before, after) =>
+        before.bag !== after.bag ||
+        before.box !== after.box ||
+        before.party !== after.party ||
+        before.dex !== after.dex ||
+        before.daily !== after.daily
+    )
+  })
+
+  orca.panels.handle('encounter.command', (raw) => {
+    const input = requestScope(raw)
+    const { client, sequence, revision, action } = raw
+    if (
+      typeof client !== 'string' ||
+      !/^[a-f0-9]{36}$/.test(client) ||
+      !Number.isSafeInteger(sequence) ||
+      sequence < 1 ||
+      !Number.isSafeInteger(revision) ||
+      !playerActions.has(action?.type)
+    ) {
+      throw new Error('Invalid encounter command.')
+    }
+    const at = clock()
+    const receiptKey = `encounter:${client}`
+    return store.transact(async (save) => {
+      const receipt = save.receipts[receiptKey]
+      if (receipt && sequence <= receipt.sequence) {
+        return {
+          save,
+          result: sequence === receipt.sequence ? receipt.result : { ok: true, replayed: true }
+        }
+      }
+      const context = await contextFor(save, input, at, true)
+      try {
+        if (!context.workspaceId || !context.slots.length) {
+          throw new Error('Open a workspace with an active Pokémon.')
+        }
+        const state = stateFor(save, context.workspaceId)
+        if (revision !== (state?.revision ?? 0)) {
+          throw new Error('The encounter changed. Try again.')
+        }
+        verifyAction(save, state, context, action)
+        const next = applyEncounter(save, action, { ...context, key: `${client}:${sequence}` })
+        const result = { ok: true }
+        return {
+          save: { ...next, receipts: { ...next.receipts, [receiptKey]: { sequence, result } } },
+          result
+        }
+      } catch (error) {
+        return { save, result: { ok: false, error: error.message } }
+      }
+    })
+  })
+}

@@ -1,3 +1,9 @@
+import { registerCatalogSprites } from './catalog/sprite-worker.mjs'
+import {
+  encounterTrainerAction,
+  registerEncounterHandlers,
+  settleEncounterWork
+} from './encounters/trainer-encounters.mjs'
 import { registerTerminalFocus } from './terminal-focus.mjs'
 import { recordStatus, trainerView, workingMinutes } from './trainer.mjs'
 import { trainerAction } from './trainer-actions.mjs'
@@ -149,7 +155,8 @@ export function deactivate() {
 
 export default function activate(orca) {
   registerTerminalFocus(orca)
-  activateTrainer(orca)
+  registerCatalogSprites(orca)
+  activateTrainer(orca, { registerEncounterHandlers, encounterTrainerAction, settleEncounterWork })
 }
 
 export function activateTrainer(

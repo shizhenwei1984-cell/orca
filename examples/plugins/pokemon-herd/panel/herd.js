@@ -1,3 +1,6 @@
+import { loadCatalogSprite } from './catalog/sprite.mjs'
+import { mountEncounterGame } from './encounters/encounter-game.js'
+import { encounterSprites } from './encounters/encounter-sprites.js'
 import { species, starterDex } from './pokemon.mjs'
 import { mountTrainer } from './trainer.js'
 import { worldInteractions } from './world-interactions.js'
@@ -79,11 +82,36 @@ const world = mountWorld(worldContainer, {
     return false
   }
 })
-const playSound = bindWorldPreferences(orca, signal, (settings) => world.update({ settings }))
+const encounterContainer = document.querySelector('#encounters')
+let battleSoundChanged = false
+const encounters = mountEncounterGame(encounterContainer, {
+  request: (name, input) => orca.plugin.request(name, input, { signal }),
+  interactions: worldInteractions,
+  world: worldContainer,
+  ...encounterSprites(loadCatalogSprite),
+  onSettings({ battleSounds }) {
+    battleSoundChanged = true
+    return orca.storage.set('battle.sounds', battleSounds)
+  },
+  signal
+})
+void orca.storage
+  .get('battle.sounds')
+  .then((value) => {
+    if (!battleSoundChanged && typeof value === 'boolean') {
+      encounters.update({ settings: { battleSounds: value } })
+    }
+  })
+  .catch(() => {})
+const playSound = bindWorldPreferences(orca, signal, (settings) => {
+  world.update({ settings })
+  encounters.update({ settings })
+})
 
 function selectView(party) {
   actions.hidePopover()
   worldContainer.hidden = party
+  encounterContainer.hidden = party
   herd.hidden = !party
   showWorld.setAttribute('aria-pressed', String(!party))
   showParty.setAttribute('aria-pressed', String(party))
@@ -413,7 +441,10 @@ retry.onclick = () => {
 
 // workspace.changed replays the current context when the panel subscribes.
 const subscriptions = [
-  orca.plugin.on('trainer.changed', readProgress),
+  orca.plugin.on('trainer.changed', () => {
+    void readProgress()
+    void encounters.refresh()
+  }),
   orca.on('agent.status.changed', (event) => {
     if (
       workspace &&

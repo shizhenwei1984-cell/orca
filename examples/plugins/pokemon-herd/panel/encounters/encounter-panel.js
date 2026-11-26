@@ -127,7 +127,7 @@ function turnLine(turn, names) {
   return `${names[turn.side]}${move}${details.length ? ` · ${details.join(' · ')}` : ''}`
 }
 
-function battleLog(result, now) {
+function battleLog(result) {
   const header = resultLine(result)
   const region = text('section', null, 'encounter-result')
   region.append(text('strong', header))
@@ -135,13 +135,7 @@ function battleLog(result, now) {
   if (paid) {
     region.append(text('p', paid))
   }
-  if (result.kind === 'throwing') {
-    const ball = text('div', '◉', 'encounter-ball')
-    ball.setAttribute('aria-hidden', 'true')
-    ball.style.animationDelay = `${740 - (now - result.at)}ms`
-    ball.style.animationIterationCount = result.shakes
-    region.append(ball)
-  } else if (result.shakes != null) {
+  if (result.kind !== 'throwing' && result.shakes != null) {
     region.append(
       text('p', `${result.shakes} shake${result.shakes === 1 ? '' : 's'}`, 'encounter-muted')
     )
@@ -178,14 +172,16 @@ function battleLog(result, now) {
 }
 
 // The host owns refreshes and persists actions through onAction. render accepts a structured snapshot.
-export function mountEncounterPanel(root, { onAction, sprite }) {
+export function mountEncounterPanel(root, { onAction, sprite, onSound }) {
   const sheet = text('link')
   sheet.rel = 'stylesheet'
   sheet.href = new URL('./encounters.css', import.meta.url).href
   const content = text('section', null, 'encounter-panel')
   const live = text('p', null, 'encounter-live')
   live.setAttribute('role', 'status')
-  root.replaceChildren(sheet, live, content)
+  const stage = text('section', null, 'encounter-stage')
+  stage.hidden = true
+  root.replaceChildren(sheet, live, stage, content)
   let model
   let pending = false
   let error = ''
@@ -195,6 +191,33 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
   let sparPartner
   let visitorId
   let lastResult
+  let sound = false
+  let epoch = 0
+
+  async function submit(command) {
+    if (pending) {
+      return
+    }
+    pending = true
+    const scope = epoch
+    error = ''
+    draw()
+    try {
+      const response = await onAction(command)
+      if (scope === epoch && response?.error) {
+        error = response.error
+      }
+    } catch {
+      if (scope === epoch) {
+        error = 'The encounter action could not be saved.'
+      }
+    } finally {
+      if (scope === epoch) {
+        pending = false
+        draw()
+      }
+    }
+  }
 
   function button(name, command, disabled = false, primary = false) {
     const node = text('button', name)
@@ -202,37 +225,24 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
     node.disabled = pending || disabled
     node.className = primary ? 'encounter-primary' : ''
     node.setAttribute('data-encounter-control', JSON.stringify(command))
-    node.addEventListener('click', async () => {
-      if (pending) {
-        return
-      }
-      pending = true
-      error = ''
-      draw()
-      try {
-        const response = await onAction(command)
-        if (response?.error) {
-          error = response.error
-        }
-      } catch {
-        error = 'The encounter action could not be saved.'
-      } finally {
-        pending = false
-        draw()
-      }
-    })
+    node.addEventListener('click', () => void submit(command))
     return node
   }
 
   function portrait(pick) {
     const node = text('div', null, 'encounter-portrait')
-    const asset = sprite?.(pick)
-    if (asset) {
+    if (sprite) {
       const image = text('img')
-      image.src = asset
       image.alt = ''
-      image.addEventListener('error', () => image.remove(), { once: true })
-      node.append(image)
+      image.addEventListener('load', () => node.prepend(image), { once: true })
+      Promise.resolve()
+        .then(() => sprite(pick))
+        .then((asset) => {
+          if (asset) {
+            image.src = asset
+          }
+        })
+        .catch(() => {})
     }
     const info = text('div')
     info.append(text('strong', pick.name))
@@ -272,6 +282,7 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
     )
     ball.setAttribute('data-encounter-control', 'ball')
     berry.setAttribute('data-encounter-control', 'berry')
+    berry.disabled = (ball.value || offer.ball) === 'master-ball'
     ball.addEventListener('change', () => {
       ballChoice = ball.value
       draw()
@@ -286,7 +297,12 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
       label('Berry', berry),
       button(
         'Throw ball',
-        { type: 'throw', id: visitor.id, ball: ball.value || null, bait: berry.value || null },
+        {
+          type: 'throw',
+          id: visitor.id,
+          ball: ball.value || null,
+          bait: berry.disabled ? null : berry.value || null
+        },
         !ball.value && !offer.ball,
         true
       )
@@ -323,7 +339,21 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
         : visitor
           ? 'Wild encounter'
           : 'Encounters'
-    body.append(text('h2', title))
+    const header = text('div', null, 'encounter-header')
+    header.append(text('h2', title))
+    if (onSound) {
+      const toggle = text('button', 'Battle sound')
+      toggle.type = 'button'
+      toggle.setAttribute('data-encounter-control', 'battle-sound')
+      toggle.setAttribute('aria-pressed', String(sound))
+      toggle.addEventListener('click', () => {
+        sound = !sound
+        onSound(sound)
+        draw()
+      })
+      header.append(toggle)
+    }
+    body.append(header)
 
     if (outbreak) {
       body.append(
@@ -475,7 +505,7 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
       body.append(text('p', error, 'encounter-error'))
     }
     if (result) {
-      body.append(battleLog(result, now))
+      body.append(battleLog(result))
     }
     const resultKey = result ? `${result.at}:${result.kind}` : null
     if (resultKey !== lastResult || error) {
@@ -491,6 +521,48 @@ export function mountEncounterPanel(root, { onAction, sprite }) {
   }
 
   return {
+    stage,
+    submit,
+    sound(value) {
+      if (sound === value) {
+        return
+      }
+      sound = value
+      draw()
+    },
+    activateVisitor() {
+      const visitor = model?.visitor
+      if (visitor?.canGift) {
+        return submit({ type: 'gift', id: visitor.id })
+      }
+      if (visitor?.catch && (ballChoice || visitor.catch.ball)) {
+        const ball = content.querySelector('[data-encounter-control="ball"]')
+        const berry = content.querySelector('[data-encounter-control="berry"]')
+        return submit({
+          type: 'throw',
+          id: visitor.id,
+          ball: ball?.value || null,
+          bait: berry?.disabled ? null : berry?.value || null
+        })
+      }
+      this.focus()
+    },
+    focus() {
+      const control =
+        content.querySelector('[data-encounter-control="ball"]') ??
+        content.querySelector('.encounter-primary:enabled, [data-encounter-control="fighter"]')
+      control?.focus({ preventScroll: true })
+      content.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    },
+    reset() {
+      epoch++
+      pending = false
+      model = null
+      selected = ''
+      error = ''
+      content.replaceChildren()
+      live.textContent = ''
+    },
     render(snapshot) {
       model = snapshot
       draw()

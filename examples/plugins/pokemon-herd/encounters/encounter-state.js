@@ -39,7 +39,7 @@ import {
   WAIT_MS
 } from './rules/trainers.js'
 import { rollSize, WEATHER_SHARE } from './rules/weather.js'
-import { actFor, DASH_SPEED, FLEE_SPEED, HALT, TEASE_PURSE } from './rules/wildacts.js'
+import { actFor, DASH_SPEED } from './rules/wildacts.js'
 
 export const ENCOUNTER_VERSION = 1
 export const CROSS_MS = 39000
@@ -255,7 +255,7 @@ export function createVisitor(state, context, deltas) {
     ? null
     : actFor(pick, { boosted: weather?.types, working: workingSlots.length > 0 }, random)
   const crossing = CROSS_MS / (act?.kind === 'dash' ? DASH_SPEED : 1)
-  const actMs = act?.ms ?? HALT[act?.kind] ?? 0
+  const actMs = act?.ms ?? 0
   if (actMs) {
     act.from = now + Math.round(crossing * within([0.3, 0.6], random))
     act.until = act.from + actMs
@@ -268,12 +268,9 @@ export function createVisitor(state, context, deltas) {
     giftAt: null,
     throws: 0,
     appearedAt: now,
-    expiresAt: now + (act?.kind === 'tease' ? crossing / FLEE_SPEED : crossing) + actMs,
-    purse: allowance(
-      daily,
-      'purse',
-      act?.kind === 'tease' ? Math.round(stake * TEASE_PURSE) : stake
-    )
+    crossing,
+    expiresAt: now + crossing + actMs,
+    purse: allowance(daily, 'purse', stake)
   }
   deltas.seen.push(pick.dex)
 }
