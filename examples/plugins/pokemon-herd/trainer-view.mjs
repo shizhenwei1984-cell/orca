@@ -89,6 +89,9 @@ export function catalogBox(save, closed, entry) {
         name: nameFor(pick),
         shiny: pick.shiny === true,
         alpha: pick.alpha === true,
+        nature: natureOf(pick)?.name ?? null,
+        held: ITEMS[pick.held]?.name ?? null,
+        ball: ITEMS[pick.ball]?.name ?? null,
         jobs: pokemon.jobs,
         friendship: pokemon.friendship
       }

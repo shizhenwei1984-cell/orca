@@ -9,7 +9,7 @@ export async function openCompanionPicker(
   const ask = (name, data, abort = signal) =>
     window.orca.plugin.request(name, data, { signal: abort })
   const requestPreferences = (change) => ask('catalog.preferences', change)
-  const loadBox = (entry) => ask('trainer.catalog-box', { terminalIds, entry })
+  const loadBox = (entry) => ask('trainer.catalog-box', { terminalIds, ...(entry && { entry }) })
   const [{ source, favorites }, boxed] = await Promise.all([
     requestPreferences(null),
     loadBox().catch(() => null)

@@ -359,7 +359,8 @@ export function openCatalogPicker({
     if (!boxed?.has(entryKey(entry))) {
       return
     }
-    const query = loadBox({ dex: entry.dex, form: entry.form })
+    const { dex, form } = entry
+    const query = loadBox({ dex, ...(form && { form }) })
     boxQuery = query
     try {
       const { count, entries } = await query
@@ -380,7 +381,10 @@ export function openCatalogPicker({
           individual.shiny && 'Shiny',
           individual.alpha && 'Alpha',
           `Friendship ${individual.friendship}/100`,
-          `${individual.jobs} jobs`
+          individual.nature,
+          `${individual.jobs} jobs`,
+          individual.held && `Holding ${individual.held}`,
+          individual.ball && `Caught in ${individual.ball}`
         ]
           .filter(Boolean)
           .join(' · ')
