@@ -127,6 +127,7 @@ export function mountWorkspaceCompanions(orca, root, signal, repaint) {
     }
     const request = new AbortController()
     pending = request
+    let retry = false
     try {
       const snapshot = await orca.host.call(VIEW, undefined, {
         signal: AbortSignal.any([signal, request.signal])
@@ -148,6 +149,7 @@ export function mountWorkspaceCompanions(orca, root, signal, repaint) {
       repaint()
     } catch {
       if (pending === request && !signal.aborted) {
+        retry = true
         rows.clear()
         repaint()
       }
@@ -157,7 +159,7 @@ export function mountWorkspaceCompanions(orca, root, signal, repaint) {
         if (again) {
           again = false
           void read()
-        } else if (grants?.fatigue || grants?.portraits) {
+        } else if (retry || grants?.fatigue || grants?.portraits) {
           timer = setTimeout(read, 2500)
         }
       }

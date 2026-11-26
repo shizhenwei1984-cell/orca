@@ -103,6 +103,7 @@ export function paintActors(
       id: actor,
       cx: actor.track?.target ?? actor.x,
       from: actor.track?.from,
+      x: actor.x,
       settled: !actor.moving,
       since: actor.settledAt,
       rank: entity.id === focusedId ? -1 : rank,
@@ -187,15 +188,11 @@ export function paintActors(
       const visibleHeight = Math.max(24, Math.round(h * 0.74))
       const y = row * rowHeight + ground
       const spot = tags.get(actor)
-      const left =
-        actor.moving || actor.dragging
-          ? Math.min(width - spot.w, Math.max(0, actor.x - spot.w / 2))
-          : spot.left
       body.style.left = `${Math.round(actor.x - grab / 2)}px`
       body.style.top = `${Math.round(y - visibleHeight - (actor.dragging ? 8 : 0))}px`
       body.style.width = `${grab}px`
       body.style.height = `${visibleHeight}px`
-      tag.style.left = `${Math.round(left)}px`
+      tag.style.left = `${Math.round(spot.left)}px`
       tag.style.top = `${y + 11 + 17 * spot.line}px`
       tag.style.width = `${Math.round(spot.w)}px`
 

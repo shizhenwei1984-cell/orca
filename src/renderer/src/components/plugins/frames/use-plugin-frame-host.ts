@@ -40,6 +40,7 @@ import {
   openSiblingPluginPanel,
   registerPluginPanelActivationReceiver
 } from '../view/plugin-panel-activation'
+import { moveOwnPluginPanel } from '../view/plugin-panel-guest-placement'
 import { usePluginFrameThemeSync } from './use-plugin-panel-theme-revision'
 import { forwardPluginFramePush } from './plugin-frame-workspace-focus'
 
@@ -151,6 +152,9 @@ export function usePluginFrameHost(options: {
       onOpenPanel: panelTabKey
         ? (params: unknown) =>
             openSiblingPluginPanel(panelTabKey, params, workspaceView?.permitsHandle)
+        : undefined,
+      onMovePanel: panelTabKey
+        ? (params: unknown) => moveOwnPluginPanel(panelTabKey, params)
         : undefined,
       onPanelActivationReady: (workspaceId: unknown) => {
         if (panelTabKey) {

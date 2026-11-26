@@ -47,12 +47,12 @@
   outline: none;
 }
 
-.pokemon-world__actor[data-focused='true'],
-.pokemon-world__actor:focus-visible {
+.pokemon-world__actor[data-focused='true'] .pokemon-world__body,
+.pokemon-world__actor:focus-visible .pokemon-world__body {
   z-index: 1;
 }
 
-.pokemon-world__actor--dragging {
+.pokemon-world__actor--dragging .pokemon-world__body {
   z-index: 2;
 }
 
@@ -116,6 +116,7 @@
 }
 
 .pokemon-world__tag {
+  z-index: 3;
   height: 16px;
   line-height: 14px;
   overflow: hidden;

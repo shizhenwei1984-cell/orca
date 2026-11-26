@@ -13,8 +13,8 @@ import {
   getRepoExecutionHostId,
   type ExecutionHostId
 } from '../../../../../shared/execution-host/execution-host'
-import { frameWorkspaceId } from '../view/plugin-panel-activation'
 import type { WorkspaceCompanionPermission } from '../../../../../shared/plugins/frames/plugin-workspace-view'
+import { frameWorkspaceId } from '../view/plugin-panel-workspace'
 
 export type WorkspaceViewScope = {
   key: string

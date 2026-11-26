@@ -93,7 +93,7 @@ export function reconcileTrainerWorkspaces(save, catalog, legacy, workspaceId) {
   for (const [slot, member] of Object.entries(save.party)) {
     const oldId = member.workspaceId ?? member.workspaceListId
     const id = resolve(oldId)
-    if (id && id !== member.workspaceId) {
+    if (id && id !== member.workspaceId && (member.terminalId || member.hostWorkspaceId)) {
       if (party === save.party) {
         party = { ...save.party }
       }

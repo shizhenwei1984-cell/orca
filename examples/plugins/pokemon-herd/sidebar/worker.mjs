@@ -88,7 +88,11 @@ export function registerSidebar(orca, store, workspaces) {
     const progress = await store
       .read((save) => companions(save, id, list.terminals, agents, catalog.resolve))
       .catch(() => null)
-    return { ...list, agents, companions: progress }
+    return {
+      ...list,
+      agents: agents.map(({ liveIdentity: _liveIdentity, ...agent }) => agent),
+      companions: progress
+    }
   })
 
   orca.panels.handle('sidebar.openWorkspace', ({ workspaceId }) =>

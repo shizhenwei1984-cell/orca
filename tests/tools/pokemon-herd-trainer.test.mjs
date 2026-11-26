@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest'
+import { reconcileLiveTerminals } from '../../examples/plugins/pokemon-herd/trainer-live-terminals.mjs'
 import {
   loadTrainer,
   recordStatus,
@@ -100,4 +101,57 @@ test('a trainer snapshot spanning multiple storage values survives an interrupte
   expect(restored.save.bag.money).toBe(307)
   expect(restored.save.bag.items).toEqual({ 'rare-candy': 2 })
   expect(restored.save.encounterState).toEqual(encounterState)
+})
+
+test('an unbound companion can join only its unique live pane and original workspace event', async () => {
+  const at = 1_800_000_000_000
+  const member = {
+    workspaceId: 'identity:forest',
+    sessionId: 'agent-session',
+    terminalId: null,
+    title: 'Original pane title',
+    lastAt: at,
+    assignment: 'existing-assignment',
+    pokemon: { id: 'original-individual', dex: 25 },
+    run: { state: 'working', phaseSince: at, credited: 0 }
+  }
+  const save = { party: { 'tab:pane': member }, revision: 42, work: { jobs: 3, ms: 4200 } }
+  const agent = {
+    terminalId: 'term-live',
+    sessionId: 'agent-session',
+    liveIdentity: { paneKey: 'tab:pane', hostId: 'local', receivedAt: at }
+  }
+  const rooms = {
+    resolve: (id) => id,
+    workspaces: [{ id: 'identity:forest', hostId: 'local' }]
+  }
+  const read = (agents, workspaceId = 'identity:forest') =>
+    reconcileLiveTerminals(
+      {
+        host: {
+          call: async (method) =>
+            method === 'workspace.readContext'
+              ? { workspaceId, terminals: [{ id: 'term-live' }] }
+              : { agents }
+        }
+      },
+      save,
+      rooms,
+      ['term-live']
+    )
+
+  const linked = await read([agent])
+  expect(linked).toEqual({
+    ...save,
+    party: { 'tab:pane': { ...member, terminalId: 'term-live' } }
+  })
+  expect(await read([agent], 'identity:other')).toBe(save)
+  expect(await read([{ ...agent, sessionId: 'replacement-session' }])).toBe(save)
+  expect(
+    await read([{ ...agent, liveIdentity: { ...agent.liveIdentity, receivedAt: at + 1 } }])
+  ).toBe(save)
+  expect(
+    await read([{ ...agent, liveIdentity: { ...agent.liveIdentity, hostId: 'ssh:other' } }])
+  ).toBe(save)
+  expect(await read([agent, { ...agent, terminalId: 'term-shadow' }])).toBe(save)
 })

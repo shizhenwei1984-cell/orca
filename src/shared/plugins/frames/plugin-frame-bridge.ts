@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { pluginIdSchema } from '../manifest/plugin-manifest-fields'
 import { pluginPanelActionIdSchema } from '../contributions/plugin-panel-contribution'
+import { PLUGIN_PANEL_PLACEMENTS } from '../contributions/plugin-panel-placement'
 import { isPluginJsonObject } from '../manifest/plugin-json-object'
 import { PLUGIN_PROTOCOL_VERSION } from './plugin-protocol'
 
@@ -61,6 +62,11 @@ export type PluginFrameHello = {
 /** Per-plugin bridge budgets, enforced host-side. Why 120: a panel loading its storage atoms,
  *  settings and first worker requests makes a burst of small calls. */
 export const OPEN_PLUGIN_PANEL_METHOD = 'panel.open'
+export const MOVE_PLUGIN_PANEL_METHOD = 'panel.move'
+export const movePluginPanelParamsSchema = z.strictObject({
+  placement: z.enum(PLUGIN_PANEL_PLACEMENTS),
+  workspaceId: z.string().min(1).max(1024).optional()
+})
 export const openPluginPanelParamsSchema = z.strictObject({
   panel: pluginIdSchema,
   action: pluginPanelActionIdSchema,

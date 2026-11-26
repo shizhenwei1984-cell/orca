@@ -1,3 +1,4 @@
+import { reconcileLiveTerminals } from './trainer-live-terminals.mjs'
 import {
   companionMenu,
   encounterTrainerAction,
@@ -8,7 +9,8 @@ import { dueCare, recordStatus, sampleCare, trainerView, workingMinutes } from '
 import { pokemonId, readMoveEditor, trainerAction } from './trainer-actions.mjs'
 import { MAX_MOVES } from './encounters/rules/moves.js'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
-import { hasTrainerSave, readTrainer, writeTrainer } from './trainer-save.mjs'
+import { hasTrainerSave } from './trainer-save.mjs'
+import { createTrainerStore } from './trainer-store.mjs'
 import { catalogBox, gameView } from './trainer-view.mjs'
 import { entryOf } from './catalog/dex.mjs'
 import { registerSidebar } from './sidebar/worker.mjs'
@@ -28,62 +30,6 @@ function terminalIds(input) {
     throw new Error('Expected up to 50 terminal IDs')
   }
   return ids
-}
-
-export function createTrainerStore(orca, workspaces = listTrainerWorkspaces(orca)) {
-  let current
-  let tail = Promise.resolve()
-  let writeError
-
-  function queue(run) {
-    const result = tail.then(async () => {
-      current ??= await readTrainer(orca.storage)
-      return run()
-    })
-    tail = result.catch(() => {})
-    return result
-  }
-
-  function transact(apply, visible = () => true) {
-    return queue(async () => {
-      for (let attempt = 0; ; attempt++) {
-        const before = current.save
-        const catalog = await workspaces().catch(() => ({ resolve: () => null }))
-        const { save, result } = await apply(reconcileTrainerWorkspaces(before, catalog), catalog)
-        try {
-          if (save !== before) {
-            current = await writeTrainer(orca.storage, current, save)
-          }
-        } catch (error) {
-          current = undefined
-          writeError = error
-          if (attempt) {
-            orca.panels.post('trainer.changed', null)
-            throw error
-          }
-          // The index may already be committed if its acknowledgement was lost.
-          current = await readTrainer(orca.storage)
-          continue
-        }
-        if (writeError || (save !== before && visible(before, save))) {
-          orca.panels.post('trainer.changed', null)
-        }
-        writeError = undefined
-        return result
-      }
-    })
-  }
-
-  return {
-    transact,
-    read: (view) =>
-      queue(() => {
-        if (writeError) {
-          throw writeError
-        }
-        return view(current.save)
-      })
-  }
 }
 
 function getTerminalLists(orca) {
@@ -386,6 +332,7 @@ export function activateTrainer(
   )
 
   async function sampleLiveAgents(save, catalog) {
+    save = await reconcileLiveTerminals(orca, save, catalog)
     const at = Date.now()
     const settings = await preferences(save.settings)
     const rooms = new Map()
@@ -440,7 +387,10 @@ export function activateTrainer(
 
   orca.panels.handle('trainer.read', (input) => {
     const ids = terminalIds(input)
-    return store.read((save) => trainerView(save, ids))
+    return store.transact(async (save, catalog) => {
+      const next = await reconcileLiveTerminals(orca, save, catalog, ids)
+      return { save: next, result: trainerView(next, ids) }
+    })
   })
   orca.panels.handle('trainer.game', (input) => {
     const ids = terminalIds(input)

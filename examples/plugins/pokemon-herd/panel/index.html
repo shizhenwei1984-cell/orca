@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="./catalog/picker.css" />
     <link rel="stylesheet" href="./move-editor.css" />
   </head>
-  <body>
-    <header>
+  <body data-view="world">
+    <header id="herd-heading">
       <h1 id="workspace">Pokémon Herd</h1>
       <span id="count"></span>
     </header>
@@ -17,7 +17,6 @@
       <strong id="wallet"></strong>
       <span id="work"></span>
       <span id="candy" hidden></span>
-      <button type="button" id="open-trainer" aria-keyshortcuts="B Alt+Shift+B">Trainer</button>
     </section>
     <p role="status" id="progress-error" hidden></p>
     <nav aria-label="Herd views" class="toolbar">
@@ -26,6 +25,7 @@
         World actions
       </button>
       <button id="show-party" aria-controls="herd" aria-pressed="false">Party</button>
+      <button type="button" id="open-trainer" aria-keyshortcuts="B Alt+Shift+B">Trainer</button>
       <button
         id="show-settings"
         aria-controls="herd-settings"

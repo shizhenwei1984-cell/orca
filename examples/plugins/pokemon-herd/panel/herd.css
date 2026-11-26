@@ -11,7 +11,7 @@ body {
 .herd-strip {
   display: flex;
   flex-direction: column;
-  padding: 4px 8px;
+  padding: 4px 8px 2px;
 }
 .herd-strip .toolbar {
   position: sticky;
@@ -21,8 +21,28 @@ body {
   margin: 0 0 4px;
   background: var(--orca-background);
 }
+.herd-strip .toolbar > button {
+  padding-inline: 8px;
+}
 .herd-strip #world {
   order: -1;
+}
+.herd-strip[data-view='world'] #care-status {
+  position: fixed;
+  inset: var(--herd-settings-top, 38px) 8px auto;
+  z-index: 2;
+  margin: 0;
+  padding: 4px;
+  overflow-wrap: anywhere;
+  background: var(--orca-popover);
+  color: var(--orca-popover-foreground);
+  border-radius: var(--orca-radius);
+  pointer-events: none;
+}
+.herd-strip[data-view='world'] :is(#herd-heading, #trainer),
+#encounters[hidden],
+#care-status:empty {
+  display: none;
 }
 .herd-strip #herd-settings {
   position: fixed;
@@ -160,14 +180,11 @@ small,
 #settings-status:empty {
   display: none;
 }
-#care-status:empty {
-  margin: 0;
-}
 #world-actions {
   inset: auto;
   margin: 0;
-  max-width: calc(100vw - 8px);
-  max-height: calc(100vh - 8px);
+  max-width: calc(100% - 8px);
+  max-height: calc(100% - 8px);
   overflow: auto;
   padding: 4px;
   border: 1px solid var(--orca-border);
@@ -177,12 +194,28 @@ small,
 }
 #world-actions:popover-open {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
+}
+#world-actions:has(.companion-menu) {
+  width: min(330px, calc(100% - 8px));
+}
+.world-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.world-action-group > span {
+  flex-basis: 100%;
+}
+#world-actions button[aria-pressed='true'] {
+  background: var(--orca-accent);
+  color: var(--orca-accent-foreground);
 }
 .companion-menu {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
-  max-width: 320px;
 }
 .companion-menu:has([role='status']:empty) {
   display: none;
@@ -195,6 +228,9 @@ small,
 .companion-menu header {
   align-items: center;
 }
+.companion-menu header > div {
+  min-width: 0;
+}
 .companion-menu canvas {
   flex: none;
   image-rendering: pixelated;
@@ -202,6 +238,15 @@ small,
 .companion-menu small {
   display: block;
   color: var(--orca-muted-foreground);
+}
+.companion-menu :is(strong, small),
+#world-actions button {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#world-actions button {
+  text-align: start;
 }
 .companion-menu h3 {
   margin: 0 0 4px;
@@ -213,9 +258,6 @@ small,
 .companion-chips .companion-mate {
   display: grid;
   justify-items: center;
-}
-#world-actions button {
-  text-align: start;
 }
 #count,
 .state {
