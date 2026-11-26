@@ -5,16 +5,17 @@ import { cardOf, heartsText, nameFor, needsText } from '../encounters/rules/pick
 import { pokemonId } from '../trainer-actions.mjs'
 import { trainerPick } from '../trainer-game.mjs'
 
-function companions(save, workspaceId, agents) {
-  const targets = new Map(agents.filter((agent) => agent.terminalId).map((a) => [a.terminalId, a]))
+function companions(save, workspaceId, terminals, agents, resolve) {
+  const targets = new Set(terminals.map(({ id }) => id))
+  const sessions = new Map(agents.map(({ terminalId, sessionId }) => [terminalId, sessionId]))
   const matches = new Map()
   for (const [slot, member] of Object.entries(save.party)) {
-    const agent = targets.get(member.terminalId)
+    const sessionId = sessions.get(member.terminalId)
     if (
-      !agent ||
+      !targets.has(member.terminalId) ||
       !member.pokemon ||
-      member.workspaceId !== workspaceId ||
-      (agent.sessionId && member.sessionId && agent.sessionId !== member.sessionId) ||
+      resolve(member.workspaceId) !== workspaceId ||
+      (sessionId && member.sessionId && sessionId !== member.sessionId) ||
       matches.get(member.terminalId)?.member.lastAt >= member.lastAt
     ) {
       continue
@@ -44,11 +45,11 @@ function companions(save, workspaceId, agents) {
   })
 }
 
-export function registerSidebar(orca, store) {
+export function registerSidebar(orca, store, workspaces) {
   const call = orca.host.call
   orca.panels.handle('sidebar.workspaces', async () => {
     const [list, projects, context] = await Promise.all([
-      call('workspace.list'),
+      workspaces(true),
       call('project.list'),
       call('workspace.readContext')
     ])
@@ -68,19 +69,24 @@ export function registerSidebar(orca, store) {
         hostId: hostId ?? 'local',
         hidden: hidden === true
       })),
-      activeWorkspace: context?.workspaceId ?? null,
+      activeWorkspace: list.resolve(context?.workspaceId),
       truncated: list.truncated || projects.truncated
     }
   })
 
   orca.panels.handle('sidebar.workspace', async ({ workspaceId }) => {
+    const catalog = await workspaces()
+    const id = catalog.resolve(workspaceId)
+    if (!id) {
+      throw new Error('That workspace is no longer available.')
+    }
     const [list, { agents }] = await Promise.all([
-      call('terminal.list', { workspaceId }),
-      call('agents.list', { workspaceId })
+      call('terminal.list', { workspaceId: id }),
+      call('agents.list', { workspaceId: id })
     ])
     // Keep navigation usable if the trainer save cannot be read.
     const progress = await store
-      .read((save) => companions(save, workspaceId, agents))
+      .read((save) => companions(save, id, list.terminals, agents, catalog.resolve))
       .catch(() => null)
     return { ...list, agents, companions: progress }
   })

@@ -74,8 +74,9 @@ export function terminal(row, { rail, current, signal, focus, actions, showWorks
       const label = project && project !== name ? `${project} · ${name}` : name
       copy.append(element('span', label, 'meta ellipsis'))
     }
-    const picture = portrait(pokemon, agent.agent || name, signal)
-    label.append(picture)
+  }
+  if (agent || pokemon) {
+    label.append(portrait(pokemon, agent?.agent || name, signal))
   }
   if (pokemon) {
     const { evolution } = pokemon

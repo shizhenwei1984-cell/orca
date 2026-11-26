@@ -565,11 +565,14 @@ for (const event of ['workspace.created', 'workspace.removed']) {
   window.orca.on(event, () => schedule({ index: true }))
 }
 window.orca.on('agent.status.changed', ({ workspaceListId, workspaceId }) => {
-  schedule({ workspaceId: workspaceListId ?? workspaceId })
+  schedule({ workspaceId })
+  if (workspaceListId && workspaceListId !== workspaceId) {
+    schedule({ workspaceId: workspaceListId })
+  }
 })
 plugin.on('trainer.changed', () => {
   for (const [workspaceId, data] of readouts) {
-    if (data.agents.length) {
+    if (data.agents.length || data.companions?.length) {
       pending.add(workspaceId)
     }
   }

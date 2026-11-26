@@ -37,16 +37,13 @@ const playerActions = new Set([
 ])
 const stateFor = (save, workspaceId) =>
   Object.hasOwn(save.encounters ?? {}, workspaceId) ? save.encounters[workspaceId] : null
-const workspaceOf = (member) => member?.workspaceListId ?? member?.workspaceId
 
-function roomScope(save, scope, requested) {
-  const rooms = new Set(scope.slots.map((slot) => workspaceOf(save.party[slot])).filter(Boolean))
-  const workspaceId = requested || (rooms.size === 1 ? rooms.values().next().value : null)
+function roomScope(save, scope) {
   const slots = scope.slots.filter((slot) => {
-    const room = workspaceOf(save.party[slot])
-    return workspaceId && (!room || room === workspaceId) && save.party[slot]?.pokemon
+    const member = save.party[slot]
+    return scope.workspaceId && member?.workspaceId === scope.workspaceId && member.pokemon
   })
-  return { ...scope, slots, workspaceId }
+  return { ...scope, slots }
 }
 
 function rulesFor(save, { slots, at, rnd, settings, rain }) {
@@ -158,7 +155,7 @@ function applyEncounter(save, action, context) {
 
 export function settleEncounterWork(before, after, context) {
   const { at } = context
-  const scope = roomScope(after, context, context.workspaceId)
+  const scope = roomScope(after, context)
   const { workspaceId } = scope
   const day = dayOf(at)
   if (!workspaceId || after.daily?.day !== day) {
@@ -190,7 +187,7 @@ export function settleEncounterWork(before, after, context) {
 }
 
 export function encounterTrainerAction(save, action, context) {
-  const scope = { ...context, ...roomScope(save, context, context.workspaceId) }
+  const scope = roomScope(save, context)
   const prior = stateFor(save, scope.workspaceId)
   const slot = action.target?.slot
   if (action.type === 'use' && TOWER_HEAL_IDS.includes(action.item) && scope.slots.includes(slot)) {
@@ -332,10 +329,16 @@ export function registerEncounterHandlers(
     return load
   })
 
-  async function contextFor(save, input, at, fresh) {
+  async function contextFor(save, input, catalog, at, fresh) {
     return {
       ...input,
-      ...roomScope(save, await getScope(save, input.terminalIds, fresh), input.workspaceId),
+      ...roomScope(
+        save,
+        await getScope(save, input.terminalIds, catalog, {
+          fresh,
+          requested: input.workspaceId
+        })
+      ),
       at,
       rnd
     }
@@ -344,8 +347,8 @@ export function registerEncounterHandlers(
   orca.panels.handle('encounter.read', (raw) => {
     const input = requestScope(raw)
     return store.transact(
-      async (save) => {
-        const context = await contextFor(save, input, clock(), false)
+      async (save, catalog) => {
+        const context = await contextFor(save, input, catalog, clock(), false)
         if (!context.workspaceId || !context.slots.length) {
           return { save, result: null }
         }
@@ -376,7 +379,7 @@ export function registerEncounterHandlers(
     }
     const at = clock()
     const receiptKey = `encounter:${client}`
-    return store.transact(async (save) => {
+    return store.transact(async (save, catalog) => {
       const receipt = save.receipts[receiptKey]
       if (receipt && sequence <= receipt.sequence) {
         return {
@@ -384,7 +387,7 @@ export function registerEncounterHandlers(
           result: sequence === receipt.sequence ? receipt.result : { ok: true, replayed: true }
         }
       }
-      const context = await contextFor(save, input, at, true)
+      const context = await contextFor(save, input, catalog, at, true)
       try {
         if (!context.workspaceId || !context.slots.length) {
           throw new Error('Open a workspace with an active Pokémon.')

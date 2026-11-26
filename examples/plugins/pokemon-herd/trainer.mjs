@@ -131,7 +131,12 @@ function boxedPicks(save) {
 export function recordStatus(
   save,
   event,
-  { slots = [event.paneKey], rnd = Math.random, initialPick } = {}
+  {
+    slots = [event.paneKey],
+    rnd = Math.random,
+    initialPick,
+    workspaceId = event.workspaceListId ?? event.workspaceId
+  } = {}
 ) {
   const { paneKey, receivedAt: at } = event
   const previous = Object.hasOwn(save.party, paneKey) ? save.party[paneKey] : undefined
@@ -151,7 +156,8 @@ export function recordStatus(
   const companion = {
     ...previous,
     terminalId: event.terminalId ?? previous?.terminalId ?? null,
-    workspaceId: event.workspaceListId ?? event.workspaceId ?? previous?.workspaceId ?? null,
+    workspaceId:
+      workspaceId ?? event.workspaceListId ?? event.workspaceId ?? previous?.workspaceId ?? null,
     title: event.title ?? previous?.title ?? null,
     sessionId: event.sessionId ?? previous?.sessionId ?? null,
     lastAt: at,
