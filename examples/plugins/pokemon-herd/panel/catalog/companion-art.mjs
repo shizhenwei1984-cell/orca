@@ -1,3 +1,4 @@
+import { spriteVariants } from '../../catalog/dex.mjs'
 import { loadCatalogSprite, localCatalogSprite, playCatalogSprite } from './sprite.mjs'
 
 const arts = new Map()
@@ -18,15 +19,14 @@ function drain() {
 }
 
 function catalogArt(pick, pose, working, season) {
-  const { dex, form, gender, shiny, mega, megaKind } = pick
-  const key = [dex, form, gender, shiny || '', mega, megaKind, pose, working, season].join(':')
+  const options = { working, season }
+  const key = [pose, ...spriteVariants(pick, options).map(({ folder }) => folder)].join(':')
   let art = arts.get(key)
   if (art && Date.now() < art.retryAt) {
     arts.delete(key)
     arts.set(key, art)
     return art
   }
-  const options = { working, season }
   const local = localCatalogSprite(pick, pose, options)
   art = { sprite: local, retryAt: Infinity }
   if (!local) {
@@ -117,8 +117,16 @@ export function worldCatalogSheet(actor, pick, pose, season) {
     art = { pick, pose, working, season, asset: catalogArt(pick, pose, working, season) }
     actor.catalogArt = art
   }
-  const sprite = art.asset.sprite
-  if (sprite && !art.asset.sheet) {
+  return anchoredSheet(art.asset)
+}
+
+export function catalogSheet(pick, pose, working, season = 0) {
+  return anchoredSheet(catalogArt(pick, pose, working, season))
+}
+
+function anchoredSheet(asset) {
+  const sprite = asset.sprite
+  if (sprite && !asset.sheet) {
     const sheet = {
       ...sprite,
       frames: sprite.times.length,
@@ -127,10 +135,10 @@ export function worldCatalogSheet(actor, pick, pose, season) {
       facing: sprite.facing ?? 'd',
       bottom: 2
     }
-    art.asset.sheet = sheet
+    asset.sheet = sheet
     if (!sprite.facing) {
       void anchorSheet(sheet).catch(() => {})
     }
   }
-  return art.asset.sheet
+  return asset.sheet
 }

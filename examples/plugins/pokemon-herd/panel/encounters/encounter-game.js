@@ -1,4 +1,5 @@
 import { appearanceOf } from '../../catalog/trainer-catalog.mjs'
+import { prepareBattleArt } from './battle-sprites.js'
 import { mountBattleStage } from './battle-stage.js'
 import { mountEncounterPanel } from './encounter-panel.js'
 
@@ -7,6 +8,8 @@ const NEAR = 24
 const motionKinds = new Set(['tease', 'nap', 'challenge', 'curious', 'friendly', 'weather'])
 const clamp = (value) => Math.min(1, Math.max(0, value))
 const center = (rect) => rect.left + rect.width / 2
+const activeRaid = (raid) => raid?.phase === 'battle' || raid?.phase === 'egg'
+const mapVisitorId = (visitor, raid) => (activeRaid(raid) || visitor?.raid ? raid?.id : visitor?.id)
 
 export function mountEncounterGame(
   root,
@@ -81,13 +84,13 @@ export function mountEncounterGame(
   }
 
   function worldVisitor(model) {
-    const { visitor, raid, busy, now, result } = model
+    const { raid, busy, now, result } = model
+    const visitor = activeRaid(raid) ? null : model.visitor
     if (busy && (result?.kind === 'caught' || result?.kind === 'fled')) {
       sendVisitor(null)
       return
     }
-    const visitorId =
-      visitor?.id ?? (raid?.phase === 'battle' || raid?.phase === 'egg' ? raid.id : null)
+    const visitorId = mapVisitorId(visitor, raid)
     if (!visitorId) {
       visitorMotion = null
       sendVisitor(null)
@@ -173,22 +176,49 @@ export function mountEncounterGame(
     sendVisitor(entity)
   }
 
-  function worldBattle({ result, party }) {
+  function presentBattle(model) {
+    const { result, party, visitor, raid } = model
     const own = party.find(({ slot }) => slot === (result?.slot ?? result?.hit?.pane))
+    const visitorOnMap = visitor && !activeRaid(raid) && result?.visitorId === visitor.id
     const opponent =
       result?.kind === 'spar'
         ? party.find(({ slot }) => slot === result.opponent)
-        : { terminalId: result?.visitorId }
-    onBattle?.(
-      own?.terminalId && opponent?.terminalId && (result.turns?.length || result.hit)
-        ? {
-            result,
-            own: own.terminalId,
-            opponent: opponent.terminalId,
-            spar: result.kind === 'spar'
+        : {
+            terminalId: visitorOnMap ? mapVisitorId(visitor, raid) : result?.visitorId,
+            status: visitorOnMap ? visitor.status : null
           }
-        : null
-    )
+    const fight = result?.turns?.length || result?.hit
+    const valid =
+      own?.terminalId &&
+      opponent?.terminalId &&
+      (!result.ownId || own.pokemonId === result.ownId) &&
+      (!result.opponentId || opponent.pokemonId === result.opponentId)
+    const statuses = new Map(party.map(({ terminalId, status }) => [terminalId, status]))
+    if (visitor && !activeRaid(raid)) {
+      statuses.set(mapVisitorId(visitor, raid), visitor.status)
+    }
+    onBattle?.({
+      statuses,
+      game:
+        fight && valid
+          ? {
+              result,
+              own: own.terminalId,
+              opponent: opponent.terminalId,
+              spar: result.kind === 'spar'
+            }
+          : null
+    })
+    const target = activeRaid(raid) ? raid.pick : visitor?.pick
+    const lead = party.find(({ fighter }) => fighter) ?? party[0]
+    prepareBattleArt(target, false)
+    if (target) {
+      prepareBattleArt(lead, lead?.mega === 'auto')
+    }
+    stage.render(fight && !valid ? { ...model, result: null } : model, model.now, {
+      own: result?.kind === 'spar' ? null : own?.status,
+      opponent: result?.kind === 'spar' ? null : opponent?.status
+    })
   }
 
   function partyMember(actor) {
@@ -285,9 +315,8 @@ export function mountEncounterGame(
         return
       }
       worldVisitor(model)
-      worldBattle(model)
       panel.render(model)
-      stage.render(model, model.now)
+      presentBattle(model)
       checkProximity()
     } catch (error) {
       if (scope === active && !lifetime.signal.aborted) {
@@ -309,7 +338,11 @@ export function mountEncounterGame(
       return { error: 'The encounter is still loading.' }
     }
     const active = scope
-    const pokemonId = snapshot.party.find(({ slot }) => slot === action.slot)?.pokemonId
+    const member = snapshot.party.find(({ slot }) => slot === action.slot)
+    const pokemonId = member?.pokemonId
+    if (['attack', 'raid-hit', 'spar'].includes(action.type)) {
+      prepareBattleArt(member, member?.mega === 'auto')
+    }
     const opponentId = snapshot.party.find(({ slot }) => slot === action.opponent)?.pokemonId
     const payload = {
       ...input(),
@@ -348,11 +381,15 @@ export function mountEncounterGame(
     if (shaken || !visitor || !member?.able || snapshot.busy) {
       return
     }
-    if (visitor.id === snapshot.visitor?.id) {
-      return panel.submit({ type: 'attack', id: visitor.id, slot: member.slot })
+    const { raid, visitor: target } = snapshot
+    if (visitor.id !== mapVisitorId(target, raid)) {
+      return
     }
-    if (visitor.id === snapshot.raid?.id && snapshot.raid.phase === 'battle') {
-      return panel.submit({ type: 'raid-hit', id: visitor.id, slot: member.slot })
+    if (raid?.phase === 'battle') {
+      return panel.submit({ type: 'raid-hit', id: raid.id, slot: member.slot })
+    }
+    if (target && !activeRaid(raid)) {
+      return panel.submit({ type: 'attack', id: target.id, slot: member.slot })
     }
   }
 
@@ -370,7 +407,11 @@ export function mountEncounterGame(
 
   const worldCallbacks = {
     onWild(visitor) {
-      if (snapshot?.visitor?.id === visitor.id) {
+      if (
+        snapshot?.visitor &&
+        !activeRaid(snapshot.raid) &&
+        mapVisitorId(snapshot.visitor, snapshot.raid) === visitor.id
+      ) {
         return panel.activateVisitor()
       }
       if (snapshot?.raid?.id === visitor.id) {
@@ -380,7 +421,7 @@ export function mountEncounterGame(
     onDrop: drop,
     onSpar: spar,
     onMenu({ visitor }) {
-      if (visitor && (visitor.id === snapshot?.visitor?.id || visitor.id === snapshot?.raid?.id)) {
+      if (visitor && visitor.id === mapVisitorId(snapshot?.visitor, snapshot?.raid)) {
         panel.focus()
         return true
       }

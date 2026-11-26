@@ -13,6 +13,7 @@ import {
 import { abilityOf, lockOf, megaAbility, sayName, stageWords } from './rules/abilities.js'
 import { evolutionsOf } from './rules/dex.js'
 import {
+  COUNTER_LAND_MS,
   cooldownLeft,
   eggsOn,
   laysEgg,
@@ -63,7 +64,6 @@ const GIFT_WAIT_MS = 800
 const SPAR_GAP = 600000
 const BOOST_GAP = 30000
 const CHOOSE_MS = 6000
-const COUNTER_LAND_MS = 1640
 const nextBattleAt = (now, exchange) =>
   now + (exchange.entry.length ? 900 : 0) + (exchange.turns.length > 1 ? 3030 : 2040)
 const throwEnd = (shakes) => 740 + Math.max(1, shakes) * 700
@@ -532,6 +532,7 @@ function strikeRaid(state, context, deltas, slot) {
     visitorId: raid.id,
     own: pick,
     ownBefore: hpOf(state, slot, now),
+    opponentBefore: raid.hp,
     pick: raid.boss,
     hit,
     hp: updated.hp,
@@ -633,6 +634,7 @@ function spar(state, context, deltas, action) {
       side: by === 'a' ? 'own' : 'opponent',
       notes: [...match.entry[by].map(sayName), stageWords(match.entryStages[by])].filter(Boolean)
     })),
+    statusBefore: { own: null, opponent: null },
     turns: match.turns.map((turn) => ({
       side: turn.by === 'a' ? 'own' : 'opponent',
       move: turn.move?.name,
@@ -643,6 +645,9 @@ function spar(state, context, deltas, action) {
       boosted: turn.move?.boosted,
       blue: battleKey(picks[turn.by === 'a' ? 0 : 1]) === '6mX',
       status: turn.move?.status,
+      ailments: turn.ailments,
+      statusAction: turn.statusAction,
+      statusTick: turn.tick?.kind,
       damage: turn.dmg,
       targetHp: turn.hp,
       ownHp: turn.tick?.hp ?? turn.recoil?.hp ?? turn.drain?.hp,

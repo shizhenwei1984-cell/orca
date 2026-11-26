@@ -52,7 +52,10 @@ function roomScope(save, scope) {
 
 function rulesFor(save, { slots, at, rnd, settings, rain }) {
   const party = Object.fromEntries(
-    slots.map((slot) => [slot, trainerPick(save.party[slot].pokemon)])
+    slots.map((slot) => {
+      const { pokemon } = save.party[slot]
+      return [slot, { ...trainerPick(pokemon), id: pokemonId(pokemon, slot) }]
+    })
   )
   const ownedPicks = [
     ...Object.values(save.party).flatMap(({ pokemon }) => (pokemon ? [trainerPick(pokemon)] : [])),
@@ -361,6 +364,11 @@ function snapshotFor(save, context) {
     ...snapshot,
     workspaceId: context.workspaceId,
     revision: state.revision ?? 0,
+    result: snapshot.result && {
+      ...snapshot.result,
+      ownId: state.result.own?.id,
+      opponentId: state.result.opponent && state.result.pick?.id
+    },
     party: snapshot.party.map((pick) => {
       const { pokemon, terminalId } = save.party[pick.slot]
       return { ...pick, pokemonId: pokemonId(pokemon, pick.slot), terminalId }

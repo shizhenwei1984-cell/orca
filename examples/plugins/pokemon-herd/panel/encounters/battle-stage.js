@@ -1,5 +1,12 @@
 import { battleSoundURL as soundURL, createBattleAudio } from './battle-audio.js'
 import { battleOutcome, mountBattleEffects } from './battle-effects.js'
+import {
+  battleCell,
+  battleSheet,
+  battleSprites,
+  paintBattleMask,
+  statusTag
+} from './battle-sprites.js'
 import { battleSounds, battleTimeline, EFFECT_TAIL, oppositeSide } from './battle-timeline.js'
 
 const trainerURL = (name, pose) => new URL(`./trainers/${name}${pose}.png`, import.meta.url).href
@@ -30,6 +37,7 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
   let cryAt = -Infinity
   let soundMount
   let request
+  let syncStatuses
 
   function element(tag, className, text) {
     const el = document.createElement(tag)
@@ -74,16 +82,28 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
     const figure = element('div', 'encounter-stage-fighter')
     const face = element('div', 'encounter-stage-sprite', pick?.name?.slice(0, 1))
     const meter = element('meter', 'encounter-stage-hp')
+    const status = element('span', 'encounter-stage-status')
+    const art = element('span', 'encounter-stage-art')
+    status.hidden = true
+    art.hidden = true
     meter.min = 0
     meter.max = 1
     meter.value = hp
     meter.setAttribute('aria-label', `${pick?.name ?? 'Opponent'} HP`)
     const caption = element('span', null, pick?.name)
-    figure.append(face, caption, meter)
+    figure.append(face, caption, meter, status)
     if (pick) {
       const image = element('img')
       image.alt = ''
-      image.addEventListener('load', () => face.replaceChildren(image), { once: true })
+      image.addEventListener(
+        'load',
+        () => {
+          if (art.hidden) {
+            face.replaceChildren(image)
+          }
+        },
+        { once: true }
+      )
       Promise.resolve()
         .then(() => sprite?.(pick))
         .then((url) => {
@@ -93,7 +113,42 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
         })
         .catch(() => {})
     }
-    return { figure, face, meter }
+    function paint(pose, facing, reduced) {
+      const [text, color] = statusTag(pose.status)
+      if (status.textContent !== (text ?? '')) {
+        status.hidden = !text
+        status.textContent = text ?? ''
+        status.style.setProperty('--battle-status-color', color)
+      }
+      const state = { ...pose, facing, reduced, working: pick?.mega === 'auto' }
+      const artwork = battleSheet(pick, state)
+      if (!artwork) {
+        return
+      }
+      const { sheet } = artwork
+      const scale = Math.min(face.offsetWidth / sheet.width, face.offsetHeight / sheet.height)
+      const w = Math.round(sheet.width * scale)
+      const h = Math.round(sheet.height * scale)
+      const { row, flip, frame } = battleCell(
+        sheet,
+        { ...state, still: reduced || pose.status === 'frz' },
+        artwork.pose !== 'battle-idle'
+      )
+      art.style.width = `${w}px`
+      art.style.height = `${h}px`
+      art.style.backgroundImage = `url(${JSON.stringify(sheet.src)})`
+      art.style.backgroundSize = `${w * sheet.cols}px ${h * sheet.rows}px`
+      art.style.backgroundPosition = `${-frame * w}px ${-row * h}px`
+      art.style.transform = flip ? 'scaleX(-1)' : ''
+      art.dataset.battlePose = artwork.pose
+      art.dataset.battleFacing = facing
+      paintBattleMask(art, reduced ? { status: pose.status } : pose)
+      if (art.hidden) {
+        art.hidden = false
+        face.replaceChildren(art)
+      }
+    }
+    return { figure, face, meter, paint }
   }
 
   function projectile(layer, side, name, frames, duration) {
@@ -106,6 +161,7 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
   function clear() {
     generation++
     view.cancelAnimationFrame(request)
+    syncStatuses = undefined
     audio.stop()
     key = undefined
     for (const timer of timers) {
@@ -117,7 +173,7 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
     delete root.dataset.outcome
   }
 
-  function render(model, wallTime) {
+  function render(model, wallTime, statuses) {
     const visitor = model?.visitor
     const result = model?.result
     const showThrow = result?.shakes != null && model.now < result.revealAt + 1100
@@ -134,6 +190,7 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
       return
     }
     if (sceneKey === key) {
+      syncStatuses?.(statuses)
       return
     }
     clear()
@@ -264,16 +321,28 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
     const sides = { own: yours, opponent: other }
     const beats = battleTimeline(result)
     const effects = mountBattleEffects(fx, 'encounter-battle-canvas')
+    let live = statuses
+    let playing = true
+    syncStatuses = (value) => {
+      live = value
+      if (!playing) {
+        draw()
+      }
+    }
     function draw() {
       const now = sceneTime()
       const reduced = reducedMotion?.() ?? motion.matches
       const active = now < beats.at(-1).land + EFFECT_TAIL
+      playing = active
       if (document.hidden || !active || reduced) {
         effects.clear()
       }
       const visible = active && !reduced && !document.hidden && effects.begin()
+      const poses = battleSprites(beats, result.statusBefore ?? live, now)
       const positions = {}
-      for (const [side, { face, meter }] of Object.entries(sides)) {
+      for (const [side, { face, meter, paint }] of Object.entries(sides)) {
+        const pose = active ? poses[side] : { pose: 'battle-idle', elapsed: 0, status: live[side] }
+        paint(pose, side === 'own' ? 'r' : 'l', reduced)
         face.style.translate = ''
         face.style.opacity =
           !reduced && meter.value <= 0 && now >= beats.at(-1).land + 690 ? '0' : ''
@@ -289,6 +358,9 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
             face.style.translate = `${dx}px ${dy}px`
             face.style.opacity = opacity
           }
+        }
+        if (pose.aura) {
+          effects.aura(pose.aura, positions[side])
         }
       }
       if (active) {
@@ -334,7 +406,9 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
             ? `${Math.min(100, Math.max(1, Math.round(turn.damage * 100)))}% damage`
             : null
         message.textContent =
-          [turn.move, outcome?.[0] ?? damage].filter(Boolean).join(' · ') || message.textContent
+          [turn.move, outcome?.[0] ?? damage, ...(beat.strike ? (turn.notes ?? []) : [])]
+            .filter(Boolean)
+            .join(' · ') || message.textContent
         if (fresh && recoil) {
           animate(attacker.face, [{ transform: 'scale(0.86)' }, { transform: 'none' }], 320)
         }
@@ -343,8 +417,8 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
   }
 
   return {
-    render(model, wallTime) {
-      render(model, wallTime)
+    render(model, wallTime, statuses = {}) {
+      render(model, wallTime, statuses)
       const { result } = model ?? {}
       if (result?.shakes != null && result.outcome) {
         root.dataset.outcome = result.outcome

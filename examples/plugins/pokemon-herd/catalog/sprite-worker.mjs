@@ -5,7 +5,15 @@ export const SPRITE_REQUEST = 'catalog.sprite'
 const REVISION = 'ced880d7598b9d505a267dbed5d05482197b05ff'
 const SOURCE = `https://raw.githubusercontent.com/PMDCollab/SpriteCollab/${REVISION}/sprite`
 const CREDITS = `https://github.com/PMDCollab/SpriteCollab/blob/${REVISION}/sprite`
-const POSES = { idle: 'Idle', walk: 'Walk', sleep: 'Sleep' }
+const POSES = {
+  idle: ['Idle', 'Walk'],
+  walk: ['Walk'],
+  sleep: ['Sleep', 'Idle', 'Walk'],
+  'battle-idle': ['Idle', 'Walk'],
+  attack: ['Attack', 'Strike', 'Swing', 'Shoot', 'Hop'],
+  special: ['SpAttack', 'Shoot', 'Charge', 'Attack'],
+  hurt: ['Hurt']
+}
 const PNG_HEADER = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
 
 async function fetchAsset(path, limit) {
@@ -53,7 +61,7 @@ function animationIndex(xml) {
 }
 
 function animationFor(index, pose) {
-  for (const name of new Set([POSES[pose], ...(pose === 'sleep' ? ['Idle'] : []), 'Walk'])) {
+  for (const name of POSES[pose]) {
     let animation = index.get(name)
     for (let i = 0; animation?.copy && i < 8; i++) {
       animation = index.get(animation.copy)

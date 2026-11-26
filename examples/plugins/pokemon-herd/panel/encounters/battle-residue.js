@@ -52,13 +52,13 @@ const particles = {
 }
 const oscillate = (time, period) => (1 - Math.cos((time / period) * Math.PI * 2)) / 2
 
-export function drawResidue(shape, type, style, x, y, ground, elapsed) {
+export function drawResidue(shape, type, style, x, y, ground, elapsed, duration = RESIDUE_MS) {
   const time = elapsed - RESIDUE_FROM
   const kind = residueOf(type)
-  if (!kind || time < 0 || time >= RESIDUE_MS) {
+  if (!kind || time < 0 || time >= duration) {
     return
   }
-  const fade = Math.min(1, (RESIDUE_MS - time) / RESIDUE_FADE)
+  const fade = Math.min(1, (duration - time) / RESIDUE_FADE)
   if (kind === 'freeze') {
     shape(x, y, 34, Math.max(12, 2 * (ground - y) - 6), '#bfefff', fade * 0.32, true)
   }

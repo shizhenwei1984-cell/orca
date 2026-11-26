@@ -8,7 +8,7 @@ const BUNDLED = {
 }
 const DURATIONS = { walk: 640, idle: 1000, sleep: 1800 }
 
-/** @typedef {'idle' | 'walk' | 'sleep'} Pose */
+/** @typedef {'idle' | 'walk' | 'sleep' | 'battle-idle' | 'attack' | 'special' | 'hurt'} Pose */
 /** @typedef {{src: string, width: number, height: number, times: number[], row: number, cols: number, rows: number, facing?: string, shiny: boolean, credits: string}} Sprite */
 
 function bundledSprite(folder, pose) {
@@ -18,6 +18,9 @@ function bundledSprite(folder, pose) {
   }
   const [name, frames] = entry
   const count = pose === 'sleep' ? 2 : frames[pose]
+  if (!count) {
+    return null
+  }
   return {
     src: new URL(`../sprites/${name}-${pose}.png`, import.meta.url).href,
     width: 40,

@@ -1,5 +1,6 @@
 import { pose } from './reactions.js'
 import { worldCatalogSheet } from '../catalog/companion-art.mjs'
+import { battleCell, battleSheet, paintBattleMask } from '../encounters/battle-sprites.js'
 
 const FALLBACK = Object.fromEntries(
   Object.entries({
@@ -69,7 +70,10 @@ function frameAt(sheet, elapsed) {
 
 export function paintSprite(node, actor, { now, scale, reduced, hovered, season = 0, evolution }) {
   const { sprites } = actor.assets
-  const current = pose(actor, actor.mood, now, hovered, actor.hoverSide)
+  const battle = evolution ? null : actor.battleSprite
+  const current = battle
+    ? { sprite: battle.facing === 'r' ? 'idleR' : 'idleL', face: battle.facing }
+    : pose(actor, actor.mood, now, hovered, actor.hoverSide)
   const facing = current.face ?? { idleL: 'l', idleR: 'r', walkL: 'l', walkR: 'r' }[current.sprite]
   const side = (facing ?? actor.dir) === 'r' ? 1 : -1
   const anim = current.anim
@@ -97,7 +101,15 @@ export function paintSprite(node, actor, { now, scale, reduced, hovered, season 
     pick && !(anim && sprites.reactions?.[anim])
       ? worldCatalogSheet(actor, pick, catalogPose, season)
       : original
-  const sheet = incoming || currentSheet || original
+  const artwork =
+    battle &&
+    battleSheet(pick, {
+      ...battle,
+      reduced,
+      working: actor.entity.state === 'working',
+      season
+    })
+  const sheet = artwork?.sheet || incoming || currentSheet || original
   const actualAnimation = anim && sprites.reactions?.[anim]
   const step = anim && actor.react?.seq?.find((item) => now >= item.at && now < item.until)
   const elapsed = Math.max(0, anim ? now - (step?.at ?? actor.react?.at ?? now) : now - actor.born)
@@ -109,11 +121,21 @@ export function paintSprite(node, actor, { now, scale, reduced, hovered, season 
   const baseHeight = sheet?.height ?? 18
   const w = Math.round(baseWidth * scale)
   const h = Math.round(baseHeight * scale)
-  const freezeFrame = reduced || evolution || (!pick && standingTurn) || (anim && !actualAnimation)
-  const frame = sheet && !freezeFrame ? frameAt(sheet, elapsed) : 0
+  const still =
+    reduced ||
+    evolution ||
+    actor.battleStatus === 'frz' ||
+    (!pick && standingTurn) ||
+    (anim && !actualAnimation)
   const sourceDirection = sheet?.facing ?? (current.sprite.endsWith('R') ? 'r' : 'l')
-  const row = sheet?.rows >= 8 ? ({ l: 2, r: 6 }[facing] ?? 0) : (sheet?.row ?? 0)
-  const flip = facing && facing !== 'd' && sourceDirection !== 'd' && facing !== sourceDirection
+  const { frame, row, flip } =
+    battle && sheet
+      ? battleCell(sheet, { ...battle, still }, artwork?.pose && artwork.pose !== 'battle-idle')
+      : {
+          frame: sheet && !still ? frameAt(sheet, elapsed) : 0,
+          row: sheet?.rows >= 8 ? ({ l: 2, r: 6 }[facing] ?? 0) : (sheet?.row ?? 0),
+          flip: facing && facing !== 'd' && sourceDirection !== 'd' && facing !== sourceDirection
+        }
   node.classList.toggle('pokemon-world__sprite--placeholder', !sheet)
   node.style.width = `${w}px`
   node.style.height = `${h}px`
@@ -128,6 +150,14 @@ export function paintSprite(node, actor, { now, scale, reduced, hovered, season 
     evolution && sheet
       ? `brightness(${1 - evolution.light}) invert(${evolution.light}) drop-shadow(0 0 2px var(--orca-ring, Highlight))`
       : ''
+  if (battle && sheet) {
+    node.dataset.battlePose = artwork?.pose ?? 'battle-idle'
+    node.dataset.battleFacing = battle.facing
+  } else {
+    delete node.dataset.battlePose
+    delete node.dataset.battleFacing
+  }
+  paintBattleMask(node, { status: actor.battleStatus, flash: reduced ? 0 : battle?.flash })
   if (node.dataset.credits !== (sheet?.credits ?? '')) {
     node.dataset.credits = sheet?.credits ?? ''
   }

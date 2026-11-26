@@ -280,20 +280,31 @@ export function sparTurns(A, B, rnd = Math.random, boost = (m) => m, weather = n
       }
       const to = other(by),
         me = st[by]
+      let thawed = false
+      const record = (turn) =>
+        turns.push({
+          ...turn,
+          ...(thawed && { statusAction: 'thaw' }),
+          ailments: {
+            own: hp.a > 0 ? (st.a.status ?? null) : null,
+            opponent: hp.b > 0 ? (st.b.status ?? null) : null
+          }
+        })
       if (by !== first && flinched) {
-        turns.push({ by, skip: 'flinch' })
+        record({ by, skip: 'flinch' })
         continue
       }
       if (me.status === 'frz') {
         if (rnd() < 0.2) {
           me.status = null
+          thawed = true
         } else {
-          turns.push({ by, skip: 'frz' })
+          record({ by, skip: 'frz', statusAction: 'frz' })
           continue
         }
       }
       if (me.status === 'par' && rnd() < 0.25) {
-        turns.push({ by, skip: 'par' })
+        record({ by, skip: 'par', statusAction: 'par' })
         continue
       }
       const att = side[by],
@@ -307,7 +318,7 @@ export function sparTurns(A, B, rnd = Math.random, boost = (m) => m, weather = n
         if (locks(ab[by]) && !ab[by].locked) {
           ab[by].locked = moves[by].name
         } // (locked in it, as any move)
-        turns.push({
+        record({
           by,
           move: { ...moves[by] },
           dmg: 0,
@@ -318,7 +329,7 @@ export function sparTurns(A, B, rnd = Math.random, boost = (m) => m, weather = n
       }
       // Sucker Punch: it fails unless the other's about to attack (abilities.js suckerFails).
       if (suckerFails(moves[by], moves[to], by !== first)) {
-        turns.push({ by, move: { ...moves[by], miss: true, eff: 1 }, dmg: 0, hp: hp[to] })
+        record({ by, move: { ...moves[by], miss: true, eff: 1 }, dmg: 0, hp: hp[to] })
         continue
       }
       // Hex: twice as strong on one with a status.
@@ -420,7 +431,7 @@ export function sparTurns(A, B, rnd = Math.random, boost = (m) => m, weather = n
         hp[by] = Math.max(0, hp[by] - t)
         turn.tick = { kind: me.status, dmg: t, hp: hp[by] }
       }
-      turns.push(turn)
+      record(turn)
     }
     // The round over: Speed Boost (said with the round's last turn).
     // Leftovers: a sixteenth back to each still up.

@@ -14,6 +14,7 @@ import {
   knockOf,
   moveStyle,
   physicalParts,
+  RESIDUE_FROM,
   SHAKE_MS,
   signatureParts,
   slashParts,
@@ -127,7 +128,8 @@ export function mountBattleEffects(parent, className) {
     if (elapsed >= 0 && elapsed < 780) {
       const outcome = battleOutcome(beat)
       if (labels && outcome) {
-        label(outcome, target.x, target.top - 11)
+        const actor = turn.statusTick || turn.statusAction ? source : target
+        label(outcome, actor.x, actor.top - 11)
       }
       const number = strike && !turn.miss && damageText(turn.damage, eff, turn.side === 'opponent')
       if (number && !reduced) {
@@ -299,5 +301,9 @@ export function mountBattleEffects(parent, className) {
     drawParts(marks, elapsed)
   }
 
-  return { begin, clear, draw, label }
+  function aura({ type, elapsed, duration }, { x, y, ground }) {
+    drawResidue(shape, type, moveStyle(type), x, y, ground, elapsed + RESIDUE_FROM, duration)
+  }
+
+  return { begin, clear, draw, label, aura }
 }

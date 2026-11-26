@@ -107,6 +107,7 @@ export function renderEncounterSnapshot(state, options) {
     visitor: v && {
       id: v.id,
       pick: describePick(pick, pick.hp ?? 1),
+      status: pick.hp > 0 || pick.hp == null ? (pick.status ?? null) : null,
       appearedAt: v.appearedAt,
       expiresAt: v.expiresAt,
       crossing: v.crossing ?? CROSS_MS,
@@ -137,6 +138,7 @@ export function renderEncounterSnapshot(state, options) {
       ...describePick(mon, hpOf(state, slot, now)),
       able: canFight(state, party, slot, now),
       restsUntil: state.health[slot]?.rest ?? null,
+      status: hpOf(state, slot, now) > 0.001 ? (v?.statuses?.[slot] ?? null) : null,
       cooldownUntil: phase === 'battle' ? now + cooldownLeft(raid, slot, now) : null,
       moves:
         v && !state.clash ? movesFor(v, party, slot).map(({ name, type }) => ({ name, type })) : [],
