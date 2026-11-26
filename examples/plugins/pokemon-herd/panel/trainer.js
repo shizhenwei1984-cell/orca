@@ -1,3 +1,5 @@
+import { openCompanionPicker } from './catalog/companion-picker.mjs'
+
 const dialog = document.querySelector('#trainer-game')
 const tabs = document.querySelector('#trainer-tabs')
 const body = document.querySelector('#trainer-view')
@@ -18,6 +20,7 @@ let sequence = 0
 let requestVersion = 0
 let pending
 let busy = false
+let picking = false
 let focusedTerminal = null
 let group = 'Balls'
 let selectedRegion = ''
@@ -110,11 +113,15 @@ async function refresh(force = false) {
   }
 }
 
-async function submit(action) {
-  if (busy || (pending && action)) {
+async function submit(action, fromPicker = false) {
+  const newAction = pending && action && JSON.stringify(pending.action) !== JSON.stringify(action)
+  if (busy || newAction || (pending && action && !fromPicker)) {
+    if (fromPicker) {
+      throw new Error('Retry the pending trainer action first.')
+    }
     return
   }
-  if (action) {
+  if (action && !pending) {
     pending = { client, sequence: ++sequence, action, terminalIds: getTerminals() }
   }
   if (!pending) {
@@ -133,9 +140,46 @@ async function submit(action) {
   } catch (error) {
     status.textContent = error.message
     retry.hidden = false
+    if (fromPicker) {
+      throw error
+    }
   } finally {
     busy = false
     body.inert = false
+  }
+}
+
+async function changeCompanion(pokemon, opener) {
+  if (picking) {
+    return
+  }
+  picking = true
+  opener.disabled = true
+  try {
+    await openCompanionPicker(
+      pokemon,
+      game,
+      async (action) => {
+        const result = await submit(action, true)
+        if (!result.ok) {
+          throw new Error(result.message)
+        }
+      },
+      () =>
+        dialog.open &&
+        active === 'Party' &&
+        game.party.some(({ ref }) => ref.slot === pokemon.ref.slot && ref.id === pokemon.ref.id)
+    )
+  } catch (error) {
+    status.textContent = error.message
+  } finally {
+    picking = false
+    opener.disabled = false
+    if (opener.isConnected) {
+      opener.focus()
+    } else if (dialog.open) {
+      tabs.querySelector('[aria-pressed="true"]')?.focus()
+    }
   }
 }
 
@@ -213,7 +257,11 @@ function pokemonCard(pokemon) {
     actions.append(act('Take held item', { type: 'take-held', target }))
   }
   if (pokemon.terminalId) {
-    actions.prepend(act('Pet', { type: 'pet', target }, { disabled: pokemon.friendship === 100 }))
+    const change = button('Change Pokémon', () => void changeCompanion(pokemon, change))
+    actions.prepend(
+      change,
+      act('Pet', { type: 'pet', target }, { disabled: pokemon.friendship === 100 })
+    )
     actions.append(act('Box it', { type: 'box', target }))
   } else {
     actions.prepend(

@@ -7,7 +7,6 @@ import {
   genderChoices,
   megaForms,
   REGIONS,
-  rollGender,
   searchEntries,
   TYPES
 } from '../../catalog/dex.mjs'
@@ -398,8 +397,10 @@ export function openCatalogPicker({
     const same = currentKey === entryKey(selected)
     const { dex, form } = selected
     const megas = megaForms(selected)
-    const kind = megas[Number(megaView.value) - 1]?.kind ?? (same ? current.megaKind : undefined)
-    const nextGender = gender.value || rollGender(dex)
+    const kind =
+      megas[Number(megaView.value) - 1]?.kind ??
+      megas.find(({ kind }) => same && kind === current.megaKind)?.kind
+    const nextGender = gender.value
     const nextPick = {
       dex,
       ...(form ? { form } : {}),

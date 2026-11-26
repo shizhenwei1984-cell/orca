@@ -1,15 +1,14 @@
 # Pokémon catalog
 
-The picker uses the walking species and forms from Pokerdr 2.44.0. Names, types, and unlock filters work offline. Normal Bulbasaur, Charmander, Squirtle, and Pikachu use the plugin's bundled sheets. Other looks load on demand and successful remote loads stay cached for the worker's lifetime. If a shiny or female sheet is missing, the preview can use the regular look of the same species or form. If that sheet is unavailable, the picker displays **Preview unavailable** and still allows eligible selections.
+The picker's names, types, and unlock filters work offline. Normal Bulbasaur, Charmander, Squirtle, and Pikachu use bundled sheets. Other looks load on demand. If a shiny or female sheet is missing, the preview can use the regular look of the same species or form. If that sheet is unavailable, the picker displays **Preview unavailable** and still allows eligible selections.
 
-## Integrate the picker
+## Appearance and storage
 
-1. Set the plugin manifest's execution to `trusted-worker` and point `main` to its worker entry. In the worker's `activate(orca)`, call `registerCatalogSprites(orca)` from `catalog/sprite-worker.mjs`.
-2. Add `panel/catalog/picker.css` to the panel's stylesheets. Import `openCatalogPicker` from `panel/catalog/picker.mjs` and call it from the companion change control.
-3. Pass the companion's `current` pick and an `onSelect(pick)` callback. Resolve the callback after saving and throw on failure so the picker stays open. Pass `favorites` and `onFavoritesChange(keys)` to persist favorites across picker openings. Orca's `storage:own` capability allows the panel to use `orca.storage` for both.
-4. Pass `unlocks` from the game state. `caught` and `shinyUnlocked` are sets of dex numbers. `available` is an optional set of exact species and form keys, such as `37-0001`. `trainer` restricts choices to starters and caught species. `legendsOpen` allows uncaught legendary and mythical species. `taken` and `shinyOdds` are optional picker settings.
+`trainer.game` supplies the party's current appearance, identity reference and catalog unlocks. The trainer's serialized `choose` action validates that reference, species, form, gender, Mega and shiny unlock before applying the pick. `trainer.read` projects the current appearance for the cards and world, including when the companion evolves.
 
-Call `loadCatalogSprite(pick, pose, { working, season, signal })` from `panel/catalog/sprite.mjs` to reuse the art outside the picker. It returns a sheet and frame data suitable for `playCatalogSprite(canvas, sprite, signal)`, or `null` if art is unavailable. Abort the signal when changing pose, changing companion, or clearing the canvas. The worker sends PNG data URLs over `orca.plugin.request`. The panel loads its bundled sheets via the plugin's own protocol.
+The worker stores favorite catalog keys and the new-companion source under `catalog.preferences`. Starters are the default. Favorites and All available Pokémon use the trainer's unlocks. When the favorite pool has no eligible Pokémon, the worker uses a starter.
+
+`loadCatalogSprite(pick, pose, { working, season, signal })` returns a PNG and frame metadata or `null`. The worker requests validated animation names and catalog folders at one pinned SpriteCollab revision. It rejects redirects and bounds response sizes and PNG dimensions. The worker stores successful sheets and their credits in two 224 KiB Orca storage buckets, with least recently used sheets evicted within each bucket. Individual PNG downloads are limited to 160 KiB. Both trainer save banks can use 4.5 MiB of the host's 5 MiB plugin storage limit. Bundled art is always available, and sheets retained in the cache can be reused offline after a worker restart.
 
 ## Credits
 

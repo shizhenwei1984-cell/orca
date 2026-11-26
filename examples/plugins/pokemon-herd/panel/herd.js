@@ -1,14 +1,16 @@
 import { species, starterDex } from './pokemon.mjs'
+import { disposeCompanionArt, paintCompanionArt } from './catalog/companion-art.mjs'
 import { mountTrainer } from './trainer.js'
 import { worldInteractions } from './world-interactions.js'
 import { bindWorldPreferences } from './world-preferences.js'
 import { mountWorld } from './world/world.js'
+import { seasonAt } from './world/scene.js'
 
 const poses = {
-  working: ['Working', 'walk', '640ms'],
-  waiting: ['Waiting for input', 'idle', '1s'],
-  blocked: ['Blocked', 'idle', '540ms'],
-  done: ['Resting', 'sleep', '1.8s']
+  working: ['Working', 'walk'],
+  waiting: ['Waiting for input', 'idle'],
+  blocked: ['Blocked', 'idle'],
+  done: ['Resting', 'sleep']
 }
 const herd = document.querySelector('#herd')
 const message = document.querySelector('#message')
@@ -162,20 +164,13 @@ function jobCount(jobs) {
   return `${number.format(jobs)} ${jobs === 1 ? 'job' : 'jobs'}`
 }
 
-function updatePose(row, pokemon, state) {
-  const [label, pose, duration] = poses[state]
+function paintCompanion(row, appearance, state, member, season) {
+  const { dex } = appearance
+  const current = species[dex]
+  const [label, pose] = poses[state]
   row.dataset.state = state
   row.querySelector('.state').textContent = label
-  const sprite = row.querySelector('.sprite')
-  sprite.style.backgroundImage = `url('./sprites/${pokemon.name.toLowerCase()}-${pose}.png')`
-  sprite.style.setProperty('--frames', pose === 'sleep' ? 2 : pokemon[pose])
-  sprite.style.setProperty('--duration', duration)
-}
-
-function paintCompanion({ row, starter, state }, member) {
-  const dex = member?.dex ?? starter
-  const current = species[dex]
-  updatePose(row, species[member?.starter ?? starter], state)
+  paintCompanionArt(row.querySelector('.sprite'), appearance, pose, state === 'working', season)
   row.querySelector('small').textContent = member?.name ?? current?.name ?? `#${dex}`
   row.querySelector('.progress').hidden = !member
   if (member) {
@@ -195,6 +190,7 @@ function paintCompanion({ row, starter, state }, member) {
 function paintRoster() {
   const entities = []
   const stale = new Set(cards.keys())
+  const { a, b, t } = seasonAt(new Date())
   for (const agent of roster) {
     const key = agent.terminalId ?? agent
     const row = cards.get(key) ?? template.content.firstElementChild.cloneNode(true)
@@ -209,20 +205,23 @@ function paintRoster() {
     const member = progress.get(agent.terminalId)
     const starter = starterDex(agent)
     row.querySelector('.care').onclick = () => trainerGame.openParty(agent.terminalId)
-    paintCompanion({ row, starter, state: agent.state }, member)
+    const appearance = member?.appearance ?? { dex: starter }
+    paintCompanion(row, appearance, agent.state, member, t < 0.5 ? a : b)
     if (workspace?.terminals.has(agent.terminalId)) {
       entities.push({
         id: agent.terminalId,
         label,
         species: member?.name ?? species[member?.dex ?? starter]?.name,
-        spriteSpecies: species[member?.starter ?? starter]?.name,
+        appearance,
         state: agent.state,
         stateStartedAt: agent.stateStartedAt
       })
     }
   }
   for (const key of stale) {
-    cards.get(key).remove()
+    const row = cards.get(key)
+    disposeCompanionArt(row.querySelector('.sprite'))
+    row.remove()
     cards.delete(key)
   }
   world.update({ agents: entities })
@@ -431,6 +430,9 @@ window.addEventListener(
     workspace?.scope.abort()
     for (const subscription of subscriptions) {
       subscription.dispose()
+    }
+    for (const row of cards.values()) {
+      disposeCompanionArt(row.querySelector('.sprite'))
     }
     world.dispose()
   },

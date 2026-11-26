@@ -1,9 +1,9 @@
 import { openCatalogPicker } from './picker.mjs'
 
-export async function openCompanionPicker(pokemon, game, onChoose, opener) {
+export async function openCompanionPicker(pokemon, game, onChoose, isCurrent) {
   const request = (change) => window.orca.plugin.request('catalog.preferences', change)
   const { source, favorites } = await request(null)
-  if (!opener.isConnected) {
+  if (!isCurrent()) {
     return
   }
   const { caught, shinyUnlocked, ...unlocks } = game.catalog

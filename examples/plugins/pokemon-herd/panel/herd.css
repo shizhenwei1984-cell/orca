@@ -155,11 +155,9 @@ li {
   width: 58%;
 }
 .sprite {
+  display: block;
   width: 80px;
   height: 80px;
-  background-repeat: no-repeat;
-  background-size: auto 100%;
-  animation: frames var(--duration) steps(var(--frames)) infinite;
 }
 li[data-state='working'] .trail {
   animation: patrol 5s ease-in-out infinite alternate;
@@ -205,11 +203,6 @@ input:focus-visible {
   outline: 2px solid var(--orca-ring);
   outline-offset: 1px;
 }
-@keyframes frames {
-  to {
-    background-position-x: calc(-80px * var(--frames));
-  }
-}
 @keyframes patrol {
   from {
     transform: translateX(0);
@@ -219,7 +212,6 @@ input:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sprite,
   li[data-state='working'] .trail {
     animation: none;
   }

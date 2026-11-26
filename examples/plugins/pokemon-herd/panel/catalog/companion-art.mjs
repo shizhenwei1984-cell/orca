@@ -75,6 +75,35 @@ export function disposeCompanionArt(canvas) {
   cards.delete(canvas)
 }
 
+async function anchorSheet(sheet) {
+  const image = new Image()
+  image.src = sheet.src
+  await image.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = sheet.width * sheet.frames
+  canvas.height = sheet.height
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  const rows = sheet.rows >= 8 ? [0, 2, 6] : [0]
+  let bottom = sheet.height - 1
+  for (const row of rows) {
+    const y = row * sheet.height
+    context.clearRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, y, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height)
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height)
+    for (let pixel = canvas.width * canvas.height - 1; pixel >= 0; pixel--) {
+      const padding = sheet.height - 1 - Math.floor(pixel / canvas.width)
+      if (padding >= bottom) {
+        break
+      }
+      if (data[pixel * 4 + 3]) {
+        bottom = padding
+        break
+      }
+    }
+  }
+  sheet.bottom = bottom
+}
+
 export function worldCatalogSheet(actor, pick, pose, season) {
   const working = actor.entity.state === 'working'
   let art = actor.catalogArt
@@ -89,15 +118,19 @@ export function worldCatalogSheet(actor, pick, pose, season) {
     actor.catalogArt = art
   }
   const sprite = art.asset.sprite
-  if (sprite && sprite !== art.sprite) {
-    art.sprite = sprite
-    art.sheet = {
+  if (sprite && !art.asset.sheet) {
+    const sheet = {
       ...sprite,
       frames: sprite.times.length,
       frameDurations: sprite.times,
       duration: sprite.times.reduce((sum, time) => sum + time, 0),
-      facing: sprite.facing ?? 'd'
+      facing: sprite.facing ?? 'd',
+      bottom: 2
+    }
+    art.asset.sheet = sheet
+    if (!sprite.facing) {
+      void anchorSheet(sheet).catch(() => {})
     }
   }
-  return art.sheet
+  return art.asset.sheet
 }

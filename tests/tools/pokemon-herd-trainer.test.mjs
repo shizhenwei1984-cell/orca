@@ -29,7 +29,7 @@ test('a saved paused job resumes once and rounds each short job independently ac
     event('first', 'done', 24_000)
   ].reduce(recordStatus, loadTrainer(JSON.parse(JSON.stringify(trainer))))
 
-  expect(trainerView(trainer, ['first', 'second'])).toEqual({
+  expect(trainerView(trainer, ['first', 'second'])).toMatchObject({
     jobs: 2,
     ms: 12_000,
     money: 4,

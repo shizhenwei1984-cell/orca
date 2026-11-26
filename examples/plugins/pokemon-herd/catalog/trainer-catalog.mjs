@@ -42,7 +42,9 @@ export function validateChoice(save, pokemon, action) {
   if (
     (gender !== undefined && !genderChoices(dex).includes(gender)) ||
     (mega !== undefined && !['on', 'off', 'auto'].includes(mega)) ||
+    (mega === 'on' && !megas.length) ||
     (megaKind !== undefined && !megas.some(({ kind }) => kind === megaKind)) ||
+    (action.fresh !== undefined && typeof action.fresh !== 'boolean') ||
     (shiny !== undefined && typeof shiny !== 'boolean') ||
     (shiny === true &&
       (!entry.shiny || (!save.dex.shiny.includes(dex) && !(same && pokemon.shiny))))
