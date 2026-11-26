@@ -21,6 +21,7 @@ import {
   withSeen
 } from './encounters/rules/trainer.js'
 import { abilityOf } from './encounters/rules/abilities.js'
+import { appearanceOf } from './catalog/trainer-catalog.mjs'
 import { BORN_KEPT, careWork, hatchPick } from './trainer-rules/breed.mjs'
 import { hasForm, hasShiny, isWalkable } from './encounters/rules/dex.js'
 import { rollGender } from './encounters/rules/gender.js'
@@ -40,6 +41,12 @@ export function savedPokemon(pick, previous, id, jobs = previous?.jobs ?? 0) {
   const { friend: _friend, hearts: _hearts, jobs: stageJobs = 0, pastJobs, ...rest } = pick
   return {
     ...rest,
+    ...(previous &&
+    pick.evolvedAt !== previous.evolvedAt &&
+    pick.evolvedAt &&
+    pick.dex !== previous.dex
+      ? { evolvedFrom: appearanceOf(previous) }
+      : {}),
     ...((previous?.id ?? id) ? { id: previous?.id ?? id } : {}),
     starter: previous?.starter ?? pick.dex,
     stageJobs,

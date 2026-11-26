@@ -26,6 +26,7 @@ import { duplicates, releasePay } from './trainer-rules/box.mjs'
 import { allowance, dayOf, TIP } from './encounters/rules/trainer.js'
 import { validateChoice } from './catalog/trainer-catalog.mjs'
 import { genderFrom } from './encounters/rules/gender.js'
+import { abilSlot } from './encounters/rules/abilities.js'
 import { KEPT_ITEMS } from './encounters/rules/form-items.js'
 import {
   MINUTE,
@@ -78,10 +79,10 @@ function cancelCare(save, slot) {
   }
 }
 
-export function itemOptions(pokemon, slot, bag, at) {
+export function itemOptions(pokemon, slot, bag, at, hpOf) {
   const pick = trainerPick(pokemon)
-  const how = { day: dayOf(at), night: isNight(at) }
-  return Object.keys(bag.items).filter((id) => itemUse(pick, slot, id, how))
+  const how = { day: dayOf(at), night: isNight(at), hpOf }
+  return Object.keys(bag.items).filter((id) => bag.items[id] > 0 && itemUse(pick, slot, id, how))
 }
 
 function applyToPokemon(save, { slot, pokemon }, item, { at, slots, battles }) {
@@ -147,9 +148,9 @@ function bringOut(save, { slot, pokemon }, target, { at, key, battles }) {
   return battles?.swap ? battles.swap(next, pane) : next
 }
 
-function choose(save, { slot, pokemon }, action, { at, slots, key, rnd, battles }) {
+function choose(save, { slot, pokemon }, action, { at, slots, key, rnd, battles, settings }) {
   const { dex, form } = action
-  const { same, gender, mega, megaKind, shiny } = validateChoice(save, pokemon, action)
+  const { same, gender, mega, megaKind, shiny } = validateChoice(save, pokemon, action, settings)
   if (same) {
     return putPokemon(save, slot, {
       ...pokemon,
@@ -327,6 +328,34 @@ export function trainerAction(save, action, context) {
       ).values()
     ]
     return release(save, selected, at)
+  }
+  if (type === 'swap-companions') {
+    const a = find(action.target, party)
+    const b = find(action.destination, party)
+    const first = save.party[a.slot]
+    const second = save.party[b.slot]
+    if (a.slot === b.slot || action.target.id === action.destination.id) {
+      throw new Error('Choose two different companions.')
+    }
+    const transfer = (seat, from, ref) => {
+      const { careNote: _careNote, petAt: _petAt, quickAt: _quickAt, ...member } = seat
+      return {
+        ...member,
+        ...(from.petAt != null ? { petAt: from.petAt } : {}),
+        ...(from.quickAt != null ? { quickAt: from.quickAt } : {}),
+        pokemon: { ...from.pokemon, id: ref.id, abil: abilSlot(from.pokemon, ref.slot) },
+        assignment: context.key
+      }
+    }
+    const next = {
+      ...save,
+      party: {
+        ...save.party,
+        [a.slot]: transfer(first, second, action.destination),
+        [b.slot]: transfer(second, first, action.target)
+      }
+    }
+    return context.battles?.exchange ? context.battles.exchange(next, a.slot, b.slot) : next
   }
   if (type === 'box' || type === 'choose' || type === 'pet') {
     const target = find(action.target, party)

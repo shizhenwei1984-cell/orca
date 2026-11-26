@@ -9,6 +9,7 @@ import {
   CANDY_JOB_MS,
   jobPay,
   loadBag,
+  loadBoosts,
   MAX_ITEM,
   pickup,
   pickupDelay
@@ -324,6 +325,7 @@ export function trainerView(save, terminalIds) {
       hungry: !!member.run?.input?.hungry,
       careNote: member.careNote ?? null,
       evolvedAt: member.pokemon.evolvedAt ?? null,
+      evolvedFrom: member.pokemon.evolvedFrom ?? null,
       starter,
       dex,
       appearance: appearanceOf(member.pokemon),
@@ -338,6 +340,7 @@ export function trainerView(save, terminalIds) {
   return {
     ...save.work,
     money: save.bag.money,
+    boosts: loadBoosts(save.boosts, Date.now()),
     candy: save.bag.items['rare-candy'] ?? 0,
     berries: ['berry', 'sitrus-berry'].filter((item) => save.bag.items[item] > 0),
     companions

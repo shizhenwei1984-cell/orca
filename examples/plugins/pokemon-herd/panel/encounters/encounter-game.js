@@ -100,15 +100,25 @@ export function mountEncounterGame(
         ? 'Raid egg'
         : pick.name
     const act = visitor?.act
+    const tags = pick?.tags ?? []
+    const rare = tags.includes('Legendary')
+      ? 'Legendary'
+      : tags.includes('Alpha')
+        ? tags.includes('Shadow')
+          ? 'Shadow Alpha'
+          : 'Alpha'
+        : tags.includes('Shiny')
+          ? 'Shiny'
+          : null
+    const arrival =
+      rare && visitor?.appearedAt && !visitor.trainer && !visitor.raid
+        ? { text: `${rare} ${label} appeared!`, until: visitor.appearedAt + 3500 }
+        : null
     const waiting = visitor?.trainer || !visitor?.appearedAt || visitor.raid
     const parked = busy || (act && motionKinds.has(act.kind) && now >= act.from && now < act.until)
     if (visitorMotion?.id !== visitorId) {
       visitorMotion = { id: visitorId, from: -0.08, startedAt: visitor?.appearedAt ?? now }
-      if (
-        visitor &&
-        !visitor.trainer &&
-        pick.tags?.some((tag) => ['Shiny', 'Alpha', 'Legendary'].includes(tag))
-      ) {
+      if (arrival && now < arrival.until) {
         onRare?.(pick, scope.signal)
       }
     }
@@ -156,7 +166,8 @@ export function mountEncounterGame(
       startedAt: motion.startedAt,
       duration: Math.max(1, (visitor?.expiresAt ?? now + 1) - motion.startedAt),
       row: 0,
-      icon
+      icon,
+      arrival
     }
     motion.entity = entity
     sendVisitor(entity)

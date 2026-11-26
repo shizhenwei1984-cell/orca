@@ -35,7 +35,7 @@ const fold = (value) =>
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
 
-function showPokemon(pokemon, slot, save, at, member) {
+export function showPokemon(pokemon, slot, save, at, member, hpOf) {
   const pick = trainerPick(pokemon)
   return {
     ref: { slot, id: pokemonId(pokemon, slot) },
@@ -63,7 +63,7 @@ function showPokemon(pokemon, slot, save, at, member) {
     purify: canPurify(pick),
     releasePay: member ? null : releasePay(pick),
     inCare: save.care.pair.includes(slot),
-    items: itemOptions(pokemon, slot, save.bag, at)
+    items: itemOptions(pokemon, slot, save.bag, at, hpOf)
   }
 }
 
@@ -166,11 +166,11 @@ function pokedexView(dex) {
   }
 }
 
-export function gameView(save, { at, slots, closed, query }) {
+export function gameView(save, { at, slots, closed, query, settings }) {
   const daily = today(save, at, slots)
   return {
     money: save.bag.money,
-    catalog: catalogUnlocks(save),
+    catalog: catalogUnlocks(save, settings),
     items: grouped(Object.keys(ITEMS)).map((id) => ({
       id,
       name: ITEMS[id].name,

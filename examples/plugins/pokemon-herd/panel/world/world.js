@@ -14,6 +14,7 @@ import { dropTarget, onDizzy, onFocus, shaken } from './reactions.js'
 import { restSpot } from './rest.js'
 import { nightness, RAINBOW_MS, seasonAt, weatherOf } from './scene.js'
 import { assignEntity, createActor, paintActors } from './view.js'
+import { ITEMS } from '../../encounters/rules/items.js'
 
 const DEFAULT_SETTINGS = {
   rows: 1,
@@ -45,7 +46,14 @@ export function mountWorld(container, callbacks = {}) {
   const canvas = document.createElement('canvas')
   canvas.className = 'pokemon-world__landscape'
   canvas.setAttribute('aria-hidden', 'true')
-  root.append(style, canvas)
+  const notices = document.createElement('div')
+  notices.className = 'pokemon-world__notices'
+  notices.setAttribute('role', 'status')
+  const arrival = document.createElement('span')
+  arrival.hidden = true
+  const boostStatus = document.createElement('div')
+  notices.append(arrival, boostStatus)
+  root.append(style, canvas, notices)
   container.append(root)
 
   const landscape = createLandscape(canvas)
@@ -56,6 +64,8 @@ export function mountWorld(container, callbacks = {}) {
   const actors = new Map()
   const field = { width: 0, settings: { ...DEFAULT_SETTINGS }, weather: 'clear' }
   let visitor
+  let boosts = {}
+  let boostText = ''
   let hovered
   let lastFocus
   let fixedTime = null
@@ -272,6 +282,27 @@ export function mountWorld(container, callbacks = {}) {
       }
     }
     positionVisitor(timestamp)
+    const announcement = visitor?.entity.arrival
+    const caption = announcement && timestamp < announcement.until ? announcement.text : ''
+    if (caption !== arrival.textContent) {
+      arrival.textContent = caption
+      arrival.hidden = !caption
+    }
+    const active = Object.entries(boosts).filter(([, until]) => until > timestamp)
+    const labels = active.map(
+      ([id, until]) =>
+        `${ITEMS[id].icon} ${ITEMS[id].name} · ${Math.ceil((until - timestamp) / 60_000)} min`
+    )
+    if (labels.join('|') !== boostText) {
+      boostText = labels.join('|')
+      boostStatus.replaceChildren(
+        ...labels.map((label) => {
+          const pill = document.createElement('span')
+          pill.textContent = label
+          return pill
+        })
+      )
+    }
     const heads = paintActors(actorList(), { ...field, now: timestamp, hovered })
     if (force || frame - lastScenery >= 125) {
       landscape({ ...field, now: timestamp, heads })
@@ -447,6 +478,9 @@ export function mountWorld(container, callbacks = {}) {
       setGeometry()
       if (patch.agents) {
         syncAgents(patch.agents)
+      }
+      if (patch.boosts) {
+        boosts = patch.boosts
       }
       if ('visitor' in patch) {
         updateVisitor(patch.visitor)

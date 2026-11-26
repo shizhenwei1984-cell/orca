@@ -135,7 +135,8 @@ export function openCatalogPicker({
   let savingFavorite = false
   const currentEntry = entryOf(current)
   const currentKey = currentEntry && entryKey(currentEntry)
-  const selectable = (entry) => canChoose(entry, unlocks)
+  const eligible = (entry) => canChoose(entry, unlocks)
+  const selectable = (entry) => entry === currentEntry || eligible(entry)
   const randomChoices = () =>
     results.filter((entry) => entry !== selected && entry !== currentEntry && selectable(entry))
 
@@ -154,7 +155,7 @@ export function openCatalogPicker({
       types: [type.value, secondType.value].filter(Boolean),
       mega: megaFilter.checked,
       keys: favoriteFilter.checked ? new Set(keys) : undefined,
-      available: available.checked ? selectable : undefined
+      available: unlocks.trainer ? eligible : available.checked ? selectable : undefined
     })
     const pages = Math.max(1, Math.ceil(results.length / PAGE_SIZE))
     page = Math.min(page, pages - 1)
@@ -354,7 +355,8 @@ export function openCatalogPicker({
     })
   }
   retry.onclick = renderArt
-  find('[data-source]').hidden = !onSourceChange
+  find('[data-source]').hidden = !onSourceChange || unlocks.trainer
+  available.closest('label').hidden = !!unlocks.trainer
   sourceField.value = source
   sourceField.onchange = async () => {
     sourceField.disabled = true

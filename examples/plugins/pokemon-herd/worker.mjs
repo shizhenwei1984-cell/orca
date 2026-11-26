@@ -1,10 +1,11 @@
 import {
+  companionMenu,
   encounterTrainerAction,
   registerEncounterHandlers,
   settleEncounterWork
 } from './encounters/trainer-encounters.mjs'
 import { dueCare, recordStatus, sampleCare, trainerView, workingMinutes } from './trainer.mjs'
-import { trainerAction } from './trainer-actions.mjs'
+import { pokemonId, trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
 import { readTrainer, writeTrainer } from './trainer-save.mjs'
 import { gameView } from './trainer-view.mjs'
@@ -139,6 +140,9 @@ function actionOf(input) {
   return { client, sequence, action }
 }
 
+const exchangeFields = ['slot', 'id', 'terminalId', 'sessionId', 'assignment']
+const exchangeRef = (ref) => exchangeFields.map((field) => ref?.[field])
+
 function partySlots(save, ids, workspaceId) {
   const wanted = new Set(ids)
   const slots = new Map()
@@ -172,15 +176,18 @@ export function activateTrainer(
 ) {
   registerTerminalFocus(orca)
   registerCatalogSprites(orca)
-  const catalogPreferences = registerCatalogPreferences(orca)
   const workspaces = listTrainerWorkspaces(orca)
   const store = createTrainerStore(orca, workspaces)
+  const catalogPreferences = registerCatalogPreferences(orca, async () => {
+    const { trainer, legendsOpen } = await preferences(await store.read((save) => save.settings))
+    return { trainer, legendsOpen }
+  })
   registerSidebar(orca, store, workspaces)
   const list = getTerminalLists(orca)
   let settings = defaultHerdSettings
-  async function preferences() {
+  async function preferences(legacy) {
     try {
-      settings = await readHerdSettings(orca.storage)
+      settings = await readHerdSettings(orca.storage, legacy)
     } catch (error) {
       orca.log(error.message)
     }
@@ -218,7 +225,42 @@ export function activateTrainer(
     )
     const workspaceId =
       room ?? (candidateWorkspaces.size === 1 ? candidateWorkspaces.values().next().value : null)
-    return { slots, closed, workspaceId }
+    return { slots, closed, workspaceId, listed: lists.get(workspaceId)?.ids }
+  }
+
+  async function exchangeTargets(save, scope, active) {
+    const { slots, workspaceId, listed } = scope
+    const terminals = new Set(active?.terminals.map(({ id }) => id))
+    const members = slots.filter((slot) => {
+      const member = save.party[slot]
+      return (
+        member.workspaceId === workspaceId &&
+        listed?.has(member.terminalId) &&
+        terminals.has(member.terminalId)
+      )
+    })
+    if (members.length < 2) {
+      return []
+    }
+    const { agents } = await orca.host.call('agents.list', { workspaceId })
+    return members.flatMap((slot) => {
+      const { pokemon, terminalId, sessionId, assignment } = save.party[slot]
+      const live = agents.filter((agent) => agent.terminalId === terminalId)
+      return sessionId &&
+        live.length === 1 &&
+        live[0].sessionId === sessionId &&
+        live[0].stateStartedAt <= save.party[slot].lastAt
+        ? [
+            {
+              slot,
+              id: pokemonId(pokemon, slot),
+              terminalId,
+              sessionId,
+              assignment: assignment ?? ''
+            }
+          ]
+        : []
+    })
   }
 
   function settleWork(before, after, at, slots, workspaceId, settings) {
@@ -260,15 +302,13 @@ export function activateTrainer(
             : null)
         const room = await list(roomId)
         const slots = [...new Set([...partySlots(save, room?.ids ?? [], roomId), event.paneKey])]
-        const [settings, initialPick] = await Promise.all([
-          preferences(),
-          prior?.pokemon
-            ? undefined
-            : catalogPreferences().then(
-                (pickPreferences) => initialCatalogPick(save, pickPreferences, Math.random),
-                (error) => orca.log(error.message)
-              )
-        ])
+        const settings = await preferences(save.settings)
+        const initialPick = prior?.pokemon
+          ? undefined
+          : await catalogPreferences().then(
+              (pickPreferences) => initialCatalogPick(save, pickPreferences, Math.random, settings),
+              (error) => orca.log(error.message)
+            )
         const after = recordStatus(save, event, {
           slots,
           initialPick,
@@ -295,7 +335,7 @@ export function activateTrainer(
 
   async function sampleLiveAgents(save, catalog) {
     const at = Date.now()
-    const settings = await preferences()
+    const settings = await preferences(save.settings)
     const rooms = new Map()
     for (const [slot, member] of Object.entries(save.party)) {
       if (!member.run || !catalog.resolve(member.workspaceId) || !member.terminalId) {
@@ -356,17 +396,57 @@ export function activateTrainer(
     return store.transact(async (save, catalog) => {
       const scope = await getScope(save, ids, catalog)
       const next = settleBadges(save, scope.slots)
-      return { save: next, result: gameView(next, { ...scope, at: Date.now(), query }) }
+      const settings = await preferences(save.settings)
+      return { save: next, result: gameView(next, { ...scope, at: Date.now(), query, settings }) }
+    })
+  })
+  orca.panels.handle('trainer.companion-menu', (input) => {
+    const ids = terminalIds(input)
+    return store.transact(async (save, catalog) => {
+      const active = await orca.host.call('workspace.readContext')
+      const scope = await getScope(save, ids, catalog, {
+        fresh: true,
+        requested: catalog.resolve(active?.workspaceId)
+      })
+      const slot = input.target?.slot
+      const member = scope.slots.includes(slot) ? save.party[slot] : null
+      if (
+        !member ||
+        pokemonId(member.pokemon, slot) !== input.target.id ||
+        !active?.terminals.some(({ id }) => id === member.terminalId)
+      ) {
+        return { save, result: null }
+      }
+      const targets = await exchangeTargets(save, scope, active).catch(() => [])
+      const source = targets.find((target) => target.slot === slot) ?? null
+      const settings = await preferences(save.settings)
+      return {
+        save,
+        result: companionMenu(
+          save,
+          { ...scope, settings, at: Date.now(), rnd: Math.random },
+          slot,
+          source,
+          targets
+        )
+      }
     })
   })
   orca.panels.handle('trainer.command', (input) => {
     const ids = terminalIds(input)
     const { client, sequence, action } = actionOf(input)
+    const exchange = action.type === 'swap-companions'
+    const swapToken = exchange
+      ? JSON.stringify([exchangeRef(action.target), exchangeRef(action.destination)])
+      : undefined
     const at = Date.now()
     return store.transact(
       async (save, catalog) => {
         const receipt = save.receipts[client]
         if (receipt && sequence <= receipt.sequence) {
+          if (receipt.swapToken !== swapToken || (exchange && sequence !== receipt.sequence)) {
+            return { save, result: { ok: false, message: 'That companion command has expired.' } }
+          }
           return {
             save,
             result: sequence === receipt.sequence ? receipt.result : { ok: true, replayed: true }
@@ -374,12 +454,19 @@ export function activateTrainer(
         }
 
         const inventoryOnly = ['buy', 'sell', 'boost', 'undo-release'].includes(action.type)
+        const active =
+          exchange || action.worldTerminalId !== undefined
+            ? await orca.host.call('workspace.readContext')
+            : null
         const scope = inventoryOnly
           ? { slots: [], closed: new Set(), workspaceId: null }
-          : await getScope(save, ids, catalog, { fresh: true })
+          : await getScope(save, ids, catalog, {
+              fresh: true,
+              requested: exchange ? catalog.resolve(active?.workspaceId) : undefined
+            })
         const context = {
           ...scope,
-          settings: inventoryOnly ? undefined : await preferences(),
+          settings: inventoryOnly ? undefined : await preferences(save.settings),
           at,
           key: `${client}:${sequence}`,
           rnd: Math.random
@@ -387,12 +474,18 @@ export function activateTrainer(
         let next = save
         let result
         try {
-          if (action.worldTerminalId !== undefined) {
+          if (exchange) {
+            const targets = await exchangeTargets(save, scope, active)
+            const valid = (ref) =>
+              targets.some((target) => exchangeFields.every((key) => ref?.[key] === target[key]))
+            if (!valid(action.target) || !valid(action.destination)) {
+              throw new Error('These companions are no longer available to swap.')
+            }
+          } else if (action.worldTerminalId !== undefined) {
             const slot = action.target?.slot
             const terminalId = action.worldTerminalId
-            const active = await orca.host.call('workspace.readContext')
             if (
-              !['use', 'pet'].includes(action.type) ||
+              !['use', 'pet', 'take-held'].includes(action.type) ||
               !scope.slots.includes(slot) ||
               save.party[slot].terminalId !== terminalId ||
               !active?.terminals.some(({ id }) => id === terminalId)
@@ -411,7 +504,13 @@ export function activateTrainer(
           result = { ok: false, message: error.message }
         }
         return {
-          save: { ...next, receipts: { ...next.receipts, [client]: { sequence, result } } },
+          save: {
+            ...next,
+            receipts: {
+              ...next.receipts,
+              [client]: { sequence, result, ...(exchange && { swapToken }) }
+            }
+          },
           result
         }
       },

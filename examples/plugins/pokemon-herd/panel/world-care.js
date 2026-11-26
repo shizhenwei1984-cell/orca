@@ -7,7 +7,7 @@ export function mountWorldCare(orca, status, onSaved) {
   let sequence = 0
   let sending
 
-  return async (action, agent, scope, terminalIds) => {
+  return async (action, agent, scope, terminalIds, message) => {
     if (scope.aborted || sending === scope || !agent.ref) {
       return
     }
@@ -17,7 +17,7 @@ export function mountWorldCare(orca, status, onSaved) {
       client,
       sequence: ++sequence,
       terminalIds,
-      action: { ...action, target: agent.ref, worldTerminalId: agent.id }
+      action: { target: agent.ref, ...action, worldTerminalId: agent.id }
     }
     const send = () => orca.plugin.request('trainer.command', payload, { signal: scope })
     try {
@@ -31,15 +31,14 @@ export function mountWorldCare(orca, status, onSaved) {
         result = await send()
       }
       if (!scope.aborted && result.ok) {
-        status.textContent =
-          action.type === 'pet' ? `Petted ${agent.species}.` : `Fed ${agent.species}.`
+        status.textContent = action.type === 'pet' ? `Petted ${agent.species}.` : message
         onSaved(action)
       } else if (!scope.aborted && !quietPetErrors.has(result.message)) {
         status.textContent = result.message
       }
     } catch {
       if (!scope.aborted) {
-        status.textContent = 'Could not save Pokémon care. Try again.'
+        status.textContent = 'Could not save the companion action. Try again.'
       }
     } finally {
       if (sending === scope) {
