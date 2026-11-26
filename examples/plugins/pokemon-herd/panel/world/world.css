@@ -1,0 +1,153 @@
+.pokemon-world {
+  position: relative;
+  box-sizing: border-box;
+  isolation: isolate;
+  overflow: hidden;
+  inline-size: 100%;
+  background: var(--orca-card, Canvas);
+  color: var(--orca-card-foreground, CanvasText);
+  font: 12px var(--orca-font-sans, sans-serif);
+  border: 1px solid var(--orca-border, transparent);
+  border-radius: var(--orca-radius);
+  user-select: none;
+}
+
+.pokemon-world__landscape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+.pokemon-world[data-background='plain']::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 calc(var(--pokemon-ground) + 2px),
+    var(--orca-border, GrayText) calc(var(--pokemon-ground) + 2px) calc(var(--pokemon-ground) + 3px),
+    transparent calc(var(--pokemon-ground) + 3px) var(--pokemon-row-height)
+  );
+}
+
+.pokemon-world > .pokemon-world__actor {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  appearance: none;
+  pointer-events: none;
+  outline: none;
+}
+
+.pokemon-world__actor[data-focused='true'],
+.pokemon-world__actor:focus-visible {
+  z-index: 1;
+}
+
+.pokemon-world__actor--dragging {
+  z-index: 2;
+}
+
+.pokemon-world__body,
+.pokemon-world__tag {
+  position: absolute;
+  box-sizing: border-box;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.pokemon-world__body {
+  display: grid;
+  justify-items: center;
+  align-items: end;
+  touch-action: none;
+}
+
+.pokemon-world__sprite {
+  position: absolute;
+  background-repeat: no-repeat;
+  bottom: 0;
+  image-rendering: pixelated;
+  transform-origin: 50% 80%;
+  pointer-events: none;
+}
+
+.pokemon-world__sprite--placeholder {
+  border: 1px solid #28252c;
+  border-radius: 50%;
+  background: linear-gradient(#e14c52 0 43%, #28252c 43% 57%, #f4eee9 57%);
+}
+
+.pokemon-world__sprite--placeholder::after {
+  content: '';
+  position: absolute;
+  inset: 35%;
+  background: #f4eee9;
+  border: 1px solid #28252c;
+  border-radius: 50%;
+}
+
+.pokemon-world__badge {
+  position: absolute;
+  bottom: calc(100% - 2px);
+  left: 58%;
+  line-height: 14px;
+  min-width: 14px;
+  padding-inline: 2px;
+  border: 1px solid var(--orca-border, transparent);
+  border-radius: var(--orca-radius);
+  background: var(--orca-popover, Canvas);
+  color: var(--orca-popover-foreground, CanvasText);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.pokemon-world__actor[data-mood='blocked'] .pokemon-world__badge,
+.pokemon-world__actor[data-mood='waiting'] .pokemon-world__badge {
+  color: var(--orca-destructive, CanvasText);
+}
+
+.pokemon-world__tag {
+  height: 16px;
+  line-height: 14px;
+  overflow: hidden;
+  padding-inline: 3px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  border-radius: var(--orca-radius);
+  background: var(--orca-card, Canvas);
+  touch-action: none;
+}
+
+.pokemon-world__actor:is(:hover, :focus-visible, [data-focused='true']) .pokemon-world__tag {
+  background: var(--orca-accent, Canvas);
+  color: var(--orca-accent-foreground, CanvasText);
+}
+
+.pokemon-world:focus-visible,
+.pokemon-world__actor:focus-visible :is(.pokemon-world__body, .pokemon-world__tag) {
+  outline: 2px solid var(--orca-ring, Highlight);
+  outline-offset: -2px;
+}
+
+.pokemon-world__shot {
+  position: absolute;
+  color: #ffe27a;
+  pointer-events: none;
+}
+
+.pokemon-world__actor[data-petted='true'] .pokemon-world__badge[data-attention='true']::after {
+  content: '♥';
+  position: absolute;
+  right: calc(100% + 4px);
+  color: inherit;
+}
