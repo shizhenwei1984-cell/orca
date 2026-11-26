@@ -24,6 +24,7 @@ import {
   registerPluginPanelActivationReceiver
 } from '../view/plugin-panel-activation'
 import { usePluginFrameThemeSync } from './use-plugin-panel-theme-revision'
+import { forwardPluginFramePush } from './plugin-frame-workspace-focus'
 
 /** Wires one plugin frame (panel or editor, iframe or guest): message host, watchdog and live theme. */
 export function usePluginFrameHost(options: {
@@ -185,12 +186,19 @@ export function usePluginFrameHost(options: {
     if (!frameKey || !sessionToken || !subscribe) {
       return
     }
-    return subscribe(sessionToken, (raw) => {
+    const forward = forwardPluginFramePush((push) =>
+      getFrameWindow()?.postMessage(pluginEvent(FRAME_EVENTS.push, push), '*')
+    )
+    const unsubscribe = subscribe(sessionToken, (raw) => {
       const push = pluginPanelPushSchema.safeParse(raw)
       if (push.success) {
-        getFrameWindow()?.postMessage(pluginEvent(FRAME_EVENTS.push, push.data), '*')
+        forward.receive(push.data)
       }
     })
+    return () => {
+      forward.dispose()
+      unsubscribe()
+    }
   }, [frameKey, getFrameWindow, sessionToken])
 
   useEffect(() => {

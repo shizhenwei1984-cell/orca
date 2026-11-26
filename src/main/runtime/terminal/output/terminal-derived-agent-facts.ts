@@ -16,6 +16,8 @@ import type { ParsedAgentStatusPayload } from '../../../../shared/agent-status/c
 import { isAgentStatusHeldOpenByChildWork } from '../../../../shared/agent-status/lifecycle/agent-lead-status-fold'
 import { AGENT_STATUS_STALE_AFTER_MS } from '../../../../shared/agent-status/contracts/agent-status-freshness'
 import { lapsedProgramStatusChildHold } from '../../../../shared/program-status/agent-status-projector'
+import { getPtyExecutionHost } from '../../../../shared/terminal/pty/lifecycle/terminal-execution-host'
+import { getConnectionExecutionHostId } from '../../../../shared/execution-host/execution-host'
 
 // Why: programs report only changes, so a long `working` renews its row inside AGENT_STATUS_STALE_AFTER_MS.
 const PROGRAM_STATUS_LEASE_RENEWAL_MS = 10 * 60 * 1000
@@ -79,6 +81,21 @@ export abstract class OrcaRuntimeWithCreateTerminalSideEffectCommandCodeDetector
       }
     }
     return { cwd, cwdChanged }
+  }
+
+  readTerminalFolderKey(ptyId: string): string | undefined {
+    const pty = this.ptysById.get(ptyId)
+    const path = this.terminalCwdByPtyId.get(ptyId)
+    if (!pty?.connected || !path) {
+      return undefined
+    }
+    const host = getConnectionExecutionHostId(pty.connectionId)
+    const ptyHost = getPtyExecutionHost(ptyId)
+    const distro = this.wslDistroByPtyId.get(ptyId) ?? pty.wslDistro
+    if ((ptyHost && ptyHost !== host) || (pty.isWsl && !distro)) {
+      return undefined
+    }
+    return JSON.stringify([host, distro, this.terminalFileUriHostnameByPtyId.get(ptyId), path])
   }
 
   protected pathFlavorForPty(pty?: RuntimePtyWorktreeRecord | null): 'posix' | 'win32' {

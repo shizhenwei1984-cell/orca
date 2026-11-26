@@ -49,6 +49,21 @@ const agentsListResult = z.object({
         state: z.enum(AGENT_STATUS_STATES),
         /** When it entered `state`, in ms since the epoch. */
         stateStartedAt: z.number().finite(),
+        /** Another live agent in this workspace is working in the same reported terminal folder. */
+        sameFolderRival: z.literal(true).optional(),
+        /** Live provider children without their own terminals. Child IDs are opaque and read-only. */
+        children: z
+          .array(
+            z.object({
+              id: z.string().max(80),
+              state: z.enum(['working', 'blocked', 'waiting', 'idle']),
+              startedAt: z.number().finite()
+            })
+          )
+          .max(16)
+          .optional(),
+        /** The parent itself is working, independent of activity folded in from its children. */
+        leadWorking: z.boolean().optional(),
         /** The agent's own session id, which `agent.resume` takes; null when Orca has none.
          *  Absent before host API 1.8. */
         sessionId: pluginAgentSessionIdSchema.nullable().optional(),

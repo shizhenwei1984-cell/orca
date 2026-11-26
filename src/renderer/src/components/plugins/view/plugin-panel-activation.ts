@@ -16,7 +16,10 @@ import {
   pluginWorkspaceId,
   PLUGIN_HOST_ID_MAX_LENGTH
 } from '../../../../../shared/plugins/workers/plugin-host-api-workspace-methods'
-import { parseWorkspaceKey } from '../../../../../shared/workspace/identity/workspace-scope'
+import {
+  getActiveSidebarWorkspaceId,
+  parseWorkspaceKey
+} from '../../../../../shared/workspace/identity/workspace-scope'
 import type { PluginHostPanel } from '../../../../../shared/plugins/plugin-list-entry'
 import { pluginPanelTabKey } from '../../../../../shared/plugins/frames/plugin-tab-key'
 import { PLUGIN_TERMINAL_ID_MAX_LENGTH } from '../../../../../shared/plugins/workers/plugin-host-api-workspace-context'
@@ -45,7 +48,7 @@ type ScopedReceiver = {
 const receivers = new Map<string, ScopedReceiver>()
 let pending: PendingActivation | undefined
 
-function frameWorkspaceId(state: AppState): string | undefined {
+export function frameWorkspaceId(state: AppState): string | undefined {
   const id = state.activeWorktreeId
   if (!id) {
     return undefined
@@ -106,8 +109,8 @@ export function registerPluginPanelActivationReceiver(
   }
 }
 
-async function readActiveTerminalId(state: AppState): Promise<string | undefined> {
-  const worktreeId = state.activeWorktreeId
+export function activePluginTerminalPane(state: AppState) {
+  const worktreeId = getActiveSidebarWorkspaceId(state.activeWorkspaceKey, state.activeWorktreeId)
   const tab =
     state.activeView === 'terminal' && worktreeId
       ? selectActiveTabForWorktree(state, worktreeId)
@@ -120,12 +123,23 @@ async function readActiveTerminalId(state: AppState): Promise<string | undefined
   if (!leafId) {
     return undefined
   }
-  const id = await resolveTerminalHandleForPane({
+  return {
     tabId: tab.entityId,
     leafId,
     ptyId: layout.ptyIdsByLeafId?.[leafId],
+    worktreeId
+  }
+}
+
+export async function readActiveTerminalId(state: AppState): Promise<string | undefined> {
+  const pane = activePluginTerminalPane(state)
+  if (!pane) {
+    return undefined
+  }
+  const id = await resolveTerminalHandleForPane({
+    ...pane,
     callRuntime: ({ method, params }) =>
-      window.api.runtime.call({ method, params: { ...params, worktreeId } })
+      window.api.runtime.call({ method, params: { ...params, worktreeId: pane.worktreeId } })
   }).catch(() => undefined)
   return id && id.length <= PLUGIN_TERMINAL_ID_MAX_LENGTH ? id : undefined
 }

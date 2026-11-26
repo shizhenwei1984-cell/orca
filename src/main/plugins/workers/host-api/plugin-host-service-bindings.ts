@@ -15,6 +15,7 @@ import type { TerminalInputKind } from '../../../../shared/terminal/input/termin
 import { pluginTerminalTitle, type PluginAgentStatusRow } from './plugin-workspace-projection'
 import type { PluginAppearanceService } from '../../appearance/plugin-appearance-service'
 import type { PluginEditorTypographySource } from '../../appearance/plugin-editor-typography'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 
 export type PluginRuntimeDelegate = {
   resolveActiveWorktreeContext(): Promise<{
@@ -35,8 +36,12 @@ export type PluginRuntimeDelegate = {
       paneTitle?: string
       tabId?: string
       leafId?: string
+      ptyId?: string | null
+      connected?: boolean
+      executionHostId?: ExecutionHostId
     }[]
   }>
+  readTerminalFolderKey?(ptyId: string): string | undefined
   sendTerminal(
     handle: string,
     action: { text?: string; enter?: boolean },
@@ -97,7 +102,7 @@ export function bindPluginHostServices(input: {
         displayName: context.displayName
       }
     },
-    listWorktreeTerminals: async (worktreeId) => {
+    listWorktreeTerminals: async (worktreeId, includeAgentActivity) => {
       const result = await delegate.listTerminals(
         `id:${worktreeId}`,
         PLUGIN_WORKSPACE_TERMINAL_LIMIT,
@@ -106,6 +111,15 @@ export function bindPluginHostServices(input: {
       return result.terminals.slice(0, PLUGIN_WORKSPACE_TERMINAL_LIMIT).map((terminal) => ({
         id: terminal.handle,
         title: pluginTerminalTitle(terminal),
+        ...(includeAgentActivity
+          ? {
+              connected: terminal.connected,
+              executionHostId: terminal.executionHostId,
+              folderKey: terminal.ptyId
+                ? delegate.readTerminalFolderKey?.(terminal.ptyId)
+                : undefined
+            }
+          : {}),
         ...(terminal.tabId && terminal.leafId
           ? { paneKey: `${terminal.tabId}:${terminal.leafId}` }
           : {})

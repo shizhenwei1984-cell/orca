@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { createHash } from 'node:crypto'
 import {
   shortPluginBranchName,
   workspaceChangedPayloadSchema
@@ -20,7 +21,12 @@ import {
   pluginWorkspaceId
 } from '../../../../shared/plugins/workers/plugin-host-api-workspace-methods'
 import { parseWorkspaceKey } from '../../../../shared/workspace/identity/workspace-scope'
-import type { AgentStatusState } from '../../../../shared/agent-status/contracts/agent-status-types'
+import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
+import {
+  getConnectionExecutionHostId,
+  type ExecutionHostId
+} from '../../../../shared/execution-host/execution-host'
+import { mainAgentState } from '../../../../shared/agent-status/lifecycle/main-agent-status'
 
 /** One terminal of a workspace, as main's runtime lists it. */
 export type PluginWorkspaceTerminal = {
@@ -29,22 +35,26 @@ export type PluginWorkspaceTerminal = {
   title?: string
   /** `tabId:leafId`, which agent statuses carry. */
   paneKey?: string
+  executionHostId?: ExecutionHostId
+  connected?: boolean
+  folderKey?: string
 }
 
 /** One agent row from the hook server's status store (the fields plugins may see). */
-export type PluginAgentStatusRow = {
-  paneKey: string
-  worktreeId?: string
-  terminalHandle?: string
-  state: AgentStatusState
-  agentType?: string
-  stateStartedAt: number
-  providerSessionOnly?: boolean
-  /** The SSH connection the pane runs on; null or absent on this machine. */
-  connectionId?: string | null
-  /** The agent's own session, which a resume names. */
-  providerSession?: { id: string; transcriptPath?: string }
-}
+export type PluginAgentStatusRow = Pick<
+  AgentStatusIpcPayload,
+  | 'paneKey'
+  | 'worktreeId'
+  | 'terminalHandle'
+  | 'state'
+  | 'agentType'
+  | 'stateStartedAt'
+  | 'providerSessionOnly'
+  | 'providerSession'
+  | 'restoredUnconfirmed'
+  | 'subagents'
+  | 'mainAgent'
+> & { connectionId?: string | null }
 
 export type PluginWorkspaceContext = z.output<typeof pluginWorkspaceContextSchema>
 
@@ -145,15 +155,59 @@ export function projectPluginWorkspaceAgents(
     .toSorted((a, b) => b.stateStartedAt - a.stateStartedAt)
     .slice(0, PLUGIN_AGENT_LIST_LIMIT)
   const taskTitles = listed.length > 0 ? readTaskTitles() : new Map<string, string>()
-  return listed.map((row) => {
-    const terminal = terminalForPane(terminals, row)
+  const folderAgents = new Map<string, Set<string>>()
+  const matched = listed.map((row) => {
+    const host = getConnectionExecutionHostId(row.connectionId)
+    const terminal = terminalForPane(
+      terminals.filter(
+        ({ executionHostId }) => executionHostId === undefined || executionHostId === host
+      ),
+      row
+    )
+    const liveTerminal =
+      terminal?.connected === true &&
+      terminal.paneKey === row.paneKey &&
+      terminal.executionHostId === host &&
+      !row.restoredUnconfirmed
+        ? terminal
+        : undefined
+    const folder = mainAgentState(row) === 'working' ? liveTerminal?.folderKey : undefined
+    if (folder && terminal) {
+      const peers = folderAgents.get(folder) ?? new Set<string>()
+      peers.add(terminal.id)
+      folderAgents.set(folder, peers)
+    }
+    return { row, terminal, folder, liveTerminalId: liveTerminal?.id }
+  })
+  return matched.map(({ row, terminal, folder, liveTerminalId }) => {
     const taskTitle = taskTitles.get(row.paneKey)
+    const children = liveTerminalId
+      ? row.subagents?.slice(0, 16).flatMap(({ id, state, startedAt }) =>
+          state === 'unverifiable'
+            ? []
+            : [
+                {
+                  id: `child:${createHash('sha256')
+                    .update(
+                      JSON.stringify([liveTerminalId, row.providerSession?.id, id, startedAt])
+                    )
+                    .digest('hex')}`,
+                  state,
+                  startedAt
+                }
+              ]
+        )
+      : undefined
     return {
       terminalId: terminal?.id ?? null,
       title: terminal?.title ?? null,
       agent: row.agentType?.slice(0, 128) ?? null,
       state: row.state,
       stateStartedAt: row.stateStartedAt,
+      ...(folder && (folderAgents.get(folder)?.size ?? 0) > 1
+        ? { sameFolderRival: true as const }
+        : {}),
+      ...(children?.length ? { children, leadWorking: row.mainAgent?.state === 'working' } : {}),
       sessionId: pluginAgentSessionId(row.providerSession) ?? null,
       // Only that it is a dispatched task, and its title: never the dispatch's own records.
       task:

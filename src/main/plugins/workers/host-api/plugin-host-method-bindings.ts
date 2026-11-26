@@ -78,7 +78,10 @@ export type PluginHostServices = {
   /** This Orca's own editor settings; absent where no profile is loaded (relay conformance). */
   editorTypography?: PluginEditorTypographySource | null
   resolveActiveWorktreeContext(): Promise<PluginWorktreeContext | null>
-  listWorktreeTerminals(worktreeId: string): Promise<PluginWorkspaceTerminal[]>
+  listWorktreeTerminals(
+    worktreeId: string,
+    includeAgentActivity?: boolean
+  ): Promise<PluginWorkspaceTerminal[]>
   listAgentStatuses(): readonly PluginAgentStatusRow[]
   /** The title of the orchestration task each pane runs, by pane key (`tabId:leafId`); absent
    *  where no runtime dispatches tasks. */
@@ -185,7 +188,7 @@ const HANDLERS: Record<PluginHostMethodName, BoundPluginHostMethod> = {
     if (!worktreeId) {
       return { agents: [] }
     }
-    const terminals = await services.listWorktreeTerminals(worktreeId).catch(() => [])
+    const terminals = await services.listWorktreeTerminals(worktreeId, true).catch(() => [])
     return {
       agents: projectPluginWorkspaceAgents(
         worktreeId,
