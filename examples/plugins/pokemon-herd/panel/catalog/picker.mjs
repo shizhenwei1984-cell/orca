@@ -33,6 +33,7 @@ const pickerMarkup = `
         <label><input type="checkbox" name="mega"> Mega evolution</label>
         <label><input type="checkbox" name="favorite"> Favorites</label>
         <label><input type="checkbox" name="available"> Available to choose</label>
+        <label data-source hidden>New companions<select name="source"><option value="starters">Starters</option><option value="any">All available Pokémon</option><option value="favorites">Favorites</option></select></label>
       </div>
     </details>
   </form>
@@ -77,8 +78,10 @@ const pickerMarkup = `
 /** @typedef {import('../../catalog/dex.mjs').Pick} Pick */
 /**
  * @param {{ current?: Pick | null, onSelect: (pick: Pick) => void | Promise<void>,
- * onClose?: () => void, favorites?: string[], onFavoritesChange?: (keys: string[]) => void | Promise<void>,
- * unlocks?: import('../../catalog/dex.mjs').Unlocks, taken?: ReadonlySet<number>, shinyOdds?: number }} options
+ * onClose?: () => void, favorites?: string[],
+ * onFavoritesChange?: (keys: string[], change: {key: string, favorite: boolean}) => string[] | Promise<string[] | void> | void,
+ * source?: string, onSourceChange?: (source: string) => Promise<void>,
+ * unlocks?: import('../../catalog/dex.mjs').Unlocks, taken?: ReadonlySet<number> }} options
  * @returns {HTMLDialogElement}
  */
 export function openCatalogPicker({
@@ -87,9 +90,10 @@ export function openCatalogPicker({
   onClose,
   favorites = [],
   onFavoritesChange,
+  source = 'starters',
+  onSourceChange,
   unlocks = {},
-  taken = new Set(),
-  shinyOdds = 64
+  taken = new Set()
 }) {
   const dialog = document.createElement('dialog')
   dialog.className = 'catalog-picker'
@@ -102,6 +106,7 @@ export function openCatalogPicker({
   const type = field('type')
   const secondType = field('secondType')
   const favoriteFilter = field('favorite')
+  const sourceField = field('source')
   const available = field('available')
   const megaFilter = field('mega')
   const list = find('.catalog-list')
@@ -350,6 +355,21 @@ export function openCatalogPicker({
     })
   }
   retry.onclick = renderArt
+  find('[data-source]').hidden = !onSourceChange
+  sourceField.value = source
+  sourceField.onchange = async () => {
+    sourceField.disabled = true
+    saveStatus.textContent = ''
+    try {
+      await onSourceChange(sourceField.value)
+      source = sourceField.value
+    } catch {
+      sourceField.value = source
+      saveStatus.textContent = 'Could not save the companion source. Try again.'
+    } finally {
+      sourceField.disabled = false
+    }
+  }
   favorite.onclick = async () => {
     if (savingFavorite) {
       return
@@ -358,10 +378,10 @@ export function openCatalogPicker({
     favorite.disabled = true
     saveStatus.textContent = ''
     const key = entryKey(selected)
-    const updated = keys.includes(key) ? keys.filter((saved) => saved !== key) : [...keys, key]
+    const enabled = !keys.includes(key)
+    const updated = enabled ? [...keys, key] : keys.filter((saved) => saved !== key)
     try {
-      await onFavoritesChange?.(updated)
-      keys = updated
+      keys = (await onFavoritesChange?.(updated, { key, favorite: enabled })) ?? updated
       renderChoice()
       renderResults()
     } catch {
@@ -381,14 +401,13 @@ export function openCatalogPicker({
     const kind = megas[Number(megaView.value) - 1]?.kind ?? (same ? current.megaKind : undefined)
     const nextGender = gender.value || rollGender(dex)
     const nextPick = {
-      ...(same ? current : {}),
       dex,
       ...(form ? { form } : {}),
       shiny:
         selected.shiny &&
         ((shiny.checked && unlocks.shinyUnlocked?.has(dex)) ||
-          (same ? current.shiny === true : Math.random() < 1 / shinyOdds)),
-      mega: megas.length ? megaMode.value : (current?.mega ?? 'auto'),
+          (same && current.shiny === true && !unlocks.shinyUnlocked?.has(dex))),
+      ...(megas.length ? { mega: megaMode.value } : {}),
       ...(kind !== undefined ? { megaKind: kind } : {}),
       ...(nextGender ? { gender: nextGender } : {})
     }
@@ -398,8 +417,8 @@ export function openCatalogPicker({
     find('[data-cancel]').disabled = true
     try {
       await onSelect(nextPick)
-    } catch {
-      saveStatus.textContent = 'Could not save Pokémon. Try again.'
+    } catch (error) {
+      saveStatus.textContent = error.message || 'Could not save Pokémon. Try again.'
       saving = false
       find('[data-cancel]').disabled = false
       renderChoice()
