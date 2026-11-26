@@ -18,6 +18,7 @@ import { campSeats, restSpot } from './rest.js'
 import { entryX, exitX, wrapOk, wrapRow } from './wrap.js'
 
 const SPEED = { working: 70, idle: 32 }
+const TIRED_SPEED_FACTOR = 0.6
 const OFF = 40
 const CAMP_GAP = 46
 const REST_GAP = 60
@@ -42,7 +43,10 @@ function walk(actor, target, speed, now, kind = 'walk') {
     from: actor.x,
     target,
     start: now,
-    duration: Math.max(1, (Math.abs(target - actor.x) * 1000) / speed),
+    duration: Math.max(
+      1,
+      (Math.abs(target - actor.x) * 1000) / (speed * (actor.tired ? TIRED_SPEED_FACTOR : 1))
+    ),
     kind
   }
   actor.moving = true
@@ -167,6 +171,17 @@ export function tickWorld(actors, field, options, now, selectPair) {
     const mood = moodOf(actor, now, night)
     onStir(actor, mood, now, night >= 0.5, has, msOf, rnd)
     actor.mood = moodOf(actor, now, night)
+    const tired = settings.tired === true && entity.sessionLimitNear === true
+    if (Boolean(actor.tired) !== tired) {
+      const track = actor.track
+      if (track) {
+        const elapsed = now - track.start
+        const ratio = tired ? 1 / TIRED_SPEED_FACTOR : TIRED_SPEED_FACTOR
+        track.start = now - elapsed * ratio
+        track.duration *= ratio
+      }
+      actor.tired = tired
+    }
     if (actor.dragging) {
       continue
     }

@@ -334,6 +334,14 @@ Call `workspace.selectTab` with `{ workspace, tab }`, or `workspace.renameTab` w
 
 Call `workspace.refreshReview` with `{ workspace }` from a trusted click or key press. This uses Orca's native review refresh. Open a projected link with `orca.shell.openExternal`, which retains Orca's own confirmation. Listen with `orca.on('workspace.viewChanged', callback)` and re-read on a notification. A notification with `reset: true` invalidates the old snapshot immediately.
 
+### Companion fatigue and notification portraits
+
+Feature-detect `workspace.companions` and call it without parameters. The snapshot is null outside an admitted workspace. Otherwise it contains `workspace`, `grants: { fatigue, portraits }`, and `companions`. Request either permission with `workspace.viewAccess` from a trusted gesture. Pass `{ workspace, capability: 'fatigue' }` or `{ workspace, capability: 'portraits' }`. Each can be revoked with `revoke: true` or from the plugin's Workspace access settings. Both begin disabled, including for installations with tab access.
+
+A companion row names its live `terminalId`. With fatigue permission, `sessionLimitNear` is a boolean at the 90% threshold when the host can match a current five-hour reading to that terminal's own account. Orca currently verifies host-runtime Codex panes launched with a saved managed account home. Other providers, hosts, and ambiguous or expired readings yield no fatigue field. Read again on `workspace.viewChanged` and periodically to observe new readings. An event with `fatigueExpired: true` invalidates cached fatigue fields immediately.
+
+With portrait permission, a row can include an opaque `target`. Call `workspace.companionPortrait` with `{ workspace, target, rgba }`. Encode exactly 40 × 40 tightly packed RGBA pixels as standard base64, or pass null to remove the image. Draw and resize the image in the guest. Orca matches the workspace, execution host, pane, and current PTY incarnation in its native desktop notification delivery. Notifications without that evidence keep their default icon. Existing notification content, settings, dismissal, and click behavior still apply. Orca sends no notification event or contents to the guest. Registration ends with the scope or panel session.
+
 ### Custom editors
 
 A custom editor opens files that end in one of its `extensions` (with the dot, such as

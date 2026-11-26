@@ -344,7 +344,13 @@ export function PluginDetailPage({
           {plugin && controls?.kind !== 'review' ? (
             <PluginAccessSection capabilities={plugin.capabilities} trust={model.trust} />
           ) : null}
-          {plugin ? <PluginWorkspaceAccess pluginKey={plugin.pluginKey} name={name} /> : null}
+          {plugin ? (
+            <PluginWorkspaceAccess
+              pluginKey={plugin.pluginKey}
+              name={name}
+              canGrantCompanions={plugin.panels.length > 0}
+            />
+          ) : null}
           {plugin ? (
             <PluginSettingsSection
               pluginKey={plugin.pluginKey}

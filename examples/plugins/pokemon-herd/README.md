@@ -20,6 +20,8 @@ The worker tracks agent status across workspaces, including folders, while the p
 
 Open **Pokémon Sidebar** to browse workspaces, focus terminals, and see agent cards with their saved Pokémon. See [Pokémon Sidebar](./sidebar/README.md) for the direct-open command and host requirements.
 
+In Herd's **Settings → Workspace access**, allow **Companion fatigue** or **Notification portraits** for the current workspace. When a verified companion is near its five-hour session limit, it walks more slowly and shows sweat while working. **Tired near the limit** controls the effect. With portrait access, Orca adds the current Pokémon's portrait to native notifications it can match to that terminal. You can remove either permission in Herd or on the plugin's detail page.
+
 See [Trainer integration](./trainer-integration.md) for the worker contracts and remaining cross-feature wiring.
 
 In Orca’s command palette, use **Choose a Pokémon companion** or **Open Pokémon Bag**.

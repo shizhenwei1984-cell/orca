@@ -25,13 +25,17 @@ export function createActor(document, entity, now, x, row, visitor = false) {
   if (!visitor) {
     button.setAttribute('aria-keyshortcuts', 'P B S Alt+Shift+P Alt+Shift+B Shift+F10')
   }
-  const [tag, body, sprite, badge] = ['tag', 'body', 'sprite', 'badge'].map((name) => {
-    const span = document.createElement('span')
-    span.className = `pokemon-world__${name}`
-    span.setAttribute('aria-hidden', 'true')
-    return span
-  })
-  body.append(sprite, badge)
+  const [tag, body, sprite, badge, sweat] = ['tag', 'body', 'sprite', 'badge', 'sweat'].map(
+    (name) => {
+      const span = document.createElement('span')
+      span.className = `pokemon-world__${name}`
+      span.setAttribute('aria-hidden', 'true')
+      return span
+    }
+  )
+  sweat.textContent = '💦'
+  sweat.hidden = true
+  body.append(sprite, badge, sweat)
   button.append(body, tag)
   const actor = {
     button,
@@ -39,6 +43,7 @@ export function createActor(document, entity, now, x, row, visitor = false) {
     body,
     sprite,
     badge,
+    sweat,
     x,
     row,
     born: now,
@@ -107,7 +112,7 @@ export function paintActors(
   for (const [row, items] of rows.entries()) {
     const tags = layoutTags(items, width, { minW: 42, maxW: 160, maxLines: 2 })
     for (const { id: actor } of items) {
-      const { entity, button, tag, body, sprite, badge } = actor
+      const { entity, button, tag, body, sprite, badge, sweat } = actor
       const visitor = button.dataset.kind === 'visitor'
       const status = visitor
         ? 'Wild visitor'
@@ -141,6 +146,8 @@ export function paintActors(
       const resting = entity.state === 'done' ? '✓' : actor.mood === 'sleep' ? 'zZ' : ''
       const icon = careIcon || attentionIcon || flash || reactIcon(actor, now) || resting
       const rival = entity.sameFolderRival && actor.mood === 'working'
+      const tired = settings.tired && entity.sessionLimitNear === true && actor.mood === 'working'
+      sweat.hidden = !tired
 
       actor.lastPaint = now
       button.dataset.mood = visitor ? 'wild' : actor.mood
@@ -163,6 +170,7 @@ export function paintActors(
         hungry && 'Hungry',
         pickup && `Found ${pickup.name}`,
         evolved && 'Evolved',
+        tired && 'Near the session limit',
         rival && 'Working in the same folder as another agent'
       ]
       setLabel(actor, description.filter(Boolean).join(' · '), settings.tags || visitor)

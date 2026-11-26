@@ -73,8 +73,7 @@ export class PluginService {
     this.options = options
     this.contentPacks = createPluginContentPacks(this.contentVerifier, options)
     this.audit = new PluginAuditLog(getPluginsDataDir(options.userDataPath))
-    const resolveApproved = (pluginKey: string, allowRefreshPause = false) =>
-      this.findApprovedPlugin(pluginKey, allowRefreshPause)
+    const resolveApproved = this.findApprovedPlugin.bind(this)
     this.panelBridge = new PluginPanelBridge({
       findApprovedPlugin: (pluginKey) => resolveApproved(pluginKey),
       grantedCapabilities: (pluginKey) => this.getGrantedCapabilities(pluginKey),
@@ -98,6 +97,7 @@ export class PluginService {
       })
     )
     this.panels = new PluginPanelController({
+      workspaceCompanions: options.workspaceCompanions,
       resolveApprovedPlugin: resolveApproved,
       contentVerifier: this.contentVerifier,
       executeHostCall: (pluginKey, method, params, surface, caller) =>
