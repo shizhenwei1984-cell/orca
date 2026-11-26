@@ -3,6 +3,15 @@ import type {
   RightSidebarExplorerView
 } from '../../../../../shared/ui-chrome/ui-chrome-types'
 import { isPluginPanelTabKey } from '../../../../../shared/plugins/frames/plugin-tab-key'
+import { normalizePluginPanelDock } from '../../../../../shared/plugins/contributions/plugin-panel-placement'
+import type { PersistedUIState } from '../../../../../shared/orca-profiles/persisted-ui-state-types'
+
+export function hydrateSidebarRoutes(ui: PersistedUIState) {
+  return {
+    ...normalizeRightSidebarRoute(ui.rightSidebarTab, ui.rightSidebarExplorerView),
+    pluginPanelDock: normalizePluginPanelDock(ui.pluginPanelDock)
+  }
+}
 
 export type RightSidebarRoute = {
   rightSidebarTab: ActiveRightSidebarTab

@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "description": "Raise a herd of Pokémon as your terminal agents work.",
   "engines": {
-    "orca": ">=1.4.260"
+    "orca": ">=1.4.274"
   },
   "execution": "trusted-worker",
   "pluginApi": 1,
@@ -17,7 +17,8 @@
         "id": "pokemon-herd",
         "title": "Pokémon Herd",
         "icon": "activity",
-        "entry": "panel/index.html"
+        "entry": "panel/index.html",
+        "defaultPlacement": "bottom"
       },
       {
         "id": "pokemon-sidebar",

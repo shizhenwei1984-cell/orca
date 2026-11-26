@@ -27,6 +27,7 @@ export function usePluginFrameHost(options: {
   /** Changes whenever a new document mounts; null while none is ready. */
   frameKey: string | null
   sessionToken: string | null
+  onPanelPreferredHeight?: (height: number) => void
   editor?: PluginFrameEditorChannel
   declarative?: PluginFrameDeclarativeChannel
   /** Must be stable: a one-shot grant from presses on Orca's own controls. */
@@ -42,6 +43,7 @@ export function usePluginFrameHost(options: {
     frameRef,
     frameKey,
     sessionToken,
+    onPanelPreferredHeight,
     editor,
     declarative,
     consumeHostActivation,
@@ -79,6 +81,7 @@ export function usePluginFrameHost(options: {
     let active = true
     const hostOptions = {
       surface,
+      onPanelPreferredHeight,
       getFrameWindow,
       getSessionToken: () => sessionTokenRef.current,
       isActive: () => active,
@@ -138,6 +141,7 @@ export function usePluginFrameHost(options: {
     frameKey,
     frameRef,
     getFrameWindow,
+    onPanelPreferredHeight,
     surface,
     trackHostCall,
     watchdog

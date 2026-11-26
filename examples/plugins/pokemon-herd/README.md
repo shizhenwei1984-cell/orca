@@ -1,6 +1,6 @@
 # Pokémon Herd for Orca
 
-Open **Pokémon Herd** in the desktop right sidebar. In **World**, each linked terminal agent in the current workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and rests when done. Click a companion or press Enter on it to pet it and return to its terminal. Press P on a focused companion to pet it without leaving the panel. Friendship rewards have a cooldown.
+Open **Pokémon Herd** to show the map below the terminal in a desktop build with native plugin docking. Use **Move panel** to dock it at the bottom, in the left sidebar, or in the right sidebar. Orca remembers the position when you reopen the map. In **World**, each linked terminal agent in the current workspace gets a Pokémon. It walks while working, stands alert while waiting or blocked, and rests when done. Click a companion or press Enter on it to pet it and return to its terminal. Press P on a focused companion to pet it without leaving the panel. Friendship rewards have a cooldown.
 
 Open **World actions** or right-click the ground for the Box, Bag, Shop, Research, Pokédex, and encounter controls. Press B or Alt+Shift+B while the world has focus to open the Bag. Right-click a companion, press Shift+F10 while it has focus, or touch and hold to open its actions. Use this menu to feed a Berry, see its details, bring out a Pokémon from the Box, or open the species picker. Alt+Shift+P opens the picker for the focused companion.
 

@@ -21,6 +21,7 @@ export const FRAME_EVENTS = {
   theme: 'theme',
   ping: 'ping',
   pong: 'pong',
+  panelPreferredHeight: 'panel.preferredHeight',
   /** frame → host: a modifier chord, so Orca's save shortcut works inside an editor. */
   editorKeydown: 'editor.keydown',
   /** host → frame: the document, on ready and whenever it changes outside the frame. */

@@ -9,6 +9,7 @@ export type PersistedUIWriteBaseline = {
   sidebarOpen: boolean
   rightSidebarOpen: boolean
   rightSidebarTab: PersistedUIState['rightSidebarTab']
+  pluginPanelDock?: PersistedUIState['pluginPanelDock']
   rightSidebarExplorerView: PersistedUIState['rightSidebarExplorerView']
   rightSidebarWidth: number
   activityBarOrder: string[]
@@ -45,6 +46,7 @@ const PERSISTED_UI_WRITE_BASELINE_FIELD_SET = {
   sidebarOpen: true,
   rightSidebarOpen: true,
   rightSidebarTab: true,
+  pluginPanelDock: true,
   rightSidebarExplorerView: true,
   rightSidebarWidth: true,
   activityBarPosition: true,
@@ -109,7 +111,7 @@ function stringArrayEqual(a: readonly string[], b: readonly string[]): boolean {
 
 /** Compares collection fields by value so hydration does not produce redundant persistence writes from new identities. */
 function writeFieldEqual(field: keyof PersistedUIWriteBaseline, a: unknown, b: unknown): boolean {
-  if (field === 'gitGraphFiltersByWorktree') {
+  if (field === 'gitGraphFiltersByWorktree' || field === 'pluginPanelDock') {
     // Same equality as hydration, so a key-order-only difference is never unsaved.
     return persistedUIValuesEqual(a, b)
   }

@@ -5,11 +5,16 @@ import type {
   RightSidebarExplorerView
 } from '../../../../../shared/ui-chrome/ui-chrome-types'
 import { defaultFileSearchState } from '../editor/search/file-search-state'
+import {
+  EMPTY_PLUGIN_PANEL_DOCK,
+  type PluginPanelDockState
+} from '../../../../../shared/plugins/contributions/plugin-panel-placement'
 
 export type RightSidebarState = {
   rightSidebarOpen: boolean
   rightSidebarWidth: number
   rightSidebarTab: ActiveRightSidebarTab
+  pluginPanelDock: PluginPanelDockState
   rightSidebarExplorerView: RightSidebarExplorerView
   rightSidebarRouteRequestId: number
   /** Whether the latest route asked Agents to focus its search box (keyboard activation of its tab). */
@@ -49,6 +54,7 @@ export function createRightSidebarState(set: EditorSet, _get: EditorGet): RightS
     rightSidebarOpen: false,
     rightSidebarWidth: 280,
     rightSidebarTab: 'explorer',
+    pluginPanelDock: EMPTY_PLUGIN_PANEL_DOCK,
     rightSidebarExplorerView: 'files',
     rightSidebarRouteRequestId: 0,
     rightSidebarRouteFocusesVaultSearch: false,
