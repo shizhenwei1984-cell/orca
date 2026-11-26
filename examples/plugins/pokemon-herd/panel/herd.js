@@ -5,6 +5,7 @@ import { species, starterDex } from './pokemon.mjs'
 import { disposeCompanionArt, paintCompanionArt } from './catalog/companion-art.mjs'
 import { mountTrainer } from './trainer.js'
 import { worldInteractions } from './world-interactions.js'
+import { mountHerdStrip } from './herd-strip.js'
 import { bindWorldPreferences } from './world-preferences.js'
 import { mountWorld } from './world/world.js'
 import { seasonAt } from './world/scene.js'
@@ -433,6 +434,8 @@ retry.onclick = () => {
   }
   void readProgress()
 }
+
+mountHerdStrip(orca, worldContainer, signal)
 
 // workspace.changed replays the current context when the panel subscribes.
 const subscriptions = [

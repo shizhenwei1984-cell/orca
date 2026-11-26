@@ -219,6 +219,15 @@ ${PLUGIN_FRAME_FACADES_SCRIPT}  if (C.user) {
       }
     })
   }
+  if (C.surface === 'panel' && C.user) {
+    orca.panel = Object.freeze({
+      setPreferredHeight: function (height) {
+        if (Number.isSafeInteger(height) && height > 0) {
+          post({ kind: 'evt', event: E.panelPreferredHeight, payload: height })
+        }
+      }
+    })
+  }
   Object.defineProperty(orca, 'api', { get: function () { return api }, enumerable: true })
   Object.defineProperty(orca, 'locale', {
     get: function () { return locale || navigator.language }, enumerable: true

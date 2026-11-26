@@ -3,6 +3,10 @@ import type { PluginCatalogType } from './catalog/plugin-catalog-types'
 import type { PluginExecutionProfile } from './contributions/plugin-execution-profile'
 import type { PluginHostImages } from './images/plugin-image-url'
 import type { PluginStatusBarItemContribution } from './contributions/plugin-status-bar-item-contribution'
+import type {
+  PluginPanelPlacement,
+  PluginPanelTabKey
+} from './contributions/plugin-panel-placement'
 
 /** One installed plugin as main projects it for every client (preload IPC and the `plugins.list`
  *  RPC). Optional fields are absent on older hosts, so paired clients must tolerate them. */
@@ -12,7 +16,8 @@ export type PluginHostPanel = {
   title: string
   /** Lucide icon name declared in the plugin manifest. */
   icon?: string
-  tabKey: `plugin:${string}`
+  tabKey: PluginPanelTabKey
+  defaultPlacement?: PluginPanelPlacement
 }
 
 /** pending awaits consent; idle defers worker startup; errored exhausted retries or failed startup. */

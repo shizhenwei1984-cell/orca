@@ -8,6 +8,29 @@ body {
   color: var(--orca-foreground);
   background: var(--orca-background);
 }
+.herd-strip {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px;
+}
+.herd-strip .toolbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  order: -2;
+  margin: 0 0 4px;
+  background: var(--orca-background);
+}
+.herd-strip #world {
+  order: -1;
+}
+.herd-strip #world-settings {
+  position: fixed;
+  inset: var(--herd-settings-top, 38px) 8px 4px;
+  z-index: 3;
+  margin: 0;
+  overflow: auto;
+}
 header,
 .caption {
   display: flex;

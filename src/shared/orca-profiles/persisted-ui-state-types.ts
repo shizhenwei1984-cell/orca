@@ -1,4 +1,5 @@
 import type { GitHistoryRefs } from '../git/history/git-history-types'
+import type { PluginPanelDockState } from '../plugins/contributions/plugin-panel-placement'
 import type { BotChatFold } from '../bots/bot-chat-tree'
 import type { JiraQuickFilterState } from '../jira/jira-quick-filters'
 import type { BrowserDevToolsDockLayout } from '../browser/devtools/browser-devtools-dock'
@@ -51,6 +52,7 @@ export type PersistedUIState = {
   sidebarOpen?: boolean
   rightSidebarOpen: boolean
   rightSidebarTab: RightSidebarTab
+  pluginPanelDock?: PluginPanelDockState
   rightSidebarExplorerView: RightSidebarExplorerView
   rightSidebarWidth: number
   /** Right sidebar activity-bar edge. Missing on older profiles, which stay at the top. */

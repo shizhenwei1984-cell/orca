@@ -63,6 +63,7 @@ export type PluginFrameDeclarativeChannel = {
 
 export type PluginFrameHostOptions = {
   surface: 'panel' | 'editor'
+  onPanelPreferredHeight?: (height: number) => void
   declarative?: PluginFrameDeclarativeChannel
   getFrameWindow: () => PluginFrameWindow | null
   /** Null until main issues one; host calls answer `unavailable` meanwhile. */
@@ -223,6 +224,16 @@ export function createPluginFrameEnvelopeHandler(
             pluginEvent(FRAME_EVENTS.hello, pluginFrameHello(options.surface, context.transport))
           )
           options.editor?.onReady()
+        } else if (message.event === FRAME_EVENTS.panelPreferredHeight) {
+          const height = message.payload
+          if (
+            context.transport === 'guest' &&
+            typeof height === 'number' &&
+            Number.isSafeInteger(height) &&
+            height > 0
+          ) {
+            options.onPanelPreferredHeight?.(height)
+          }
         } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.render) {
           options.declarative?.onRender(message.payload)
         } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.error) {

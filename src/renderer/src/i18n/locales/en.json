@@ -20646,6 +20646,13 @@
           "featuredDetail": "most installed, one per category",
           "newlyAdded": "Newly added",
           "newlyAddedDetail": "across your catalogs"
+        },
+        "PluginPanelPlacement": {
+          "bottom": "Bottom",
+          "left": "Left sidebar",
+          "right": "Right sidebar",
+          "move": "Move panel",
+          "close": "Close panel"
         }
       },
       "agent-workspace-trust-decision": {
