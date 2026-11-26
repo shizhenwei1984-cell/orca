@@ -3,11 +3,11 @@ import {
   PANEL_CONTROL_MESSAGE_MAX_BYTES,
   MOVE_PLUGIN_PANEL_METHOD,
   OPEN_PLUGIN_PANEL_METHOD,
-  readPanelPongId
+  readPanelPongId,
+  type PluginFrameHello
 } from '../../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
   pluginError,
-  pluginEvent,
   pluginFailure,
   pluginOutcomeResponse,
   pluginRequestId,
@@ -30,7 +30,7 @@ import {
   createPluginFrameGestureGate,
   createPluginFrameLanes,
   PLUGIN_FRAME_RENDER_WALK_LIMITS,
-  pluginFrameHello,
+  pluginFrameHelloEvent,
   pluginFrameLaneFor,
   type PluginFrameMessageContext,
   type PluginFrameWindow
@@ -64,6 +64,7 @@ export type PluginFrameDeclarativeChannel = {
 }
 
 export type PluginFrameHostOptions = {
+  placement?: PluginFrameHello['placement']
   surface: 'panel' | 'editor'
   onPanelPreferredHeight?: (height: number) => void
   declarative?: PluginFrameDeclarativeChannel
@@ -225,9 +226,7 @@ export function createPluginFrameEnvelopeHandler(
     switch (message.kind) {
       case 'evt':
         if (message.event === FRAME_EVENTS.ready) {
-          post(
-            pluginEvent(FRAME_EVENTS.hello, pluginFrameHello(options.surface, context.transport))
-          )
+          post(pluginFrameHelloEvent(options.surface, context.transport, options.placement))
           options.editor?.onReady()
         } else if (message.event === FRAME_EVENTS.panelPreferredHeight) {
           const height = message.payload

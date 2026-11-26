@@ -1,7 +1,10 @@
 import { z } from 'zod'
 import { pluginIdSchema } from '../manifest/plugin-manifest-fields'
 import { pluginPanelActionIdSchema } from '../contributions/plugin-panel-contribution'
-import { PLUGIN_PANEL_PLACEMENTS } from '../contributions/plugin-panel-placement'
+import {
+  PLUGIN_PANEL_PLACEMENTS,
+  type PluginPanelPlacement
+} from '../contributions/plugin-panel-placement'
 import { isPluginJsonObject } from '../manifest/plugin-json-object'
 import { PLUGIN_PROTOCOL_VERSION } from './plugin-protocol'
 
@@ -52,6 +55,7 @@ export type PluginFrameTheme = { colorScheme: 'light' | 'dark'; tokens: string }
 export type PluginFrameHello = {
   protocol: typeof PLUGIN_PROTOCOL_VERSION
   surface: 'panel' | 'editor'
+  placement?: PluginPanelPlacement
   api: { major: number; minor: number }
   methods: string[]
   theme: PluginFrameTheme

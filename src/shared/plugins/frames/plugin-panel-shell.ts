@@ -178,6 +178,9 @@ function frameApiScript(surface: PluginFrameSurface, transport: FrameTransport):
       if (m.payload.api) api = Object.freeze({ major: m.payload.api.major, minor: m.payload.api.minor })
       if (Array.isArray(m.payload.methods)) methods = m.payload.methods.slice()
       if (typeof m.payload.locale === 'string') locale = m.payload.locale.slice(0, 64)
+      if (C.surface === 'panel' && ['bottom', 'left', 'right'].includes(m.payload.placement)) {
+        document.documentElement.dataset.orcaPanelPlacement = m.payload.placement
+      }
       applyTheme(m.payload.theme)
       helloSeen = true
       start()
