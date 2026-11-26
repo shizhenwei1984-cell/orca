@@ -33,11 +33,11 @@ if [[ ! -d $release || ! -f $package ]]; then
   app="$work/deb/opt/Orca"
   cp "$work/deb/usr/share/icons/hicolor/256x256/apps/orca-ide.png" "$app/orca-personal.png"
   build="$cache/build"
-  if [[ ! -e $build ]]; then git clone --local --single-branch -b personal/release "$repo" "$build"; fi
+  if [[ ! -e $build ]]; then git clone --no-local --no-tags --depth=1 -b personal/release "$repo" "$build"; fi
   [[ $(realpath "$(git -C "$build" remote get-url origin)") == "$repo" && -z $(git -C "$build" status --porcelain) ]] || {
     echo "Build checkout must be clean and cloned from $repo: $build" >&2; exit 1;
   }
-  git -C "$build" fetch --tags origin personal/release
+  git -C "$build" fetch --no-tags --depth=1 origin personal/release
   git -C "$build" switch --detach "$commit"
   image=node:24-bookworm
   docker run --rm --user "$(id -u):$(id -g)" -v "$build:/src" -w /src \
