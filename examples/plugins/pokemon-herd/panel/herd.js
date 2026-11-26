@@ -14,6 +14,7 @@ import { mountWorld } from './world/world.js'
 import { seasonAt } from './world/scene.js'
 import { youngOf } from '../encounters/rules/picks.js'
 import { nameOf } from '../encounters/rules/dex.js'
+import { mountWorkspaceCompanions } from './workspace-companions.js'
 
 const poses = {
   working: ['Working', 'walk'],
@@ -55,6 +56,12 @@ let progressDirty = false
 let focusRequest
 let menuRequest
 let showFamily = true
+const companions = mountWorkspaceCompanions(
+  orca,
+  document.querySelector('#workspace-companions'),
+  signal,
+  paintRoster
+)
 const care = mountWorldCare(orca, careStatus, (action) => {
   if (action.type === 'pet') {
     preferences.play('pet')
@@ -417,6 +424,7 @@ function paintRoster() {
         stateStartedAt: agent.stateStartedAt,
         leadWorking: agent.leadWorking,
         sameFolderRival: agent.sameFolderRival,
+        sessionLimitNear: companions.rows.get(agent.terminalId)?.sessionLimitNear,
         task
       })
       if (showFamily && agent.children?.length) {
@@ -445,6 +453,7 @@ function paintRoster() {
     agents: [...entities, ...children],
     focusedId: workspace?.context.focusedTerminalId ?? null
   })
+  companions.syncPortraits(entities, t < 0.5 ? a : b)
   if (workspace) {
     const scope = workspace.scope
     publish('roster', {

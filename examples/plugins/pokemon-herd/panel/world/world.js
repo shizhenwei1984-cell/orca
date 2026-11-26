@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   weather: true,
   campfire: true,
   spar: true,
+  tired: true,
   tags: true
 }
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))

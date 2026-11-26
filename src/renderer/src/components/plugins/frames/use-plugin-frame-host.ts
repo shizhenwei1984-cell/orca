@@ -11,8 +11,8 @@ import {
 } from 'react'
 import { ConfirmationDialogContext } from '@/components/dismiss/confirmation/confirmation-dialog-context'
 import {
-  WORKSPACE_VIEW_AUTHORIZATION,
   WORKSPACE_VIEW_CHANGED,
+  isInternalWorkspaceViewMethod,
   isWorkspaceViewMethod
 } from '../../../../../shared/plugins/frames/plugin-workspace-view'
 import { createPluginWorkspaceViewHost } from './plugin-workspace-view-host'
@@ -111,8 +111,14 @@ export function usePluginFrameHost(options: {
             tabKey: panelTabKey,
             sessionToken: () => sessionTokenRef.current,
             confirm,
-            onChange: (reset) =>
-              getFrameWindow()?.postMessage(pluginEvent(WORKSPACE_VIEW_CHANGED, { reset }), '*')
+            onChange: (reset, fatigueExpired) =>
+              getFrameWindow()?.postMessage(
+                pluginEvent(WORKSPACE_VIEW_CHANGED, {
+                  reset,
+                  ...(fatigueExpired ? { fatigueExpired } : {})
+                }),
+                '*'
+              )
           })
         : null
     let unregisterActivation: (() => void) | undefined
@@ -128,7 +134,7 @@ export function usePluginFrameHost(options: {
       getSessionToken: () => sessionTokenRef.current,
       isActive: () => active,
       callHostMethod: async (call: Parameters<typeof callPanelActionViaPreload>[0]) => {
-        if (call.action === WORKSPACE_VIEW_AUTHORIZATION) {
+        if (isInternalWorkspaceViewMethod(call.action)) {
           return {
             ok: false as const,
             code: 'not_permitted' as const,

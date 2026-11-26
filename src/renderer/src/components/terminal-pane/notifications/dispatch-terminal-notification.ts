@@ -75,6 +75,7 @@ function hasFreshActiveHookStatus(
 }
 
 export type TerminalNotificationEvent = TerminalNotificationBinding & {
+  incarnationId?: string | null
   source: 'terminal-bell' | 'agent-task-complete'
   terminalTitle?: string
   agentStatusSnapshot?: AgentCompletionStatusSnapshot
@@ -229,6 +230,8 @@ export function dispatchTerminalNotification(
         workspaceExecutionHostId: notificationWorkspaceExecutionHostForOwner(owner),
         ...(executionHost ? { executionHost } : {}),
         paneKey: request.subjectKey ?? undefined,
+        ...(event.ptyId ? { terminalPtyId: event.ptyId } : {}),
+        ...(event.incarnationId ? { terminalIncarnationId: event.incarnationId } : {}),
         ...getNotificationWorkspaceLabels(state, request.workspaceId, event.terminalTitle),
         notificationSourceId: notificationSourceForOwner(owner, state),
         terminalTitle: event.terminalTitle,

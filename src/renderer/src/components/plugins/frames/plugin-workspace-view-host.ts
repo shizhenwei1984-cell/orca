@@ -13,6 +13,7 @@ import {
 } from '../../../../../shared/plugins/frames/plugin-workspace-view'
 import { createNonSecureContextUuid } from '../../../../../shared/identifiers/non-secure-context-uuid'
 import type { PanelActionCall } from './plugin-frame-host'
+import { createWorkspaceCompanionView } from './plugin-workspace-view-companions'
 import {
   authorizeWorkspaceViewFrame,
   visibleWorkspaceViewPlugin
@@ -46,7 +47,7 @@ export function createPluginWorkspaceViewHost(options: {
   tabKey: string
   sessionToken: () => string | null
   confirm: ConfirmationDialogContextValue | null
-  onChange: (reset: boolean) => void
+  onChange: (reset: boolean, fatigueExpired?: boolean) => void
 }) {
   let disposed = false
   let observed = false
@@ -58,6 +59,7 @@ export function createPluginWorkspaceViewHost(options: {
   const review = createWorkspaceViewReview(notify)
   let stopChat: (() => void) | undefined
   let grantKey: string | undefined
+  const companions = createWorkspaceCompanionView(() => options.onChange(false, true), stale)
 
   function notify() {
     if (!observed || disposed || timer) {
@@ -70,6 +72,7 @@ export function createPluginWorkspaceViewHost(options: {
   }
 
   function reset() {
+    companions.reset(handle)
     appearance?.abort()
     stopChat?.()
     stopChat = undefined
@@ -149,7 +152,9 @@ export function createPluginWorkspaceViewHost(options: {
       if (!plugin || !isCurrent()) {
         return stale()
       }
-      if (call.action === WORKSPACE_VIEW_METHODS.read) {
+      const readingView = call.action === WORKSPACE_VIEW_METHODS.read
+      const readingCompanions = call.action === WORKSPACE_VIEW_METHODS.companions
+      if (readingView || readingCompanions) {
         if (call.params !== undefined) {
           return refusal(
             'invalid_params',
@@ -162,7 +167,7 @@ export function createPluginWorkspaceViewHost(options: {
         observed = true
       }
       if (!scope) {
-        return call.action === WORKSPACE_VIEW_METHODS.read ? { ok: true, value: null } : stale()
+        return readingView || readingCompanions ? { ok: true, value: null } : stale()
       }
       const key = workspaceViewGrantKey(pluginKey, scope)
       grantKey = key
@@ -180,6 +185,7 @@ export function createPluginWorkspaceViewHost(options: {
             scope,
             key,
             revoke: parsed.data.revoke === true,
+            capability: parsed.data.capability,
             signal: controller.signal,
             isCurrent: async () => {
               if (!isCurrent()) {
@@ -197,8 +203,14 @@ export function createPluginWorkspaceViewHost(options: {
           appearance = undefined
         }
       }
+      if (readingCompanions) {
+        return companions.read({ call, scope, revision, key, isCurrent })
+      }
+      if (call.action === WORKSPACE_VIEW_METHODS.portrait) {
+        return companions.setPortrait(call, revision, key)
+      }
       const state = useAppStore.getState()
-      if (call.action === WORKSPACE_VIEW_METHODS.read) {
+      if (readingView) {
         const base = {
           workspace: handle,
           workspaceId: scope.publicId ?? null,

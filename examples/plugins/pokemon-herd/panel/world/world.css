@@ -148,6 +148,13 @@
   pointer-events: none;
 }
 
+.pokemon-world__sweat {
+  position: absolute;
+  top: 0;
+  left: -1em;
+  pointer-events: none;
+}
+
 .pokemon-world__actor[data-petted='true'] .pokemon-world__badge[data-attention='true']::after {
   content: '♥';
   position: absolute;
@@ -183,6 +190,14 @@
   transform: translateX(-50%);
 }
 @media (prefers-reduced-motion: no-preference) {
+  .pokemon-world__sweat {
+    animation: pokemon-sweat 1s ease-in-out infinite alternate;
+  }
+  @keyframes pokemon-sweat {
+    to {
+      opacity: 0.45;
+    }
+  }
   .pokemon-world__actor:is([data-evolution='before'], [data-evolution='after'])
     .pokemon-world__body::before {
     content: '';

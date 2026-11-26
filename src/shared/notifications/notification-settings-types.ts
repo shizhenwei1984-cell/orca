@@ -94,6 +94,9 @@ export type NotificationDispatchRequest = {
   executionHost?: `runtime:${string}`
   /** Stable `${tabId}:${leafId}` terminal pane key for click-to-focus routing. */
   paneKey?: string
+  /** Process instance that produced a terminal notification, when the producer can prove it. */
+  terminalPtyId?: string
+  terminalIncarnationId?: string
   repoLabel?: string
   worktreeLabel?: string
   /** Legacy senders may still provide this; project labels are now always shown. */

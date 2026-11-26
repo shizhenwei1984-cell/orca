@@ -14,6 +14,7 @@ import {
   type ExecutionHostId
 } from '../../../../../shared/execution-host/execution-host'
 import { frameWorkspaceId } from '../view/plugin-panel-activation'
+import type { WorkspaceCompanionPermission } from '../../../../../shared/plugins/frames/plugin-workspace-view'
 
 export type WorkspaceViewScope = {
   key: string
@@ -100,8 +101,28 @@ export function workspaceViewGrant(key: string): WorkspaceViewGrant | null {
   }
 }
 
+export function workspaceCompanionGrantKey(key: string, capability: WorkspaceCompanionPermission) {
+  return `${key}.${capability}`
+}
+
+export function workspaceCompanionAllowed(key: string, capability: WorkspaceCompanionPermission) {
+  try {
+    return localStorage.getItem(workspaceCompanionGrantKey(key, capability)) === 'allow'
+  } catch {
+    return false
+  }
+}
+
+export function workspaceCompanionGrants(key: string) {
+  return {
+    fatigue: workspaceCompanionAllowed(key, 'fatigue'),
+    portraits: workspaceCompanionAllowed(key, 'portraits')
+  }
+}
+
 export function subscribeWorkspaceViewGrant(onChange: (key: string | null) => void): () => void {
-  const storage = (event: StorageEvent) => onChange(event.key)
+  const storage = (event: StorageEvent) =>
+    onChange(event.key?.replace(/\.(fatigue|portraits)$/, '') ?? null)
   const local = (event: Event) => {
     if ('detail' in event && typeof event.detail === 'string') {
       onChange(event.detail)

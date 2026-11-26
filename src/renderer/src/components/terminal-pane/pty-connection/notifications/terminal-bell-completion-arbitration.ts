@@ -37,6 +37,8 @@ export function installTerminalBellCompletionArbitration(session: ConnectPanePty
     if (session.terminalBellNotificationTimer !== null) {
       return
     }
+    const ptyId = session.transport.getPtyId()
+    const incarnationId = session.remotePtyIncarnationId
     session.terminalBellNotificationTimer = setTimeout(() => {
       session.terminalBellNotificationTimer = null
       if (session.disposed) {
@@ -57,7 +59,8 @@ export function installTerminalBellCompletionArbitration(session: ConnectPanePty
       session.deps.dispatchNotification({
         source: 'terminal-bell',
         paneKey: session.cacheKey,
-        ptyId: session.transport.getPtyId(),
+        ptyId,
+        incarnationId,
         workspaceOwner: captureNotificationTransportOwner(session.transport)
       })
     }, AGENT_TASK_COMPLETE_NOTIFICATION_GRACE_MS)

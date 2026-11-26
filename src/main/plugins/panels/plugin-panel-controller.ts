@@ -1,4 +1,9 @@
-import { WORKSPACE_VIEW_AUTHORIZATION } from '../../../shared/plugins/frames/plugin-workspace-view'
+import {
+  WORKSPACE_VIEW_AUTHORIZATION,
+  WORKSPACE_VIEW_CLEAR_COMPANIONS,
+  isInternalWorkspaceViewMethod,
+  workspaceCompanionClearTarget
+} from '../../../shared/plugins/frames/plugin-workspace-view'
 import {
   panelActionCallSchema,
   type PluginFrameEntry
@@ -12,22 +17,21 @@ import {
   createPluginPanelCallAdmission,
   type PluginPanelCallAdmission
 } from '../../../shared/plugins/frames/plugin-panel-call-admission'
-import {
-  buildPluginPanelShellHtml,
-  type PluginFrameSurface
-} from '../../../shared/plugins/frames/plugin-panel-shell'
 import type { ValidDiscoveredPlugin } from '../discovery/plugin-discovery'
 import type { PluginHostCaller } from '../runtime/plugin-service-host-call'
 import { getPluginHostMethodSpec } from '../../../shared/plugins/workers/plugin-host-api'
 import type { PluginContentVerifier } from '../artifacts/plugin-content-integrity'
-import { PLUGIN_PANEL_ENTRY_MAX_BYTES } from '../../../shared/plugins/frames/plugin-frame-entry-limits'
-import { readContainedPluginArtifactText } from '../artifacts/plugin-contained-artifact'
+import { findFrameContribution, loadPluginPanel } from './plugin-panel-load'
 import {
   PluginPanelSessions,
   type PluginPanelSessionBinding,
   type ResolvedPluginPanelSession
 } from './panel-lifetime/plugin-panel-sessions'
 import type { PluginPanelCaller } from '../../../shared/plugins/workers/plugin-panel-bridge-protocol'
+import {
+  PluginWorkspaceCompanions,
+  type WorkspaceCompanionsOptions
+} from './plugin-workspace-companions'
 
 type PluginPanelControllerOptions = {
   resolveApprovedPlugin: (pluginKey: string) => ValidDiscoveredPlugin | null
@@ -41,25 +45,27 @@ type PluginPanelControllerOptions = {
   ) => Promise<PluginHostCallOutcome>
   log: (pluginKey: string) => (line: string) => void
   panelAdmission?: PluginPanelCallAdmission
+  workspaceCompanions?: WorkspaceCompanionsOptions
   /** A session's public id once it can no longer be used (its panel's requests stop). */
   onSessionClosed?: (panelId: string) => void
 }
 
 type FrameOpenOptions = { shell?: boolean }
 
-type LoadedPluginPanel = {
-  entry: { html: string; ui?: 'components' }
-  binding: PluginPanelSessionBinding
-}
-
 export class PluginPanelController {
   private readonly sessions: PluginPanelSessions
   private readonly boundOwnerSignals = new WeakSet<AbortSignal>()
   private readonly panelAdmission: PluginPanelCallAdmission
+  private readonly companions?: PluginWorkspaceCompanions
 
   constructor(private readonly options: PluginPanelControllerOptions) {
     this.panelAdmission = options.panelAdmission ?? createPluginPanelCallAdmission()
-    this.sessions = new PluginPanelSessions((panelId) => options.onSessionClosed?.(panelId))
+    this.companions =
+      options.workspaceCompanions && new PluginWorkspaceCompanions(options.workspaceCompanions)
+    this.sessions = new PluginPanelSessions((panelId) => {
+      this.companions?.close(panelId)
+      options.onSessionClosed?.(panelId)
+    })
   }
 
   /** The live, still-approved panel behind an owner's session: what its push channel serves. */
@@ -74,7 +80,7 @@ export class PluginPanelController {
   }
 
   async readEntry(pluginKey: string, panelId: string): Promise<{ html: string } | null> {
-    return (await this.load(pluginKey, 'panel', panelId))?.entry ?? null
+    return (await loadPluginPanel(this.options, pluginKey, 'panel', panelId))?.entry ?? null
   }
 
   /** `shell: false` (desktop guests): the guest loads its own document, so no srcdoc HTML is
@@ -144,7 +150,20 @@ export class PluginPanelController {
     }
     // Why: a dialog or browser tab on this machine must never answer a remote client's click.
     // Their own lane: a save carries a whole file, far past the 64 KiB message budget.
-    const userMethod = getPluginHostMethodSpec(this.readAction(call))?.userActivation === true
+    const action = this.readAction(call)
+    if (
+      action === WORKSPACE_VIEW_CLEAR_COMPANIONS &&
+      origin.desktop &&
+      binding.surface === 'panel'
+    ) {
+      const parsed = panelActionCallSchema.safeParse(call)
+      const target = workspaceCompanionClearTarget.safeParse(parsed.data?.params)
+      if (target.success) {
+        this.companions?.close(binding.publicId, target.data.workspace)
+      }
+      return { ok: true, value: null }
+    }
+    const userMethod = getPluginHostMethodSpec(action)?.userActivation === true
     if (userMethod && !origin.desktop) {
       return {
         ok: false,
@@ -165,10 +184,22 @@ export class PluginPanelController {
     if (!this.isCurrent(binding)) {
       return { ok: false, code: 'unavailable', error: 'panel session is no longer available' }
     }
-    if (parsed.data.action === WORKSPACE_VIEW_AUTHORIZATION) {
-      return origin.desktop && binding.surface === 'panel'
-        ? { ok: true, value: { pluginKey: binding.pluginKey } }
-        : { ok: false, code: 'not_permitted', error: 'Desktop panel session required.' }
+    if (isInternalWorkspaceViewMethod(parsed.data.action)) {
+      if (!origin.desktop || binding.surface !== 'panel') {
+        return { ok: false, code: 'not_permitted', error: 'Desktop panel session required.' }
+      }
+      if (parsed.data.action === WORKSPACE_VIEW_AUTHORIZATION) {
+        return { ok: true, value: { pluginKey: binding.pluginKey } }
+      }
+      return (
+        this.companions?.call(
+          binding.publicId,
+          parsed.data.params,
+          () =>
+            this.sessions.resolve(ownerKey, sessionToken)?.publicId === binding.publicId &&
+            this.isCurrent(binding)
+        ) ?? { ok: false, code: 'unavailable', error: 'Companion presentation is unavailable.' }
+      )
     }
     return this.options.executeHostCall(
       binding.pluginKey,
@@ -250,89 +281,20 @@ export class PluginPanelController {
     if (isCurrent?.() === false) {
       return null
     }
-    const loaded = await this.load(pluginKey, surface, contributionId, options.shell !== false)
+    const loaded = await loadPluginPanel(
+      this.options,
+      pluginKey,
+      surface,
+      contributionId,
+      options.shell !== false
+    )
     if (!loaded || isCurrent?.() === false) {
       return null
     }
     return { ...loaded.entry, sessionToken: this.sessions.issue(ownerKey, loaded.binding) }
   }
-
-  private async load(
-    pluginKey: string,
-    surface: PluginPanelSessionBinding['surface'],
-    contributionId: string,
-    withShell = true
-  ): Promise<LoadedPluginPanel | null> {
-    const plugin = this.options.resolveApprovedPlugin(pluginKey)
-    const contribution = plugin ? findFrameContribution(plugin, surface, contributionId) : null
-    if (!plugin || !contribution) {
-      return null
-    }
-    const declarative = contribution.ui === 'components'
-    // Why no entry text: a declarative entry is a module the desktop guest imports, and an
-    // isolated-only editor never runs in the srcdoc fallback; both show they need the desktop app.
-    const shellEntry = declarative || contribution.frame === 'isolated' ? null : contribution.entry
-    const html = withShell ? await this.readShell(plugin, shellEntry, surface) : ''
-    if (html === null) {
-      return null
-    }
-    return {
-      entry: declarative ? { html, ui: 'components' } : { html },
-      binding: {
-        pluginKey,
-        surface,
-        contributionId,
-        rootDir: plugin.rootDir,
-        manifestRevision: JSON.stringify(plugin.manifest)
-      }
-    }
-  }
-
-  private async readShell(
-    plugin: ValidDiscoveredPlugin,
-    entryPath: string | null,
-    surface: PluginFrameSurface
-  ): Promise<string | null> {
-    const { pluginKey } = plugin
-    const log = this.options.log(pluginKey)
-    try {
-      await this.options.contentVerifier.verify(plugin)
-      const html = buildPluginPanelShellHtml(
-        entryPath === null
-          ? ''
-          : await readContainedPluginArtifactText(
-              plugin.rootDir,
-              entryPath,
-              PLUGIN_PANEL_ENTRY_MAX_BYTES
-            ),
-        surface
-      )
-      const current = this.options.resolveApprovedPlugin(pluginKey)
-      if (current !== plugin || current.rootDir !== plugin.rootDir) {
-        return null
-      }
-      return html
-    } catch (error) {
-      log(
-        `${surface} entry ${entryPath} rejected: ${error instanceof Error ? error.message : String(error)}`
-      )
-      return null
-    }
-  }
 }
 
 function panelCaller(binding: ResolvedPluginPanelSession): PluginPanelCaller {
   return { id: binding.publicId, surface: binding.surface, contributionId: binding.contributionId }
-}
-
-function findFrameContribution(
-  plugin: ValidDiscoveredPlugin,
-  surface: PluginPanelSessionBinding['surface'],
-  id: string
-): { entry: string; ui?: string; frame?: string } | null {
-  const list =
-    surface === 'panel'
-      ? plugin.manifest.contributes.panels
-      : plugin.manifest.contributes.customEditors
-  return list.find((entry) => entry.id === id) ?? null
 }

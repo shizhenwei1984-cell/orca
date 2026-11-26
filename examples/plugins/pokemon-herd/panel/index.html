@@ -142,6 +142,7 @@
             <label><input type="checkbox" name="raids" checked /> New raids</label>
             <label><input type="checkbox" name="spar" checked /> World sparring</label>
             <label><input type="checkbox" name="family" checked /> Show sub-agents</label>
+            <label><input type="checkbox" name="tired" checked /> Tired near the limit</label>
             <label
               ><input type="checkbox" name="chooseMoves" /> Choose moves against trainers</label
             >
@@ -170,6 +171,16 @@
           </fieldset>
           <button type="submit">Save settings</button>
           <p role="status" id="settings-status"></p>
+          <fieldset id="workspace-companions" hidden>
+            <legend>Workspace access</legend>
+            <button type="button" data-companion-access="fatigue" aria-pressed="false">
+              Companion fatigue
+            </button>
+            <button type="button" data-companion-access="portraits" aria-pressed="false">
+              Notification portraits
+            </button>
+            <p role="status"></p>
+          </fieldset>
         </form>
       </div>
     </section>

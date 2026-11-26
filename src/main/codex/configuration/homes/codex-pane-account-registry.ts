@@ -1,7 +1,9 @@
+import { readFile } from 'node:fs/promises'
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { isDefinitiveAbsence } from '../../../../shared/errors/definitive-filesystem-absence'
 import { dirname, join } from 'node:path'
 import { getOrcaUserDataPath } from './codex-home-paths'
+import { decodePaneAccountRegistry } from './codex-pane-account-registry-codec'
 import { CodexPaneAccountRegistryMutations } from './codex-pane-account-registry-mutations'
 import type {
   CodexPaneAccountRecord,
@@ -30,25 +32,31 @@ function readRegistryOrNull(): CodexPaneAccountRegistryFile | null {
     if (!isDefinitiveAbsence(error)) {
       return null
     }
-    cachedRegistry = parseRegistry(null)
+    cachedRegistry = { version: 2, panes: {} }
     return cachedRegistry
   }
   // Cache salvaged/corrupt parse results; rereading unchanged bytes cannot recover more state.
-  const parsedRegistry = parseRegistryJson(rawRegistry)
-  cachedRegistryIsAuthoritative = isAuthoritativeRegistry(parsedRegistry)
-  cachedRegistry = parseRegistry(parsedRegistry)
-  if (!cachedRegistryIsAuthoritative) {
-    cachedRegistry.legacyWslAttributionUnknown = true
-  }
-  return cachedRegistry
+  return cacheRegistry(rawRegistry)
 }
 
-function parseRegistryJson(rawRegistry: string): unknown {
-  try {
-    return JSON.parse(rawRegistry)
-  } catch {
-    return null
+function cacheRegistry(raw: string): CodexPaneAccountRegistryFile {
+  const { authoritative, registry } = decodePaneAccountRegistry(raw)
+  cachedRegistryIsAuthoritative = authoritative
+  cachedRegistry = registry
+  return registry
+}
+
+export async function readCodexPaneAccountSnapshot(): Promise<
+  Readonly<Record<string, CodexPaneAccountRecord>>
+> {
+  const available = () => cachedRegistry ?? mutations.getPendingRegistry()
+  let registry = available()
+  if (!registry) {
+    const raw = await readFile(getRegistryPath(), 'utf8').catch(() => null)
+    // Spawn or teardown may have supplied newer attribution during the disk read.
+    registry = available() ?? (raw === null ? null : cacheRegistry(raw))
   }
+  return registry?.panes ?? {}
 }
 
 // Callers may read pending mutations while the disk registry is unavailable.
@@ -70,74 +78,6 @@ function readRegistryOrThrow(): CodexPaneAccountRegistryFile {
     throw new Error('Codex pane account registry could not be read')
   }
   return registry
-}
-
-function isAuthoritativeRegistry(parsed: unknown): boolean {
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return false
-  }
-  const panes = (parsed as Partial<CodexPaneAccountRegistryFile>).panes
-  const version = (parsed as Partial<CodexPaneAccountRegistryFile>).version
-  const legacyWslAttributionUnknown = (parsed as Partial<CodexPaneAccountRegistryFile>)
-    .legacyWslAttributionUnknown
-  return (
-    version === 2 &&
-    Boolean(panes) &&
-    typeof panes === 'object' &&
-    !Array.isArray(panes) &&
-    Object.values(panes).every(isPaneAccountRecord) &&
-    (legacyWslAttributionUnknown === undefined || legacyWslAttributionUnknown === true)
-  )
-}
-
-function parseRegistry(parsed: unknown): CodexPaneAccountRegistryFile {
-  const empty: CodexPaneAccountRegistryFile = { version: 2, panes: {} }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return empty
-  }
-  const panes = (parsed as Partial<CodexPaneAccountRegistryFile>).panes
-  if (!panes || typeof panes !== 'object' || Array.isArray(panes)) {
-    return empty
-  }
-  if ((parsed as Partial<CodexPaneAccountRegistryFile>).legacyWslAttributionUnknown === true) {
-    empty.legacyWslAttributionUnknown = true
-  }
-  for (const [ptyId, record] of Object.entries(panes)) {
-    if (isPaneAccountRecord(record)) {
-      const homeRoute = readPaneHomeRoute(record.homeRoute)
-      empty.panes[ptyId] = {
-        selectionKey: record.selectionKey,
-        accountId: record.accountId,
-        ...(homeRoute ? { homeRoute } : {})
-      }
-    }
-  }
-  return empty
-}
-
-function isPaneAccountRecord(value: unknown): value is CodexPaneAccountRecord {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return false
-  }
-  const record = value as Partial<CodexPaneAccountRecord>
-  return (
-    (record.selectionKey === 'host' ||
-      (typeof record.selectionKey === 'string' && /^wsl:.+/.test(record.selectionKey))) &&
-    (record.accountId === null || typeof record.accountId === 'string')
-  )
-}
-
-// Older builds called shared-home panes with pane-local CODEX_HOME 'custom-home'.
-function readPaneHomeRoute(value: unknown): CodexPaneHomeRoute | undefined {
-  if (value === 'custom-home') {
-    return 'shared-home'
-  }
-  return value === 'real-home' ||
-    value === 'shared-home' ||
-    value === 'account-home' ||
-    value === 'wsl-home'
-    ? value
-    : undefined
 }
 
 function writeRegistry(registry: CodexPaneAccountRegistryFile): boolean {

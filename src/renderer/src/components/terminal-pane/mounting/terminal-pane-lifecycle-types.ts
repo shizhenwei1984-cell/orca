@@ -93,6 +93,7 @@ export type UseTerminalPaneLifecycleDeps = {
   dispatchNotification: (event: {
     source: 'terminal-bell' | 'agent-task-complete'
     ptyId?: string | null
+    incarnationId?: string | null
     workspaceOwner?: NotificationWorkspaceOwner
     terminalTitle?: string
     paneKey?: string
