@@ -234,6 +234,7 @@ function runExchange(state, context, slot, move, itemTurn = false) {
   state.clash = { kind: 'exchange', slot, at: now, until, ...exchange }
   state.result = {
     kind: 'exchange',
+    visitorId: v.id,
     pick: v.pick,
     own: party[slot],
     ownBefore,
@@ -527,6 +528,7 @@ function strikeRaid(state, context, deltas, slot) {
   }
   state.result = {
     kind: 'raid-hit',
+    visitorId: raid.id,
     own: pick,
     ownBefore: hpOf(state, slot, now),
     pick: raid.boss,
@@ -616,6 +618,8 @@ function spar(state, context, deltas, action) {
   state.clash = { kind: 'spar', until }
   state.result = {
     kind: 'spar',
+    slot,
+    opponent,
     own: picks[0],
     pick: picks[1],
     hp: match.hp,
@@ -633,6 +637,11 @@ function spar(state, context, deltas, action) {
       move: turn.move?.name,
       type: turn.move?.type,
       physical: turn.move?.physical,
+      dash: turn.move?.dash,
+      ultimate: turn.move?.ultimate,
+      boosted: turn.move?.boosted,
+      blue: battleKey(picks[turn.by === 'a' ? 0 : 1]) === '6mX',
+      status: turn.move?.status,
       damage: turn.dmg,
       targetHp: turn.hp,
       ownHp: turn.tick?.hp ?? turn.recoil?.hp ?? turn.drain?.hp,

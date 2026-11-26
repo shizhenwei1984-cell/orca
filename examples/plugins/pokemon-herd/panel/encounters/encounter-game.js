@@ -10,7 +10,7 @@ const center = (rect) => rect.left + rect.width / 2
 
 export function mountEncounterGame(
   root,
-  { request, sprite, cry, onVisitor, onSettings, onRare, interactions, world, signal }
+  { request, sprite, cry, onVisitor, onBattle, onSettings, onRare, interactions, world, signal }
 ) {
   const document = root.ownerDocument
   const view = document.defaultView
@@ -173,6 +173,24 @@ export function mountEncounterGame(
     sendVisitor(entity)
   }
 
+  function worldBattle({ result, party }) {
+    const own = party.find(({ slot }) => slot === (result?.slot ?? result?.hit?.pane))
+    const opponent =
+      result?.kind === 'spar'
+        ? party.find(({ slot }) => slot === result.opponent)
+        : { terminalId: result?.visitorId }
+    onBattle?.(
+      own?.terminalId && opponent?.terminalId && (result.turns?.length || result.hit)
+        ? {
+            result,
+            own: own.terminalId,
+            opponent: opponent.terminalId,
+            spar: result.kind === 'spar'
+          }
+        : null
+    )
+  }
+
   function partyMember(actor) {
     return snapshot?.party.find(
       ({ terminalId, slot, pokemonId }) =>
@@ -263,9 +281,11 @@ export function mountEncounterGame(
         panel.reset()
         stage.clear()
         sendVisitor(null)
+        onBattle?.(null)
         return
       }
       worldVisitor(model)
+      worldBattle(model)
       panel.render(model)
       stage.render(model, model.now)
       checkProximity()
@@ -371,6 +391,7 @@ export function mountEncounterGame(
   function reset() {
     view.clearTimeout(refreshTimer)
     sendVisitor(null)
+    onBattle?.(null)
     scope = undefined
     reading = undefined
     sending = undefined

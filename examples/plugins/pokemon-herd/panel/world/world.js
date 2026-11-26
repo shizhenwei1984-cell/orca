@@ -1,3 +1,4 @@
+import { mountWorldBattles } from './world-battles.js'
 import { bindWorldInput } from './input.js'
 import { createLandscape } from './landscape.js'
 import {
@@ -60,6 +61,7 @@ export function mountWorld(container, callbacks = {}) {
   const systemMotion = view.matchMedia('(prefers-reduced-motion: reduce)')
   const systemLight = view.matchMedia('(prefers-color-scheme: light)')
   const controller = new AbortController()
+  const battles = mountWorldBattles(root, controller.signal)
   const options = { clock: Date.now, random: Math.random, ...callbacks }
   const actors = new Map()
   const field = { width: 0, settings: { ...DEFAULT_SETTINGS }, weather: 'clear' }
@@ -303,7 +305,9 @@ export function mountWorld(container, callbacks = {}) {
         })
       )
     }
-    const heads = paintActors(actorList(), { ...field, now: timestamp, hovered })
+    const list = actorList()
+    const heads = paintActors(list, { ...field, now: timestamp, hovered })
+    battles.paint(list, timestamp, field.reduced, field.settings.battleSounds)
     if (force || frame - lastScenery >= 125) {
       landscape({ ...field, now: timestamp, heads })
       lastScenery = frame
@@ -481,6 +485,9 @@ export function mountWorld(container, callbacks = {}) {
       }
       if (patch.boosts) {
         boosts = patch.boosts
+      }
+      if ('battle' in patch) {
+        battles.update(patch.battle)
       }
       if ('visitor' in patch) {
         updateVisitor(patch.visitor)

@@ -109,8 +109,6 @@ export function paintActors(
         : entity.state === 'done' && actor.mood === 'sleep'
           ? 'Done · Sleeping'
           : STATES[actor.mood]
-      const shots = actor.react?.shot
-      const activeShot = shots && now >= shots.at && now < shots.until && !reduced
       const { careNote, hungry } = entity
       const careDuration = careNote?.kind === 'pickup' ? 8000 : 3200
       const care =
@@ -207,21 +205,11 @@ export function paintActors(
       }
       badge.dataset.attention = attention(actor.mood) ? 'true' : 'false'
       badge.hidden = !badgeText
-      if (actor.shot) {
-        actor.shot.hidden = !activeShot
-      }
-      if (activeShot) {
-        if (!actor.shot) {
-          actor.shot = button.ownerDocument.createElement('span')
-          actor.shot.className = 'pokemon-world__shot'
-          actor.shot.setAttribute('aria-hidden', 'true')
-          button.append(actor.shot)
-        }
-        const x =
-          shots.from + ((shots.to - shots.from) * (now - shots.at)) / (shots.until - shots.at)
-        actor.shot.textContent = shots.icon
-        actor.shot.style.left = `${Math.round(x)}px`
-        actor.shot.style.top = `${y - 28}px`
+      actor.battlePosition = {
+        x: actor.x,
+        y: y - h / 2,
+        top: y - h,
+        ground: y
       }
       heads[row].push({
         x0: actor.x - grab / 2,

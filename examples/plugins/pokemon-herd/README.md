@@ -31,3 +31,5 @@ The picker uses the active terminal’s companion when Herd can verify it. Other
 Adapted from [Pokerdr](https://github.com/lntvan166/herdr-pokemon/tree/11f949d). The tree and flowers come from its scenery. Its copyright notice is included in LICENSE-upstream.
 
 The Walk, Idle and Sleep sheets for Bulbasaur, Charmander, Squirtle and Pikachu come from [PMD SpriteCollab](https://github.com/PMDCollab/SpriteCollab/tree/ced880d7598b9d505a267dbed5d05482197b05ff/sprite). The four sprite credit records name CHUNSOFT. This port crops and repacks one direction of each animation. Pokerdr identifies the collection as [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Pokémon and its characters belong to their respective owners.
+
+The battle move choreography and type palettes in `panel/encounters/fx*.js` come from the same Pokerdr revision. Orca adapts its battle drawing to Canvas 2D and uses Pokerdr’s synthesized battle sounds.

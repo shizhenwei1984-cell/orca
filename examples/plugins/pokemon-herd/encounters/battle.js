@@ -187,7 +187,17 @@ function strike(a, b, move, answer, first, flinched, takeHit, weather, random) {
   const att = a.side
   const def = b.side
   const by = a.by
-  const event = { side: by, move: move.name, type: move.type, physical: move.physical, notes: [] }
+  const event = {
+    side: by,
+    move: move.name,
+    type: move.type,
+    physical: move.physical,
+    dash: move.dash,
+    ultimate: move.ultimate,
+    blue: a.key === '6mX',
+    boosted: move.boosted,
+    notes: []
+  }
   if (att.recharge) {
     att.recharge = false
     return { ...event, move: null, notes: ['It must recharge!'] }
@@ -218,7 +228,7 @@ function strike(a, b, move, answer, first, flinched, takeHit, weather, random) {
       }
       event.notes.push(stages.length ? stageWords(stages) : 'Nothing more')
     }
-    return event
+    return { ...event, status: true, miss: move.miss }
   }
   if (suckerFails(move, answer, !first)) {
     return { ...event, notes: ['But it failed!'] }

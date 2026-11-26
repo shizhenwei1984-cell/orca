@@ -249,6 +249,8 @@ export function raidHit(r, key, pane, type, now, rnd = Math.random, how = {}) {
     ? {
         name: how.move.name,
         physical: how.move.physical,
+        dash: how.move.dash,
+        blue: key === '6mX',
         crit: how.move.crit,
         ultimate: how.move.ultimate,
         miss: how.move.miss,

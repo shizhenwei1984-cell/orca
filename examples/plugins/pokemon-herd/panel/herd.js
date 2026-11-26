@@ -99,6 +99,7 @@ const encounters = mountEncounterGame(encounterContainer, {
     orca.plugin.request(name, input, { signal: scope ? AbortSignal.any([signal, scope]) : signal }),
   interactions: worldInteractions,
   world: worldContainer,
+  onBattle: (battle) => world.update({ battle }),
   ...encounterSprites(loadCatalogSprite),
   onRare: (pick, scope) => void cry('cryRare', pick.dex, scope),
   onSettings: (patch) => preferences.patch(patch),

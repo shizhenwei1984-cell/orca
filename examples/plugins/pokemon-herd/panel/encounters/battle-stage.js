@@ -1,4 +1,7 @@
-const soundURL = (name) => new URL(`./sounds/${name}.mp3`, import.meta.url).href
+import { battleSoundURL as soundURL, createBattleAudio } from './battle-audio.js'
+import { battleOutcome, mountBattleEffects } from './battle-effects.js'
+import { battleSounds, battleTimeline, EFFECT_TAIL, oppositeSide } from './battle-timeline.js'
+
 const trainerURL = (name, pose) => new URL(`./trainers/${name}${pose}.png`, import.meta.url).href
 const trainerClasses = new Set([
   'ace',
@@ -17,7 +20,8 @@ const trainerClasses = new Set([
 export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
   const document = root.ownerDocument
   const view = document.defaultView
-  const playing = new Set()
+  const lifetime = new AbortController()
+  const audio = createBattleAudio(root, lifetime.signal)
   const timers = new Set()
   const motion = view.matchMedia('(prefers-reduced-motion: reduce)')
   let key
@@ -25,6 +29,7 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
   let generation = 0
   let cryAt = -Infinity
   let soundMount
+  let request
 
   function element(tag, className, text) {
     const el = document.createElement(tag)
@@ -37,17 +42,10 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
     return el
   }
 
-  function play(src, volume = 0.38) {
-    if (!src || !enabled) {
-      return
+  function play(src, volume) {
+    if (enabled) {
+      audio.play(src, volume)
     }
-    const audio = new view.Audio(src)
-    audio.volume = volume
-    playing.add(audio)
-    const cleanup = () => playing.delete(audio)
-    audio.addEventListener('ended', cleanup, { once: true })
-    audio.addEventListener('error', cleanup, { once: true })
-    void audio.play().catch(cleanup)
   }
 
   function announceCry(pick, volume) {
@@ -107,6 +105,8 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
 
   function clear() {
     generation++
+    view.cancelAnimationFrame(request)
+    audio.stop()
     key = undefined
     for (const timer of timers) {
       view.clearTimeout(timer)
@@ -143,6 +143,8 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
     const message = element('p', 'encounter-stage-call')
     const fx = element('div', 'encounter-stage-effects')
     fx.setAttribute('aria-hidden', 'true')
+    const origin = view.performance.now()
+    const sceneTime = () => wallTime + view.performance.now() - origin
     const when = (stamp, fn) => {
       const wait = Math.max(0, stamp - wallTime)
       if (!wait) {
@@ -151,7 +153,7 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
       }
       const timer = view.setTimeout(() => {
         timers.delete(timer)
-        fn(true)
+        fn(stamp >= sceneTime() - 250)
       }, wait)
       timers.add(timer)
     }
@@ -260,63 +262,65 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
     }
 
     const sides = { own: yours, opponent: other }
-    const { hit } = result
-    const raidTurns = hit && [
-      { ...hit, side: 'own', move: hit.name, damage: hit.dmg, targetHp: result.hp },
-      ...(hit.back
-        ? [
-            {
-              ...hit.back,
-              side: 'opponent',
-              move: hit.back.name,
-              damage: hit.back.dmg,
-              targetHp: Math.max(0, (result.ownBefore ?? 1) - hit.back.dmg)
-            }
-          ]
-        : [])
-    ]
-    const turns = raidTurns ?? result.turns
-    const exchange = result.kind === 'exchange' || result.kind === 'wild-fainted'
-    const start = result.at + (exchange && result.entry?.length ? 900 : 0)
-    const spacing = exchange ? 1100 : 1050
-    for (const [i, turn] of turns.entries()) {
+    const beats = battleTimeline(result)
+    const effects = mountBattleEffects(fx, 'encounter-battle-canvas')
+    function draw() {
+      const now = sceneTime()
+      const reduced = reducedMotion?.() ?? motion.matches
+      const active = now < beats.at(-1).land + EFFECT_TAIL
+      if (document.hidden || !active || reduced) {
+        effects.clear()
+      }
+      const visible = active && !reduced && !document.hidden && effects.begin()
+      const positions = {}
+      for (const [side, { face, meter }] of Object.entries(sides)) {
+        face.style.translate = ''
+        face.style.opacity =
+          !reduced && meter.value <= 0 && now >= beats.at(-1).land + 690 ? '0' : ''
+        if (!visible) {
+          continue
+        }
+        positions[side] = {
+          x: face.offsetLeft + face.offsetWidth / 2,
+          y: face.offsetTop + face.offsetHeight / 2,
+          ground: face.offsetTop + face.offsetHeight,
+          top: face.offsetTop,
+          shift(dx, dy, opacity = 1) {
+            face.style.translate = `${dx}px ${dy}px`
+            face.style.opacity = opacity
+          }
+        }
+      }
+      if (active) {
+        if (visible) {
+          for (const beat of beats) {
+            const side = beat.turn.side
+            effects.draw(beat, now, positions[side], positions[oppositeSide(side)], { reduced })
+          }
+        }
+        request = view.requestAnimationFrame(draw)
+      }
+    }
+    draw()
+
+    for (const beat of beats) {
+      const { turn, at, land } = beat
       const attacker = sides[turn.side]
-      const target = turn.side === 'own' ? other : yours
-      const dir = turn.side === 'own' ? 1 : -1
-      const attackAt = start + i * spacing
-      when(attackAt, (fresh) => {
-        message.textContent = turn.move ?? turn.notes?.[0] ?? ''
-        if (!fresh || !turn.move) {
-          return
-        }
-        play(soundURL(turn.physical ? 'whoosh' : 'zap'), 0.25)
-        animate(
-          attacker.face,
-          [
-            { transform: 'none' },
-            {
-              transform: `translateX(${dir * (turn.physical ? 22 : 5)}px) scale(1.08)`,
-              offset: 0.64
-            },
-            { transform: 'none' }
-          ],
-          620
-        )
-        if (!turn.physical && turn.damage != null && !(reducedMotion?.() ?? motion.matches)) {
-          const shot = projectile(
-            fx,
-            turn.side,
-            '✦',
-            [{ left: `${50 - 25 * dir}%` }, { left: `${50 + 25 * dir}%` }],
-            470
-          )
-          shot.getAnimations()[0]?.finished.then(
-            () => shot.remove(),
-            () => shot.remove()
-          )
-        }
+      const target = sides[oppositeSide(turn.side)]
+      for (const [stamp, sound] of battleSounds(beat)) {
+        when(stamp, (fresh) => {
+          if (fresh) {
+            play(soundURL(sound), 0.3)
+          }
+        })
+      }
+      when(at, () => {
+        message.textContent = turn.move
+          ? `${turn.move}${turn.boosted ? ` ${turn.boosted}` : ''}`
+          : (turn.notes?.[0] ?? '')
+        message.toggleAttribute('data-signature', !!turn.ultimate)
       })
-      when(attackAt + 475, (fresh) => {
+      when(land, (fresh) => {
         const recoil = turn.ownHp != null && turn.ownHp < attacker.meter.value
         if (turn.targetHp != null) {
           target.meter.value = turn.targetHp
@@ -324,22 +328,15 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
         if (turn.ownHp != null) {
           attacker.meter.value = turn.ownHp
         }
-        if (!fresh || !turn.move) {
-          return
-        }
-        if (recoil) {
+        const outcome = battleOutcome(beat)
+        const damage =
+          beat.strike && !turn.miss && turn.damage > 0
+            ? `${Math.min(100, Math.max(1, Math.round(turn.damage * 100)))}% damage`
+            : null
+        message.textContent =
+          [turn.move, outcome?.[0] ?? damage].filter(Boolean).join(' · ') || message.textContent
+        if (fresh && recoil) {
           animate(attacker.face, [{ transform: 'scale(0.86)' }, { transform: 'none' }], 320)
-        }
-        if (turn.damage > 0 && !turn.miss) {
-          play(soundURL(turn.targetHp <= 0 ? 'faint' : turn.crit ? 'bighit' : 'hit'))
-          animate(
-            target.face,
-            [
-              { transform: `translateX(${dir * 14}px)`, opacity: 0.42 },
-              { transform: 'none', opacity: 1 }
-            ],
-            450
-          )
         }
       })
     }
@@ -372,22 +369,13 @@ export function mountBattleStage(root, { sprite, cry, reducedMotion }) {
         play(soundURL('whoosh'))
       }
       if (!value) {
-        for (const audio of playing) {
-          audio.pause()
-        }
-        playing.clear()
+        audio.stop()
       }
     },
     clear,
-    reset() {
-      for (const audio of playing) {
-        audio.pause()
-      }
-      playing.clear()
-      clear()
-    },
+    reset: clear,
     destroy() {
-      this.sound(false)
+      lifetime.abort()
       clear()
     }
   }

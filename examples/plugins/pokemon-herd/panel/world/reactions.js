@@ -1,3 +1,7 @@
+import { battleKey } from '../../encounters/battle.js'
+import { pickMove } from '../../encounters/rules/moves.js'
+import { battleBeat } from '../encounters/battle-timeline.js'
+
 const REACTIONS = {
   wake: ['Wake', 'Hop'],
   celebrate: ['Dance', 'Hop'],
@@ -171,6 +175,8 @@ export function reactIcon(m, now) {
 export function battle(a, b, A, B, now, rnd = Math.random) {
   const len = (S, anim, min) => (anim ? Math.max(min, S.msOf(anim)) : NO_ANIM_MS)
   const seq = { a: [], b: [] }
+  const beats = []
+  const side = (key) => (key === 'a' ? 'own' : 'opponent')
   const [ax, bx] = [a.x, b.x]
   let t = now
   const strike = (S, D, k, dk) => {
@@ -180,36 +186,62 @@ export function battle(a, b, A, B, now, rnd = Math.random) {
     const hurt = reactionAnim('startle', D.has)
     const hit = t + Math.round(d * 0.5)
     const hd = len(D, hurt, 400)
-    seq[dk].push({ at: hit, until: hit + hd, anim: hurt, icon: '💢' })
+    seq[dk].push({ at: hit, until: hit + hd, anim: hurt })
+    beats.push(
+      battleBeat(
+        { side: side(k), move: 'Strike', physical: true, dash: false, damage: 0 },
+        hit,
+        hit,
+        hit
+      )
+    )
     t = Math.max(t + d, hit + hd) + 150
   }
   strike(A, B, 'a', 'b')
   strike(B, A, 'b', 'a')
   const aWins = rnd() < 0.5
-  const [W, L, wk, lk, wx, lx] = aWins ? [A, B, 'a', 'b', ax, bx] : [B, A, 'b', 'a', bx, ax]
+  const [W, L, wk, lk, winner, loser] = aWins ? [A, B, 'a', 'b', a, b] : [B, A, 'b', 'a', b, a]
   const sp = reactionAnim('special', W.has)
   const sd = len(W, sp, 700)
   seq[wk].push({ at: t, until: t + sd, anim: sp })
-  const shot = {
-    at: t + Math.round(sd * 0.4),
-    until: t + Math.round(sd * 0.4) + 450,
-    from: wx,
-    to: lx,
-    icon: '✦'
-  }
+  const launch = t + Math.round(sd * 0.4)
+  const land = launch + 450
+  const ownKey = battleKey(winner.entity?.appearance ?? { dex: 1 })
+  const otherKey = battleKey(loser.entity?.appearance ?? { dex: 1 })
+  const move = pickMove(ownKey, otherKey, Math.random, { moves: winner.entity?.moves })
+  beats.push(
+    battleBeat(
+      {
+        ...move,
+        side: side(wk),
+        move: move.name,
+        blue: ownKey === '6mX',
+        dash: false,
+        damage: 0,
+        effectiveness: move.eff
+      },
+      t,
+      launch,
+      land
+    )
+  )
   const hurt = reactionAnim('startle', L.has)
   const hd = len(L, hurt, 600)
   seq[lk].push({
-    at: shot.until,
-    until: shot.until + hd,
-    anim: hurt,
-    icon: '💥'
+    at: land,
+    until: land + hd,
+    anim: move.miss ? null : hurt
   })
-  const end = Math.max(t + sd, shot.until + hd) + 300
+  const end = Math.max(t + sd, land + hd) + 300
   a.dir = bx > ax ? 'r' : 'l'
   b.dir = ax > bx ? 'r' : 'l'
-  a.react = { seq: seq.a, until: end, face: a.dir, ...(aWins ? { shot } : {}) }
-  b.react = { seq: seq.b, until: end, face: b.dir, ...(aWins ? {} : { shot }) }
+  a.react = {
+    seq: seq.a,
+    until: end,
+    face: a.dir,
+    spar: { own: a.entity.id, opponent: b.entity.id, beats }
+  }
+  b.react = { seq: seq.b, until: end, face: b.dir }
   a.lastSpar = b.lastSpar = now
   return end
 }
