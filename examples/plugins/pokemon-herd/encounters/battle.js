@@ -53,6 +53,7 @@ import {
 import { RIVAL_POTION, RIVAL_POTION_AT, TEAM_EFFORT } from './rules/trainers.js'
 import { boosts, WEATHER_HIT } from './rules/weather.js'
 import { GRUMPY_HIT } from './rules/wildacts.js'
+import { chosenMoves } from './move-loadouts.js'
 
 const STAGE_STATS = ['atk', 'def', 'spa', 'spd', 'spe']
 const STANCE_ABILITIES = ['protean', 'libero']
@@ -65,11 +66,6 @@ export function battleKey(pick, opponent = false) {
     (opponent ? pick.mega === 'on' : pick.mega !== 'off') &&
     megaForm(pick.dex, pick.megaKind)
   return fighterKey(pick.dex, { form: pick.form, mega: mega ? (mega.kind ?? '') : null })
-}
-
-export function chosenMoves(pick, key) {
-  const kind = /^\d+m([XY]?)$/.exec(String(key))?.[1]
-  return (kind === undefined ? pick.moves : pick.megaMoves?.[kind || 'M']) ?? null
 }
 
 export function boostMove(move, weather) {

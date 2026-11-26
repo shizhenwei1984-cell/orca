@@ -28,6 +28,8 @@ import { validateChoice } from './catalog/trainer-catalog.mjs'
 import { genderFrom } from './encounters/rules/gender.js'
 import { abilSlot } from './encounters/rules/abilities.js'
 import { KEPT_ITEMS } from './encounters/rules/form-items.js'
+import { moveForms, moveLoadout, withMoveLoadout } from './encounters/move-loadouts.js'
+import { learnableOf, MAX_MOVES } from './encounters/rules/moves.js'
 import {
   MINUTE,
   creditResearch,
@@ -42,16 +44,62 @@ import {
 
 export const pokemonId = (pokemon, slot) => pokemon.id ?? `legacy:${slot}`
 
+export function moveTargetOf(pokemon, slot, location, member) {
+  return {
+    slot,
+    id: pokemonId(pokemon, slot),
+    location,
+    version: JSON.stringify([
+      pokemon.dex,
+      pokemon.form ?? null,
+      pokemon.evolvedAt ?? null,
+      member?.sessionId ?? null,
+      member?.assignment ?? null,
+      pokemon.movesRevision ?? null
+    ])
+  }
+}
+
 export function boxedPokemon(save, closed) {
   return Object.fromEntries([
     ...[...closed].flatMap((slot) => {
-      const { pokemon, lastAt } = save.party[slot]
-      return pokemon && (pokemon.locked || raised(trainerPick(pokemon)))
-        ? [[slot, { ...pokemon, boxedAt: pokemon.boxedAt ?? lastAt }]]
-        : []
+      const member = save.party[slot]
+      const pokemon = closedPokemon(member)
+      return pokemon ? [[slot, { ...pokemon, boxedAt: pokemon.boxedAt ?? member.lastAt }]] : []
     }),
     ...Object.entries(save.box)
   ])
+}
+
+function closedPokemon(member) {
+  const pokemon = member?.pokemon
+  return pokemon && (pokemon.locked || raised(trainerPick(pokemon))) ? pokemon : null
+}
+
+function resolveMoveTarget(save, target, { slots, closed }) {
+  const slot = target?.slot
+  if (typeof slot !== 'string') {
+    throw new Error('That Pokémon is no longer available.')
+  }
+  const active = target.location === 'party'
+  const member = Object.hasOwn(save.party, slot) ? save.party[slot] : null
+  const pokemon = active
+    ? slots.includes(slot) && member?.pokemon
+    : target.location === 'box' &&
+      (Object.hasOwn(save.box, slot) ? save.box[slot] : closed.has(slot) && closedPokemon(member))
+  if (!pokemon) {
+    throw new Error('That Pokémon is no longer available.')
+  }
+  const current = moveTargetOf(pokemon, slot, target.location, member)
+  if (current.id !== target.id || current.version !== target.version) {
+    throw new Error('That Pokémon or its moves changed. Open its card again.')
+  }
+  return pokemon
+}
+
+export function readMoveEditor(save, target, context) {
+  const pokemon = resolveMoveTarget(save, target, context)
+  return moveForms(pokemon).map((form) => ({ ...form, ...moveLoadout(pokemon, form.key) }))
 }
 
 function putPokemon(save, slot, pokemon) {
@@ -85,7 +133,7 @@ export function itemOptions(pokemon, slot, bag, at, hpOf) {
   return Object.keys(bag.items).filter((id) => bag.items[id] > 0 && itemUse(pick, slot, id, how))
 }
 
-function applyToPokemon(save, { slot, pokemon }, item, { at, slots, battles }) {
+function applyToPokemon(save, { slot, pokemon }, item, { at, slots, battles, key }) {
   if (!(save.bag.items[item] > 0)) {
     throw new Error('That item is no longer in the Bag.')
   }
@@ -95,6 +143,9 @@ function applyToPokemon(save, { slot, pokemon }, item, { at, slots, battles }) {
     throw new Error('That item has no effect right now.')
   }
   const updated = savedPokemon(result.pick, pokemon)
+  if (updated.form !== pokemon.form) {
+    updated.movesRevision = key
+  }
   let bag = KEPT_ITEMS.has(item) ? save.bag : addItem(save.bag, item, -1)
   if (result.back) {
     bag = addItem(bag, result.back)
@@ -129,6 +180,7 @@ function replaceParty(save, slot, pokemon, incoming, at, key, { same, all } = {}
     : save.box
   const next = putPokemon(save, slot, incoming)
   delete next.party[slot].careNote
+  next.party[slot].assignment = key
   return { ...next, box }
 }
 
@@ -295,6 +347,26 @@ export function trainerAction(save, action, context) {
   }
   if (type === 'undo-release') {
     return undoRelease(save, at)
+  }
+  if (type === 'teach-moves') {
+    const { target, form, moves } = action
+    const pokemon = resolveMoveTarget(save, target, context)
+    if (!moveForms(pokemon).some(({ key }) => key === form)) {
+      throw new Error('That form is no longer available.')
+    }
+    if (moves !== null) {
+      const eligible = new Set(learnableOf(form).map(({ name }) => name))
+      if (
+        !Array.isArray(moves) ||
+        !moves.length ||
+        moves.length > MAX_MOVES ||
+        new Set(moves).size !== moves.length ||
+        moves.some((name) => !eligible.has(name))
+      ) {
+        throw new Error('Choose one to four distinct moves this Pokémon can learn.')
+      }
+    }
+    return putPokemon(save, target.slot, withMoveLoadout(pokemon, form, moves, context.key))
   }
 
   const boxed = boxedPokemon(save, closed)

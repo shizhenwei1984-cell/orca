@@ -8,6 +8,7 @@ import { mountTrainer } from './trainer.js'
 import { mountWorldCare, mountWorldCries } from './world-care.js'
 import { worldInteractions } from './world-interactions.js'
 import { mountHerdStrip } from './herd-strip.js'
+import { bindHerdSettings } from './herd-settings.js'
 import { bindWorldPreferences } from './world-preferences.js'
 import { mountWorld } from './world/world.js'
 import { seasonAt } from './world/scene.js'
@@ -35,13 +36,14 @@ const worldContainer = document.querySelector('#world')
 const showWorld = document.querySelector('#show-world')
 const showParty = document.querySelector('#show-party')
 const showSettings = document.querySelector('#show-settings')
-const settings = document.querySelector('#world-settings')
+const settings = document.querySelector('#herd-settings')
 const actions = document.querySelector('#world-actions')
 const showActions = document.querySelector('#show-world-actions')
 const careStatus = document.querySelector('#care-status')
 const focusStatus = document.querySelector('#focus-status')
 const lifetime = new AbortController()
 const { signal } = lifetime
+const openSettingsPage = bindHerdSettings(orca, signal)
 const cards = new Map()
 let workspace
 let roster = []
@@ -156,13 +158,7 @@ function selectView(party) {
 
 function toggleSettings(open) {
   actions.hidePopover()
-  settings.hidden = !open
-  showSettings.setAttribute('aria-expanded', String(open))
-  if (open) {
-    settings.querySelector('select:enabled, input:enabled, button:enabled').focus()
-  } else {
-    showSettings.focus()
-  }
+  void openSettingsPage(open)
 }
 
 function openActions({ agent, x, y, anchor }) {
@@ -278,6 +274,10 @@ function openActions({ agent, x, y, anchor }) {
           onMega() {
             actions.hidePopover()
             runCommand('open-picker', agent)
+          },
+          onTeach(card) {
+            actions.hidePopover()
+            void trainerGame.openCompanionMoves(card)
           }
         })
         position()

@@ -1,7 +1,7 @@
 import { disposeCompanionArt, paintCompanionArt } from './catalog/companion-art.mjs'
 import { HOLD_SHOWN } from '../encounters/rules/items.js'
 
-export function renderCompanionMenu(root, menu, { signal, labels, onAction, onMega }) {
+export function renderCompanionMenu(root, menu, { signal, labels, onAction, onMega, onTeach }) {
   const { card, source, mates, held, uses, holds } = menu
   const node = (tag, text = '') => {
     const element = document.createElement(tag)
@@ -51,6 +51,7 @@ export function renderCompanionMenu(root, menu, { signal, labels, onAction, onMe
   const heading = node('header')
   heading.append(art(card.appearance, 48), details)
   root.replaceChildren(heading)
+  root.append(button('Teach moves', () => onTeach(card)))
   if (card.hasMega) {
     root.append(button('Mega settings', onMega))
   }
