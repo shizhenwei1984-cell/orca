@@ -18,6 +18,9 @@ export function createActor(document, entity, now, x, row, visitor = false) {
   button.className = 'pokemon-world__actor'
   button.dataset.actor = entity.id
   button.dataset.kind = visitor ? 'visitor' : 'agent'
+  if (!visitor) {
+    button.setAttribute('aria-keyshortcuts', 'P S')
+  }
   const [tag, body, sprite, badge] = ['tag', 'body', 'sprite', 'badge'].map((name) => {
     const span = document.createElement('span')
     span.className = `pokemon-world__${name}`
@@ -48,6 +51,7 @@ export function createActor(document, entity, now, x, row, visitor = false) {
 export function assignEntity(actor, entity) {
   if (
     entity.sprites !== actor.entity?.sprites ||
+    entity.spriteSpecies !== actor.entity?.spriteSpecies ||
     entity.species !== actor.entity?.species ||
     !actor.assets
   ) {

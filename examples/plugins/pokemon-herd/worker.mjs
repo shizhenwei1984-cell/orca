@@ -3,6 +3,7 @@ import { trainerAction } from './trainer-actions.mjs'
 import { MINUTE, settleBadges } from './trainer-game.mjs'
 import { readTrainer, writeTrainer } from './trainer-save.mjs'
 import { gameView } from './trainer-view.mjs'
+import { registerTerminalFocus } from './terminal-focus.mjs'
 
 function terminalIds(input) {
   const ids = input?.terminalIds
@@ -154,6 +155,7 @@ export function activateTrainer(
   orca,
   { registerEncounterHandlers, encounterTrainerAction, settleEncounterWork } = {}
 ) {
+  registerTerminalFocus(orca)
   const store = createTrainerStore(orca)
   const list = getTerminalLists(orca)
 
