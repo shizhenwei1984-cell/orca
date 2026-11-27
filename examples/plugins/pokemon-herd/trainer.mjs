@@ -14,7 +14,14 @@ import {
   pickup,
   pickupDelay
 } from './encounters/rules/items.js'
-import { FRIEND, expShareTarget, gainJob, hash, withFriend } from './encounters/rules/picks.js'
+import {
+  FRIEND,
+  expShareTarget,
+  gainJob,
+  hash,
+  nameFor,
+  withFriend
+} from './encounters/rules/picks.js'
 import { pokemonId } from './trainer-actions.mjs'
 import { abilityOf } from './encounters/rules/abilities.js'
 import { loadDex } from './encounters/rules/trainer.js'
@@ -330,6 +337,7 @@ export function trainerView(save, terminalIds) {
       dex,
       appearance: appearanceOf(member.pokemon),
       ...(form || !Object.hasOwn(species, dex) ? { name: fullName(dex, form) } : {}),
+      ...(member.pokemon.nick ? { cardName: nameFor(member.pokemon) } : {}),
       jobs,
       stageJobs,
       friendship,

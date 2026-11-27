@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "pokemon-herd",
   "name": "Pokémon Herd",
-  "version": "0.2.1",
+  "version": "0.2.4",
   "description": "Raise a herd of Pokémon as your terminal agents work.",
   "engines": {
     "orca": ">=1.4.274"

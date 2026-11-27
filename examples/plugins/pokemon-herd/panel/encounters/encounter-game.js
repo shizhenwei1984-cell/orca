@@ -13,7 +13,19 @@ const mapVisitorId = (visitor, raid) => (activeRaid(raid) || visitor?.raid ? rai
 
 export function mountEncounterGame(
   root,
-  { request, sprite, cry, onVisitor, onBattle, onSettings, onRare, interactions, world, signal }
+  {
+    request,
+    sprite,
+    cry,
+    onVisitor,
+    onBattle,
+    onSettings,
+    onRare,
+    onReveal,
+    interactions,
+    world,
+    signal
+  }
 ) {
   const document = root.ownerDocument
   const view = document.defaultView
@@ -407,21 +419,20 @@ export function mountEncounterGame(
 
   const worldCallbacks = {
     onWild(visitor) {
-      if (
-        snapshot?.visitor &&
-        !activeRaid(snapshot.raid) &&
-        mapVisitorId(snapshot.visitor, snapshot.raid) === visitor.id
-      ) {
+      if (visitor.id !== mapVisitorId(snapshot?.visitor, snapshot?.raid)) {
+        return
+      }
+      onReveal?.()
+      if (snapshot.visitor && !activeRaid(snapshot.raid)) {
         return panel.activateVisitor()
       }
-      if (snapshot?.raid?.id === visitor.id) {
-        panel.focus()
-      }
+      panel.focus()
     },
     onDrop: drop,
     onSpar: spar,
     onMenu({ visitor }) {
       if (visitor && visitor.id === mapVisitorId(snapshot?.visitor, snapshot?.raid)) {
+        onReveal?.()
         panel.focus()
         return true
       }

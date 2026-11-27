@@ -23,6 +23,10 @@ import {
 import { parseWorkspaceKey } from '../../../../shared/workspace/identity/workspace-scope'
 import type { AgentStatusIpcPayload } from '../../../../shared/agent-status/contracts/agent-status-ipc-payload'
 import {
+  AGENT_MODEL_MAX_LENGTH,
+  normalizeOptionalField
+} from '../../../../shared/agent-status/contracts/agent-status-field-normalization'
+import {
   getConnectionExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host/execution-host'
@@ -48,6 +52,7 @@ export type PluginAgentStatusRow = Pick<
   | 'terminalHandle'
   | 'state'
   | 'agentType'
+  | 'model'
   | 'stateStartedAt'
   | 'providerSessionOnly'
   | 'providerSession'
@@ -206,6 +211,7 @@ export function projectPluginWorkspaceAgents(
   })
   return matched.map(({ row, terminal, folder, liveTerminalId, liveIdentity, sessionId }) => {
     const taskTitle = taskTitles.get(row.paneKey)
+    const model = normalizeOptionalField(row.model, AGENT_MODEL_MAX_LENGTH)
     const children = liveTerminalId
       ? row.subagents?.slice(0, 16).flatMap(({ id, state, startedAt }) =>
           state === 'unverifiable'
@@ -227,6 +233,7 @@ export function projectPluginWorkspaceAgents(
       terminalId: terminal?.id ?? null,
       title: terminal?.title ?? null,
       agent: row.agentType?.slice(0, 128) ?? null,
+      ...(model && !/^(default|unknown)$/i.test(model) ? { model } : {}),
       state: row.state,
       stateStartedAt: row.stateStartedAt,
       ...(folder && (folderAgents.get(folder)?.size ?? 0) > 1
