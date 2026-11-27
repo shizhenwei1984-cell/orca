@@ -1,6 +1,9 @@
 import type { RefinementCtx } from 'zod'
 import type { PluginCommandPanelTarget } from '../contributions/plugin-command-contribution'
-import { isPluginCommandAliasActionId } from '../contributions/plugin-command-actions'
+import {
+  isPluginCommandAliasActionId,
+  validateCommandReplacements
+} from '../contributions/plugin-command-actions'
 import { getKeybindingConflictIdentity } from '../../keybindings/matching-key'
 import {
   PLUGIN_EVENT_CAPABILITY,
@@ -277,39 +280,5 @@ export function validatePluginManifestContributions(
         message: `${subscription.on} requires the ${required} capability`
       })
     }
-  }
-}
-
-/** A replacement runs worker code in place of a built-in, so it cannot also be a built-in alias. */
-function validateCommandReplacements(
-  commands: readonly { replaces?: string; action?: string }[],
-  ctx: RefinementCtx
-): void {
-  const replaced = new Set<string>()
-  for (const [index, command] of commands.entries()) {
-    if (command.replaces === undefined) {
-      continue
-    }
-    const path = ['contributes', 'commands', index, 'replaces']
-    if (!isPluginCommandAliasActionId(command.replaces)) {
-      ctx.addIssue({
-        code: 'custom',
-        path,
-        message: `unknown built-in action: ${command.replaces}`
-      })
-    } else if (command.action !== undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path,
-        message: 'a replacing command runs the worker; drop action'
-      })
-    } else if (replaced.has(command.replaces)) {
-      ctx.addIssue({
-        code: 'custom',
-        path,
-        message: `another command already replaces ${command.replaces}`
-      })
-    }
-    replaced.add(command.replaces)
   }
 }

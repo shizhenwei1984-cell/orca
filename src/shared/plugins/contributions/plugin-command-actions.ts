@@ -1,3 +1,4 @@
+import type { RefinementCtx } from 'zod'
 import type { KeybindingActionId, PluginKeybindingActionId } from '../../keybindings/types'
 import { PLUGIN_SCHEMA_SINCE_V1 } from '../manifest/plugin-schema-field-docs'
 
@@ -52,4 +53,38 @@ export function pluginCommandKeybindingActionId(
   commandId: string
 ): PluginKeybindingActionId {
   return `plugin:${pluginKey}/${commandId}`
+}
+
+/** A replacement runs worker code in place of a built-in, so it cannot also be a built-in alias. */
+export function validateCommandReplacements(
+  commands: readonly { replaces?: string; action?: string }[],
+  ctx: RefinementCtx
+): void {
+  const replaced = new Set<string>()
+  for (const [index, command] of commands.entries()) {
+    if (command.replaces === undefined) {
+      continue
+    }
+    const path = ['contributes', 'commands', index, 'replaces']
+    if (!isPluginCommandAliasActionId(command.replaces)) {
+      ctx.addIssue({
+        code: 'custom',
+        path,
+        message: `unknown built-in action: ${command.replaces}`
+      })
+    } else if (command.action !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path,
+        message: 'a replacing command runs the worker; drop action'
+      })
+    } else if (replaced.has(command.replaces)) {
+      ctx.addIssue({
+        code: 'custom',
+        path,
+        message: `another command already replaces ${command.replaces}`
+      })
+    }
+    replaced.add(command.replaces)
+  }
 }
