@@ -5,9 +5,9 @@ import { app, powerMonitor } from 'electron'
 import { afterEach, expect, it, vi } from 'vitest'
 import { UpdaterSetup } from './updater-setup'
 
-const { runProcess, requestGitHubReleaseHead, nativeDownload, nativeInstall } = vi.hoisted(() => ({
+const { runProcess, requestReleaseHead, nativeDownload, nativeInstall } = vi.hoisted(() => ({
   runProcess: vi.fn(),
-  requestGitHubReleaseHead: vi.fn(),
+  requestReleaseHead: vi.fn(),
   nativeDownload: vi.fn(async () => []),
   nativeInstall: vi.fn()
 }))
@@ -29,7 +29,7 @@ vi.mock('@orca/process-host', async (importOriginal) => ({
 }))
 vi.mock('../releases/updater-release-readiness', async (importOriginal) => ({
   ...(await importOriginal<typeof ReleaseReadiness>()),
-  requestGitHubReleaseHead
+  requestReleaseHead
 }))
 vi.mock('../releases/updater-changelog', () => ({ fetchChangelog: async () => null }))
 vi.mock('../electron-updater-loader', () => {
@@ -54,7 +54,7 @@ afterEach(() => {
 })
 
 function latestTag(tag: string): void {
-  requestGitHubReleaseHead.mockResolvedValue({
+  requestReleaseHead.mockResolvedValue({
     statusCode: 302,
     redirectUrl: `https://github.com/stablyai/orca/releases/tag/${tag}`
   })
