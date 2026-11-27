@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Adapted for Orca from Pokémon Sidebar’s agent card and rail. See NOTICE.
 import { loadCatalogSprite, playCatalogSprite } from '../panel/catalog/sprite.mjs'
+import { species, starterDex } from '../panel/pokemon.mjs'
 import { elapsed, STATUS } from './navigation.mjs'
 import { button, element, menu, popup } from './row-controls.mjs'
 
@@ -68,8 +69,15 @@ export function terminal(row, { rail, current, signal, focus, actions, showWorks
   wrapper.dataset.current = String(current)
   const label = element('span', '', 'terminal-label')
   const copy = element('span', '', 'card-copy')
-  copy.append(element(agent ? 'strong' : 'span', name, 'ellipsis'))
+  let cardPokemon = pokemon
   if (agent) {
+    if (!cardPokemon) {
+      const dex = starterDex(agent)
+      cardPokemon = { name: species[dex].name, pick: { dex } }
+    }
+    const model = element('span', agent.model ?? 'Model unavailable', 'meta ellipsis')
+    model.title = model.textContent
+    copy.append(element('strong', cardPokemon.name, 'ellipsis'), model)
     wrapper.dataset.state = agent.state
     const status = element('span', '', 'state meta')
     status.append(element('span', '', 'dot'), element('span', state), element('time', age))
@@ -82,18 +90,20 @@ export function terminal(row, { rail, current, signal, focus, actions, showWorks
       const label = project && project !== name ? `${project} · ${name}` : name
       copy.append(element('span', label, 'meta ellipsis'))
     }
+  } else {
+    copy.append(element('span', name, 'ellipsis'))
   }
-  if (agent || pokemon) {
-    label.append(portrait(pokemon, agent?.agent || name, signal))
+  if (cardPokemon) {
+    label.append(portrait(cardPokemon, name, signal))
   }
   if (pokemon) {
     const { evolution } = pokemon
-    const family = [
-      pokemon.pick.shiny ? 'Shiny ' : '',
-      pokemon.name,
-      pokemon.held ? ` · ${pokemon.held}` : ''
-    ].join('')
-    copy.append(element('span', family, 'meta ellipsis'))
+    const family = agent
+      ? [pokemon.pick.shiny && 'Shiny', pokemon.held].filter(Boolean).join(' · ')
+      : `${pokemon.pick.shiny ? 'Shiny ' : ''}${pokemon.name}${pokemon.held ? ` · ${pokemon.held}` : ''}`
+    if (family) {
+      copy.append(element('span', family, 'meta ellipsis'))
+    }
     const growth = element('span', '', 'growth meta')
     const hearts = element('span', `♥ ${pokemon.hearts}`, 'heart')
     hearts.title = `Friendship ${pokemon.friendship}/100`

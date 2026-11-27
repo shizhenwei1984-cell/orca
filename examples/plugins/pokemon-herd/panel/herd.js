@@ -433,7 +433,6 @@ function paintCompanion(row, appearance, state, member, season) {
   row.dataset.state = state
   row.querySelector('.state').textContent = label
   paintCompanionArt(row.querySelector('.sprite'), appearance, pose, state === 'working', season)
-  row.querySelector('small').textContent = member?.name ?? current?.name ?? `#${dex}`
   row.querySelector('.progress').hidden = !member
   if (member) {
     const reward = member.lastReward ? ` · +₽${number.format(member.lastReward)} last job` : ''
@@ -463,8 +462,6 @@ function paintRoster() {
     }
     stale.delete(key)
     const label = agent.title || agent.agent || 'Agent'
-    const name = row.querySelector('strong')
-    name.textContent = name.title = label
     const task = workspace?.terminals.has(agent.terminalId) ? agent.task?.title?.trim() : ''
     const caption = row.querySelector('.task')
     caption.textContent = task || ''
@@ -473,6 +470,11 @@ function paintRoster() {
     const starter = starterDex(agent)
     row.querySelector('.care').onclick = () => trainerGame.openParty(agent.terminalId)
     const appearance = member?.appearance ?? { dex: starter }
+    const name = row.querySelector('.identity strong')
+    name.textContent = name.title =
+      member?.cardName ?? member?.name ?? species[appearance.dex]?.name ?? `#${appearance.dex}`
+    const model = row.querySelector('.identity small')
+    model.textContent = model.title = agent.model ?? 'Model unavailable'
     paintCompanion(row, appearance, agent.state, member, t < 0.5 ? a : b)
     if (workspace?.terminals.has(agent.terminalId)) {
       entities.push({

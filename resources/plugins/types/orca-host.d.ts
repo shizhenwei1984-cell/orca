@@ -130,10 +130,10 @@ declare module 'orca/host' {
       result: { output: JsonValue }
       surfaces: "panel" | "editor"
     }
-    /** The agents in the focused workspace, or in the one `workspaceId` names (rejected when no workspace has it): their terminal, title, agent kind, status, session and dispatched task. `agent.status.changed` reports each change after. Since host API 1.2; `workspaceId` since 1.10. */
+    /** The agents in the focused workspace, or in the one `workspaceId` names (rejected when no workspace has it): their terminal, title, agent kind, reported model when known, status, session and dispatched task. `agent.status.changed` reports each change after. Since host API 1.2; `workspaceId` since 1.10. */
     "agents.list": {
       params: { workspaceId?: string } | undefined
-      result: { agents: { terminalId: string | null; title: string | null; agent: string | null; state: "working" | "blocked" | "waiting" | "done"; stateStartedAt: number; sessionId?: string | null; task?: { title: string } | null }[] }
+      result: { agents: { terminalId: string | null; title: string | null; agent: string | null; model?: string; state: "working" | "blocked" | "waiting" | "done"; stateStartedAt: number; sessionId?: string | null; task?: { title: string } | null }[] }
       surfaces: "worker" | "panel" | "editor"
     }
     /** Delivers a workspace, agent or editor event to this panel as `orca.on(event)`; needs the event's read capability, when it has one. The frame APIs call it for you. Since host API 1.2. */

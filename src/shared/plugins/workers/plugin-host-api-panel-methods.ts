@@ -3,6 +3,7 @@ import { PLUGIN_EVENT_NAMES } from '../contributions/plugin-event-contribution'
 import { ALL_SURFACES, FRAMES_ONLY, spec } from './plugin-host-method-spec'
 import { pluginWorkspaceIdSchema } from './plugin-host-api-workspace-methods'
 import { AGENT_STATUS_STATES } from '../../agent-status/contracts/agent-status-types'
+import { AGENT_MODEL_MAX_LENGTH } from '../../agent-status/contracts/agent-status-field-normalization'
 import { hasUnsafeProviderSessionIdChars } from '../../agent-session/lifecycle/agent-session-resume'
 import {
   PLUGIN_PANEL_REQUEST_MAX_TIMEOUT_MS,
@@ -46,6 +47,8 @@ const agentsListResult = z.object({
         title: z.string().max(512).nullable(),
         /** Which agent runs there (`claude`, `codex`, ...), when Orca knows. */
         agent: z.string().max(128).nullable(),
+        /** The model reported for this agent, when Orca knows. */
+        model: z.string().min(1).max(AGENT_MODEL_MAX_LENGTH).optional(),
         state: z.enum(AGENT_STATUS_STATES),
         /** When it entered `state`, in ms since the epoch. */
         stateStartedAt: z.number().finite(),
@@ -105,7 +108,7 @@ export const PLUGIN_PANEL_BRIDGE_API = {
   }),
   'agents.list': spec({
     summary:
-      'The agents in the focused workspace, or in the one `workspaceId` names (rejected when no workspace has it): their terminal, title, agent kind, status, session and dispatched task. `agent.status.changed` reports each change after.',
+      'The agents in the focused workspace, or in the one `workspaceId` names (rejected when no workspace has it): their terminal, title, agent kind, reported model when known, status, session and dispatched task. `agent.status.changed` reports each change after.',
     since: 2,
     paramsSince: { workspaceId: 10 },
     scope: 'any-workspace',
